@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TelnetUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.telnet.support</a> &gt; <span class="el_source">TelnetUtils.java</span></div><h1>TelnetUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.telnet.support;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * TelnetUtils
+ */
+<span class="nc" id="L25">public class TelnetUtils {</span>
+
+    public static String toList(List&lt;List&lt;String&gt;&gt; table) {
+<span class="nc" id="L28">        int[] widths = new int[table.get(0).size()];</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            for (List&lt;String&gt; row : table) {</span>
+<span class="nc" id="L31">                widths[j] = Math.max(widths[j], row.get(j).length());</span>
+<span class="nc" id="L32">            }</span>
+        }
+<span class="nc" id="L34">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        for (List&lt;String&gt; row : table) {</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">            if (buf.length() &gt; 0) {</span>
+<span class="nc" id="L37">                buf.append(&quot;\r\n&quot;);</span>
+            }
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">                if (j &gt; 0) {</span>
+<span class="nc" id="L41">                    buf.append(&quot; - &quot;);</span>
+                }
+<span class="nc" id="L43">                String value = row.get(j);</span>
+<span class="nc" id="L44">                buf.append(value);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                if (j &lt; widths.length - 1) {</span>
+<span class="nc" id="L46">                    int pad = widths[j] - value.length();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                    if (pad &gt; 0) {</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                        for (int k = 0; k &lt; pad; k++) {</span>
+<span class="nc" id="L49">                            buf.append(&quot; &quot;);</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        return buf.toString();</span>
+    }
+
+    public static String toTable(String[] header, List&lt;List&lt;String&gt;&gt; table) {
+<span class="nc" id="L59">        return toTable(Arrays.asList(header), table);</span>
+    }
+
+    public static String toTable(List&lt;String&gt; header, List&lt;List&lt;String&gt;&gt; table) {
+<span class="nc" id="L63">        int totalWidth = 0;</span>
+<span class="nc" id="L64">        int[] widths = new int[header.size()];</span>
+<span class="nc" id="L65">        int maxwidth = 70;</span>
+<span class="nc" id="L66">        int maxcountbefore = 0;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc" id="L68">            widths[j] = Math.max(widths[j], header.get(j).length());</span>
+        }
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (List&lt;String&gt; row : table) {</span>
+<span class="nc" id="L71">            int countbefore = 0;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc" id="L73">                widths[j] = Math.max(widths[j], row.get(j).length());</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                totalWidth = (totalWidth + widths[j]) &gt; maxwidth ? maxwidth : (totalWidth + widths[j]);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                if (j &lt; widths.length - 1) {</span>
+<span class="nc" id="L76">                    countbefore = countbefore + widths[j];</span>
+                }
+            }
+<span class="nc" id="L79">            maxcountbefore = Math.max(countbefore, maxcountbefore);</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">        widths[widths.length - 1] = Math.min(widths[widths.length - 1], maxwidth - maxcountbefore);</span>
+<span class="nc" id="L82">        StringBuilder buf = new StringBuilder();</span>
+        //line
+<span class="nc" id="L84">        buf.append(&quot;+&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            for (int k = 0; k &lt; widths[j] + 2; k++) {</span>
+<span class="nc" id="L87">                buf.append(&quot;-&quot;);</span>
+            }
+<span class="nc" id="L89">            buf.append(&quot;+&quot;);</span>
+        }
+<span class="nc" id="L91">        buf.append(&quot;\r\n&quot;);</span>
+        //header
+<span class="nc" id="L93">        buf.append(&quot;|&quot;);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc" id="L95">            String cell = header.get(j);</span>
+<span class="nc" id="L96">            buf.append(&quot; &quot;);</span>
+<span class="nc" id="L97">            buf.append(cell);</span>
+<span class="nc" id="L98">            int pad = widths[j] - cell.length();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (pad &gt; 0) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                for (int k = 0; k &lt; pad; k++) {</span>
+<span class="nc" id="L101">                    buf.append(&quot; &quot;);</span>
+                }
+            }
+<span class="nc" id="L104">            buf.append(&quot; |&quot;);</span>
+        }
+<span class="nc" id="L106">        buf.append(&quot;\r\n&quot;);</span>
+        //line
+<span class="nc" id="L108">        buf.append(&quot;+&quot;);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            for (int k = 0; k &lt; widths[j] + 2; k++) {</span>
+<span class="nc" id="L111">                buf.append(&quot;-&quot;);</span>
+            }
+<span class="nc" id="L113">            buf.append(&quot;+&quot;);</span>
+        }
+<span class="nc" id="L115">        buf.append(&quot;\r\n&quot;);</span>
+        //content
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (List&lt;String&gt; row : table) {</span>
+<span class="nc" id="L118">            StringBuffer rowbuf = new StringBuffer();</span>
+<span class="nc" id="L119">            rowbuf.append(&quot;|&quot;);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc" id="L121">                String cell = row.get(j);</span>
+<span class="nc" id="L122">                rowbuf.append(&quot; &quot;);</span>
+<span class="nc" id="L123">                int remaing = cell.length();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                while (remaing &gt; 0) {</span>
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (rowbuf.length() &gt;= totalWidth) {</span>
+<span class="nc" id="L127">                        buf.append(rowbuf.toString());</span>
+<span class="nc" id="L128">                        rowbuf = new StringBuffer();</span>
+//                        for(int m = 0;m &lt; maxcountbefore &amp;&amp; maxcountbefore &lt; totalWidth ; m++){
+//                            rowbuf.append(&quot; &quot;);
+//                        }
+                    }
+
+<span class="nc" id="L134">                    rowbuf.append(cell.substring(cell.length() - remaing, cell.length() - remaing + 1));</span>
+<span class="nc" id="L135">                    remaing--;</span>
+                }
+<span class="nc" id="L137">                int pad = widths[j] - cell.length();</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (pad &gt; 0) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                    for (int k = 0; k &lt; pad; k++) {</span>
+<span class="nc" id="L140">                        rowbuf.append(&quot; &quot;);</span>
+                    }
+                }
+<span class="nc" id="L143">                rowbuf.append(&quot; |&quot;);</span>
+            }
+<span class="nc" id="L145">            buf.append(rowbuf).append(&quot;\r\n&quot;);</span>
+<span class="nc" id="L146">        }</span>
+        //line
+<span class="nc" id="L148">        buf.append(&quot;+&quot;);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        for (int j = 0; j &lt; widths.length; j++) {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            for (int k = 0; k &lt; widths[j] + 2; k++) {</span>
+<span class="nc" id="L151">                buf.append(&quot;-&quot;);</span>
+            }
+<span class="nc" id="L153">            buf.append(&quot;+&quot;);</span>
+        }
+<span class="nc" id="L155">        buf.append(&quot;\r\n&quot;);</span>
+<span class="nc" id="L156">        return buf.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

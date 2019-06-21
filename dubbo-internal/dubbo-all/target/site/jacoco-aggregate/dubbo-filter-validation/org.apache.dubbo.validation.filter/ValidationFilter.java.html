@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ValidationFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-filter-validation</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.validation.filter</a> &gt; <span class="el_source">ValidationFilter.java</span></div><h1>ValidationFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.validation.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.validation.Validation;
+import org.apache.dubbo.validation.Validator;
+
+/**
+ * ValidationFilter invoke the validation by finding the right {@link Validator} instance based on the
+ * configured &lt;b&gt;validation&lt;/b&gt; attribute value of invoker url before the actual method invocation.
+ *
+ * &lt;pre&gt;
+ *     e.g. &amp;lt;dubbo:method name=&quot;save&quot; validation=&quot;jvalidation&quot; /&amp;gt;
+ *     In the above configuration a validation has been configured of type jvalidation. On invocation of method &lt;b&gt;save&lt;/b&gt;
+ *     dubbo will invoke {@link org.apache.dubbo.validation.support.jvalidation.JValidator}
+ * &lt;/pre&gt;
+ *
+ * To add a new type of validation
+ * &lt;pre&gt;
+ *     e.g. &amp;lt;dubbo:method name=&quot;save&quot; validation=&quot;special&quot; /&amp;gt;
+ *     where &quot;special&quot; is representing a validator for special character.
+ * &lt;/pre&gt;
+ *
+ * developer needs to do
+ * &lt;br/&gt;
+ * 1)Implement a SpecialValidation.java class (package name xxx.yyy.zzz) either by implementing {@link Validation} or extending {@link org.apache.dubbo.validation.support.AbstractValidation} &lt;br/&gt;
+ * 2)Implement a SpecialValidator.java class (package name xxx.yyy.zzz) &lt;br/&gt;
+ * 3)Add an entry &lt;b&gt;special&lt;/b&gt;=&lt;b&gt;xxx.yyy.zzz.SpecialValidation&lt;/b&gt; under &lt;b&gt;META-INF folders org.apache.dubbo.validation.Validation file&lt;/b&gt;.
+ *
+ * @see Validation
+ * @see Validator
+ * @see Filter
+ * @see org.apache.dubbo.validation.support.AbstractValidation
+ */
+@Activate(group = {Constants.CONSUMER, Constants.PROVIDER}, value = Constants.VALIDATION_KEY, order = 10000)
+<span class="nc" id="L59">public class ValidationFilter implements Filter {</span>
+
+    private Validation validation;
+
+    /**
+     * Sets the validation instance for ValidationFilter
+     * @param validation Validation instance injected by dubbo framework based on &quot;validation&quot; attribute value.
+     */
+    public void setValidation(Validation validation) {
+<span class="nc" id="L68">        this.validation = validation;</span>
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Perform the validation of before invoking the actual method based on &lt;b&gt;validation&lt;/b&gt; attribute value.
+     * @param invoker    service
+     * @param invocation invocation.
+     * @return Method invocation result
+     * @throws RpcException Throws RpcException if  validation failed or any other runtime exception occurred.
+     */
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+<span class="nc bnc" id="L80" title="All 4 branches missed.">        if (validation != null &amp;&amp; !invocation.getMethodName().startsWith(&quot;$&quot;)</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                &amp;&amp; ConfigUtils.isNotEmpty(invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.VALIDATION_KEY))) {</span>
+            try {
+<span class="nc" id="L83">                Validator validator = validation.getValidator(invoker.getUrl());</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                if (validator != null) {</span>
+<span class="nc" id="L85">                    validator.validate(invocation.getMethodName(), invocation.getParameterTypes(), invocation.getArguments());</span>
+                }
+<span class="nc" id="L87">            } catch (RpcException e) {</span>
+<span class="nc" id="L88">                throw e;</span>
+<span class="nc" id="L89">            } catch (Throwable t) {</span>
+<span class="nc" id="L90">                return new RpcResult(t);</span>
+<span class="nc" id="L91">            }</span>
+        }
+<span class="nc" id="L93">        return invoker.invoke(invocation);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

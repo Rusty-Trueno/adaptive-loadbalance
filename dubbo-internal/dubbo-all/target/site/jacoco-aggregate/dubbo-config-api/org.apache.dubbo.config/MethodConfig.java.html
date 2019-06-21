@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MethodConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">MethodConfig.java</span></div><h1>MethodConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.annotation.Method;
+import org.apache.dubbo.config.support.Parameter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * The method configuration
+ *
+ * @export
+ */
+public class MethodConfig extends AbstractMethodConfig {
+
+    private static final long serialVersionUID = 884908855422675941L;
+
+    /**
+     * The method name
+     */
+    private String name;
+
+    /**
+     * Stat
+     */
+    private Integer stat;
+
+    /**
+     * Whether to retry
+     */
+    private Boolean retry;
+
+    /**
+     * If it's reliable
+     */
+    private Boolean reliable;
+
+    /**
+     * Thread limits for method invocations
+     */
+    private Integer executes;
+
+    /**
+     * If it's deprecated
+     */
+    private Boolean deprecated;
+
+    /**
+     * Whether to enable sticky
+     */
+    private Boolean sticky;
+
+    /**
+     * Whether need to return
+     */
+    private Boolean isReturn;
+
+    /**
+     * Callback instance when async-call is invoked
+     */
+    private Object oninvoke;
+
+    /**
+     * Callback method when async-call is invoked
+     */
+    private String oninvokeMethod;
+
+    /**
+     * Callback instance when async-call is returned
+     */
+    private Object onreturn;
+
+    /**
+     * Callback method when async-call is returned
+     */
+    private String onreturnMethod;
+
+    /**
+     * Callback instance when async-call has exception thrown
+     */
+    private Object onthrow;
+
+    /**
+     * Callback method when async-call has exception thrown
+     */
+    private String onthrowMethod;
+
+    /**
+     * The method arguments
+     */
+    private List&lt;ArgumentConfig&gt; arguments;
+
+    /**
+     * These properties come from MethodConfig's parent Config module, they will neither be collected directly from xml or API nor be delivered to url
+     */
+    private String service;
+    private String serviceId;
+
+    @Parameter(excluded = true)
+    public String getName() {
+<span class="nc" id="L120">        return name;</span>
+    }
+
+<span class="nc" id="L123">    public MethodConfig() {</span>
+<span class="nc" id="L124">    }</span>
+
+<span class="nc" id="L126">    public MethodConfig(Method method) {</span>
+<span class="nc" id="L127">        appendAnnotation(Method.class, method);</span>
+
+<span class="nc" id="L129">        this.setReturn(method.isReturn());</span>
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if(!&quot;&quot;.equals(method.oninvoke())){</span>
+<span class="nc" id="L132">            this.setOninvoke(method.oninvoke());</span>
+        }
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if(!&quot;&quot;.equals(method.onreturn())){</span>
+<span class="nc" id="L135">            this.setOnreturn(method.onreturn());</span>
+        }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if(!&quot;&quot;.equals(method.onthrow())){</span>
+<span class="nc" id="L138">            this.setOnthrow(method.onthrow());</span>
+        }
+
+<span class="nc bnc" id="L141" title="All 4 branches missed.">        if (method.arguments() != null &amp;&amp; method.arguments().length != 0) {</span>
+<span class="nc" id="L142">            List&lt;ArgumentConfig&gt; argumentConfigs = new ArrayList&lt;ArgumentConfig&gt;(method.arguments().length);</span>
+<span class="nc" id="L143">            this.setArguments(argumentConfigs);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            for (int i = 0; i &lt; method.arguments().length; i++) {</span>
+<span class="nc" id="L145">                ArgumentConfig argumentConfig = new ArgumentConfig(method.arguments()[i]);</span>
+<span class="nc" id="L146">                argumentConfigs.add(argumentConfig);</span>
+            }
+        }
+<span class="nc" id="L149">    }</span>
+
+    public static List&lt;MethodConfig&gt; constructMethodConfig(Method[] methods) {
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if (methods != null &amp;&amp; methods.length != 0) {</span>
+<span class="nc" id="L153">            List&lt;MethodConfig&gt; methodConfigs = new ArrayList&lt;MethodConfig&gt;(methods.length);</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            for (int i = 0; i &lt; methods.length; i++) {</span>
+<span class="nc" id="L155">                MethodConfig methodConfig = new MethodConfig(methods[i]);</span>
+<span class="nc" id="L156">                methodConfigs.add(methodConfig);</span>
+            }
+<span class="nc" id="L158">            return methodConfigs;</span>
+        }
+<span class="nc" id="L160">        return Collections.emptyList();</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L164">        checkMethodName(&quot;name&quot;, name);</span>
+<span class="nc" id="L165">        this.name = name;</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (StringUtils.isEmpty(id)) {</span>
+<span class="nc" id="L167">            id = name;</span>
+        }
+<span class="nc" id="L169">    }</span>
+
+    public Integer getStat() {
+<span class="nc" id="L172">        return stat;</span>
+    }
+
+    @Deprecated
+    public void setStat(Integer stat) {
+<span class="nc" id="L177">        this.stat = stat;</span>
+<span class="nc" id="L178">    }</span>
+
+    @Deprecated
+    public Boolean isRetry() {
+<span class="nc" id="L182">        return retry;</span>
+    }
+
+    @Deprecated
+    public void setRetry(Boolean retry) {
+<span class="nc" id="L187">        this.retry = retry;</span>
+<span class="nc" id="L188">    }</span>
+
+    @Deprecated
+    public Boolean isReliable() {
+<span class="nc" id="L192">        return reliable;</span>
+    }
+
+    @Deprecated
+    public void setReliable(Boolean reliable) {
+<span class="nc" id="L197">        this.reliable = reliable;</span>
+<span class="nc" id="L198">    }</span>
+
+    public Integer getExecutes() {
+<span class="nc" id="L201">        return executes;</span>
+    }
+
+    public void setExecutes(Integer executes) {
+<span class="nc" id="L205">        this.executes = executes;</span>
+<span class="nc" id="L206">    }</span>
+
+    public Boolean getDeprecated() {
+<span class="nc" id="L209">        return deprecated;</span>
+    }
+
+    public void setDeprecated(Boolean deprecated) {
+<span class="nc" id="L213">        this.deprecated = deprecated;</span>
+<span class="nc" id="L214">    }</span>
+
+    public List&lt;ArgumentConfig&gt; getArguments() {
+<span class="nc" id="L217">        return arguments;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public void setArguments(List&lt;? extends ArgumentConfig&gt; arguments) {
+<span class="nc" id="L222">        this.arguments = (List&lt;ArgumentConfig&gt;) arguments;</span>
+<span class="nc" id="L223">    }</span>
+
+    public Boolean getSticky() {
+<span class="nc" id="L226">        return sticky;</span>
+    }
+
+    public void setSticky(Boolean sticky) {
+<span class="nc" id="L230">        this.sticky = sticky;</span>
+<span class="nc" id="L231">    }</span>
+
+    @Parameter(key = Constants.ON_RETURN_INSTANCE_KEY, excluded = true, attribute = true)
+    public Object getOnreturn() {
+<span class="nc" id="L235">        return onreturn;</span>
+    }
+
+    public void setOnreturn(Object onreturn) {
+<span class="nc" id="L239">        this.onreturn = onreturn;</span>
+<span class="nc" id="L240">    }</span>
+
+    @Parameter(key = Constants.ON_RETURN_METHOD_KEY, excluded = true, attribute = true)
+    public String getOnreturnMethod() {
+<span class="nc" id="L244">        return onreturnMethod;</span>
+    }
+
+    public void setOnreturnMethod(String onreturnMethod) {
+<span class="nc" id="L248">        this.onreturnMethod = onreturnMethod;</span>
+<span class="nc" id="L249">    }</span>
+
+    @Parameter(key = Constants.ON_THROW_INSTANCE_KEY, excluded = true, attribute = true)
+    public Object getOnthrow() {
+<span class="nc" id="L253">        return onthrow;</span>
+    }
+
+    public void setOnthrow(Object onthrow) {
+<span class="nc" id="L257">        this.onthrow = onthrow;</span>
+<span class="nc" id="L258">    }</span>
+
+    @Parameter(key = Constants.ON_THROW_METHOD_KEY, excluded = true, attribute = true)
+    public String getOnthrowMethod() {
+<span class="nc" id="L262">        return onthrowMethod;</span>
+    }
+
+    public void setOnthrowMethod(String onthrowMethod) {
+<span class="nc" id="L266">        this.onthrowMethod = onthrowMethod;</span>
+<span class="nc" id="L267">    }</span>
+
+    @Parameter(key = Constants.ON_INVOKE_INSTANCE_KEY, excluded = true, attribute = true)
+    public Object getOninvoke() {
+<span class="nc" id="L271">        return oninvoke;</span>
+    }
+
+    public void setOninvoke(Object oninvoke) {
+<span class="nc" id="L275">        this.oninvoke = oninvoke;</span>
+<span class="nc" id="L276">    }</span>
+
+    @Parameter(key = Constants.ON_INVOKE_METHOD_KEY, excluded = true, attribute = true)
+    public String getOninvokeMethod() {
+<span class="nc" id="L280">        return oninvokeMethod;</span>
+    }
+
+    public void setOninvokeMethod(String oninvokeMethod) {
+<span class="nc" id="L284">        this.oninvokeMethod = oninvokeMethod;</span>
+<span class="nc" id="L285">    }</span>
+
+    public Boolean isReturn() {
+<span class="nc" id="L288">        return isReturn;</span>
+    }
+
+    public void setReturn(Boolean isReturn) {
+<span class="nc" id="L292">        this.isReturn = isReturn;</span>
+<span class="nc" id="L293">    }</span>
+
+    @Parameter(excluded = true)
+    public String getService() {
+<span class="nc" id="L297">        return service;</span>
+    }
+
+    public void setService(String service) {
+<span class="nc" id="L301">        this.service = service;</span>
+<span class="nc" id="L302">    }</span>
+
+    @Parameter(excluded = true)
+    public String getServiceId() {
+<span class="nc" id="L306">        return serviceId;</span>
+    }
+
+    public void setServiceId(String serviceId) {
+<span class="nc" id="L310">        this.serviceId = serviceId;</span>
+<span class="nc" id="L311">    }</span>
+
+    /**
+     * service and name must not be null.
+     *
+     * @return
+     */
+    @Override
+    @Parameter(excluded = true)
+    public String getPrefix() {
+<span class="nc" id="L321">        return Constants.DUBBO + &quot;.&quot; + service</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                + (StringUtils.isEmpty(serviceId) ? &quot;&quot; : (&quot;.&quot; + serviceId))</span>
+<span class="nc" id="L323">                + &quot;.&quot; + getName();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

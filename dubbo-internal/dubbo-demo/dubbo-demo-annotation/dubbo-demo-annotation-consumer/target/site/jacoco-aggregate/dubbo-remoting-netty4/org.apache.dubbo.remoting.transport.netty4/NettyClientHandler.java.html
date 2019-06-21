@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyClientHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4</a> &gt; <span class="el_source">NettyClientHandler.java</span></div><h1>NettyClientHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.timeout.IdleStateEvent;
+
+/**
+ * NettyClientHandler
+ */
+@io.netty.channel.ChannelHandler.Sharable
+public class NettyClientHandler extends ChannelDuplexHandler {
+<span class="nc" id="L38">    private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);</span>
+
+    private final URL url;
+
+    private final ChannelHandler handler;
+
+<span class="nc" id="L44">    public NettyClientHandler(URL url, ChannelHandler handler) {</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (handler == null) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;handler == null&quot;);</span>
+        }
+<span class="nc" id="L51">        this.url = url;</span>
+<span class="nc" id="L52">        this.handler = handler;</span>
+<span class="nc" id="L53">    }</span>
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+<span class="nc" id="L57">        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+        try {
+<span class="nc" id="L59">            handler.connected(channel);</span>
+        } finally {
+<span class="nc" id="L61">            NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+        }
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+<span class="nc" id="L67">        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+        try {
+<span class="nc" id="L69">            handler.disconnected(channel);</span>
+        } finally {
+<span class="nc" id="L71">            NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+        }
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+<span class="nc" id="L77">        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+        try {
+<span class="nc" id="L79">            handler.received(channel, msg);</span>
+        } finally {
+<span class="nc" id="L81">            NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+        }
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+<span class="nc" id="L87">        super.write(ctx, msg, promise);</span>
+<span class="nc" id="L88">        final NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+<span class="nc" id="L89">        final boolean isRequest = msg instanceof Request;</span>
+
+        // We add listeners to make sure our out bound event is correct.
+        // If our out bound event has an error (in most cases the encoder fails),
+        // we need to have the request return directly instead of blocking the invoke process.
+<span class="nc" id="L94">        promise.addListener(future -&gt; {</span>
+            try {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                if (future.isSuccess()) {</span>
+                    // if our future is success, mark the future to sent.
+<span class="nc" id="L98">                    handler.sent(channel, msg);</span>
+<span class="nc" id="L99">                    return;</span>
+                }
+
+<span class="nc" id="L102">                Throwable t = future.cause();</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">                if (t != null &amp;&amp; isRequest) {</span>
+<span class="nc" id="L104">                    Request request = (Request) msg;</span>
+<span class="nc" id="L105">                    Response response = buildErrorResponse(request, t);</span>
+<span class="nc" id="L106">                    handler.received(channel, response);</span>
+                }
+            } finally {
+<span class="nc" id="L109">                NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+            }
+<span class="nc" id="L111">        });</span>
+<span class="nc" id="L112">    }</span>
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (evt instanceof IdleStateEvent) {</span>
+            try {
+<span class="nc" id="L118">                NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L120">                    logger.debug(&quot;IdleStateEvent triggered, send heartbeat to channel &quot; + channel);</span>
+                }
+<span class="nc" id="L122">                Request req = new Request();</span>
+<span class="nc" id="L123">                req.setVersion(Version.getProtocolVersion());</span>
+<span class="nc" id="L124">                req.setTwoWay(true);</span>
+<span class="nc" id="L125">                req.setEvent(Request.HEARTBEAT_EVENT);</span>
+<span class="nc" id="L126">                channel.send(req);</span>
+            } finally {
+<span class="nc" id="L128">                NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+<span class="nc" id="L129">            }</span>
+       } else {
+<span class="nc" id="L131">            super.userEventTriggered(ctx, evt);</span>
+        }
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
+            throws Exception {
+<span class="nc" id="L138">        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+        try {
+<span class="nc" id="L140">            handler.caught(channel, cause);</span>
+        } finally {
+<span class="nc" id="L142">            NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+        }
+<span class="nc" id="L144">    }</span>
+
+    /**
+     * build a bad request's response
+     *
+     * @param request the request
+     * @param t       the throwable. In most cases, serialization fails.
+     * @return the response
+     */
+    private static Response buildErrorResponse(Request request, Throwable t) {
+<span class="nc" id="L154">        Response response = new Response(request.getId(), request.getVersion());</span>
+<span class="nc" id="L155">        response.setStatus(Response.BAD_REQUEST);</span>
+<span class="nc" id="L156">        response.setErrorMessage(StringUtils.toString(t));</span>
+<span class="nc" id="L157">        return response;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

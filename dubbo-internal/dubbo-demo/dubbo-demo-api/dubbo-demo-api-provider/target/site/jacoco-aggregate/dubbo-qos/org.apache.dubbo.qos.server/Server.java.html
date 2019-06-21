@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Server.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.server</a> &gt; <span class="el_source">Server.java</span></div><h1>Server.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.server;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.qos.server.handler.QosProcessHandler;
+
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * A server serves for both telnet access and http access
+ * &lt;ul&gt;
+ * &lt;li&gt;static initialize server&lt;/li&gt;
+ * &lt;li&gt;start server and bind port&lt;/li&gt;
+ * &lt;li&gt;close server&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class Server {
+
+<span class="nc" id="L44">    private static final Logger logger = LoggerFactory.getLogger(Server.class);</span>
+<span class="nc" id="L45">    private static final Server INSTANCE = new Server();</span>
+
+    public static final Server getInstance() {
+<span class="nc" id="L48">        return INSTANCE;</span>
+    }
+
+    private int port;
+
+<span class="nc" id="L53">    private boolean acceptForeignIp = true;</span>
+
+    private EventLoopGroup boss;
+
+    private EventLoopGroup worker;
+
+<span class="nc" id="L59">    private Server() {</span>
+<span class="nc" id="L60">        this.welcome = DubboLogo.dubbo;</span>
+<span class="nc" id="L61">    }</span>
+
+    private String welcome;
+
+<span class="nc" id="L65">    private AtomicBoolean started = new AtomicBoolean();</span>
+
+    /**
+     * welcome message
+     */
+    public void setWelcome(String welcome) {
+<span class="nc" id="L71">        this.welcome = welcome;</span>
+<span class="nc" id="L72">    }</span>
+
+    public int getPort() {
+<span class="nc" id="L75">        return port;</span>
+    }
+
+    /**
+     * start server, bind port
+     */
+    public void start() throws Throwable {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (!started.compareAndSet(false, true)) {</span>
+<span class="nc" id="L83">            return;</span>
+        }
+<span class="nc" id="L85">        boss = new NioEventLoopGroup(1, new DefaultThreadFactory(&quot;qos-boss&quot;, true));</span>
+<span class="nc" id="L86">        worker = new NioEventLoopGroup(0, new DefaultThreadFactory(&quot;qos-worker&quot;, true));</span>
+<span class="nc" id="L87">        ServerBootstrap serverBootstrap = new ServerBootstrap();</span>
+<span class="nc" id="L88">        serverBootstrap.group(boss, worker);</span>
+<span class="nc" id="L89">        serverBootstrap.channel(NioServerSocketChannel.class);</span>
+<span class="nc" id="L90">        serverBootstrap.childOption(ChannelOption.TCP_NODELAY, true);</span>
+<span class="nc" id="L91">        serverBootstrap.childOption(ChannelOption.SO_REUSEADDR, true);</span>
+<span class="nc" id="L92">        serverBootstrap.childHandler(new ChannelInitializer&lt;Channel&gt;() {</span>
+
+            @Override
+            protected void initChannel(Channel ch) throws Exception {
+<span class="nc" id="L96">                ch.pipeline().addLast(new QosProcessHandler(welcome, acceptForeignIp));</span>
+<span class="nc" id="L97">            }</span>
+        });
+        try {
+<span class="nc" id="L100">            serverBootstrap.bind(port).sync();</span>
+<span class="nc" id="L101">            logger.info(&quot;qos-server bind localhost:&quot; + port);</span>
+<span class="nc" id="L102">        } catch (Throwable throwable) {</span>
+<span class="nc" id="L103">            logger.error(&quot;qos-server can not bind localhost:&quot; + port, throwable);</span>
+<span class="nc" id="L104">            throw throwable;</span>
+<span class="nc" id="L105">        }</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * close server
+     */
+    public void stop() {
+<span class="nc" id="L112">        logger.info(&quot;qos-server stopped.&quot;);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (boss != null) {</span>
+<span class="nc" id="L114">            boss.shutdownGracefully();</span>
+        }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (worker != null) {</span>
+<span class="nc" id="L117">            worker.shutdownGracefully();</span>
+        }
+<span class="nc" id="L119">    }</span>
+
+    public void setPort(int port) {
+<span class="nc" id="L122">        this.port = port;</span>
+<span class="nc" id="L123">    }</span>
+
+    public boolean isAcceptForeignIp() {
+<span class="nc" id="L126">        return acceptForeignIp;</span>
+    }
+
+    public void setAcceptForeignIp(boolean acceptForeignIp) {
+<span class="nc" id="L130">        this.acceptForeignIp = acceptForeignIp;</span>
+<span class="nc" id="L131">    }</span>
+
+    public String getWelcome() {
+<span class="nc" id="L134">        return welcome;</span>
+    }
+
+    public boolean isStarted() {
+<span class="nc" id="L138">        return started.get();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

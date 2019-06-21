@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProtostuffObjectInput.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-protostuff</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.protostuff</a> &gt; <span class="el_source">ProtostuffObjectInput.java</span></div><h1>ProtostuffObjectInput.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.common.serialize.protostuff;
+
+import io.protostuff.GraphIOUtil;
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Type;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.protostuff.utils.WrapperUtils;
+
+/**
+ * Protostuff object input implementation
+ */
+public class ProtostuffObjectInput implements ObjectInput {
+
+    private DataInputStream dis;
+
+<span class="nc" id="L37">    public ProtostuffObjectInput(InputStream inputStream) {</span>
+<span class="nc" id="L38">        dis = new DataInputStream(inputStream);</span>
+<span class="nc" id="L39">    }</span>
+
+    @SuppressWarnings(&quot;ResultOfMethodCallIgnored&quot;)
+    @Override
+    public Object readObject() throws IOException, ClassNotFoundException {
+<span class="nc" id="L44">        int classNameLength = dis.readInt();</span>
+<span class="nc" id="L45">        int bytesLength = dis.readInt();</span>
+
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        if (classNameLength &lt; 0 || bytesLength &lt; 0) {</span>
+<span class="nc" id="L48">            throw new IOException();</span>
+        }
+
+<span class="nc" id="L51">        byte[] classNameBytes = new byte[classNameLength];</span>
+<span class="nc" id="L52">        dis.readFully(classNameBytes, 0, classNameLength);</span>
+
+<span class="nc" id="L54">        byte[] bytes = new byte[bytesLength];</span>
+<span class="nc" id="L55">        dis.readFully(bytes, 0, bytesLength);</span>
+
+<span class="nc" id="L57">        String className = new String(classNameBytes);</span>
+<span class="nc" id="L58">        Class clazz = Class.forName(className);</span>
+
+        Object result;
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (WrapperUtils.needWrapper(clazz)) {</span>
+<span class="nc" id="L62">            Schema&lt;Wrapper&gt; schema = RuntimeSchema.getSchema(Wrapper.class);</span>
+<span class="nc" id="L63">            Wrapper wrapper = schema.newMessage();</span>
+<span class="nc" id="L64">            GraphIOUtil.mergeFrom(bytes, wrapper, schema);</span>
+<span class="nc" id="L65">            result = wrapper.getData();</span>
+<span class="nc" id="L66">        } else {</span>
+<span class="nc" id="L67">            Schema schema = RuntimeSchema.getSchema(clazz);</span>
+<span class="nc" id="L68">            result = schema.newMessage();</span>
+<span class="nc" id="L69">            GraphIOUtil.mergeFrom(bytes, result, schema);</span>
+        }
+
+<span class="nc" id="L72">        return result;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    public &lt;T&gt; T readObject(Class&lt;T&gt; clazz) throws IOException, ClassNotFoundException {
+<span class="nc" id="L78">        return (T) readObject();</span>
+    }
+
+    @Override
+    public &lt;T&gt; T readObject(Class&lt;T&gt; cls, Type type) throws IOException, ClassNotFoundException {
+<span class="nc" id="L83">        return readObject(cls);</span>
+    }
+
+    @Override
+    public boolean readBool() throws IOException {
+<span class="nc" id="L88">        return dis.readBoolean();</span>
+    }
+
+    @Override
+    public byte readByte() throws IOException {
+<span class="nc" id="L93">        return dis.readByte();</span>
+    }
+
+    @Override
+    public short readShort() throws IOException {
+<span class="nc" id="L98">        return dis.readShort();</span>
+    }
+
+    @Override
+    public int readInt() throws IOException {
+<span class="nc" id="L103">        return dis.readInt();</span>
+    }
+
+    @Override
+    public long readLong() throws IOException {
+<span class="nc" id="L108">        return dis.readLong();</span>
+    }
+
+    @Override
+    public float readFloat() throws IOException {
+<span class="nc" id="L113">        return dis.readFloat();</span>
+    }
+
+    @Override
+    public double readDouble() throws IOException {
+<span class="nc" id="L118">        return dis.readDouble();</span>
+    }
+
+    @Override
+    public String readUTF() throws IOException {
+<span class="nc" id="L123">        int length = dis.readInt();</span>
+<span class="nc" id="L124">        byte[] bytes = new byte[length];</span>
+<span class="nc" id="L125">        dis.read(bytes, 0, length);</span>
+<span class="nc" id="L126">        return new String(bytes);</span>
+    }
+
+    @Override
+    public byte[] readBytes() throws IOException {
+<span class="nc" id="L131">        int length = dis.readInt();</span>
+<span class="nc" id="L132">        byte[] bytes = new byte[length];</span>
+<span class="nc" id="L133">        dis.read(bytes, 0, length);</span>
+<span class="nc" id="L134">        return bytes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

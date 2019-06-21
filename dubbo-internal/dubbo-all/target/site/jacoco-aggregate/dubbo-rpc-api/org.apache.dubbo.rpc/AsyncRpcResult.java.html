@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AsyncRpcResult.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc</a> &gt; <span class="el_source">AsyncRpcResult.java</span></div><h1>AsyncRpcResult.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.Function;
+
+/**
+ * &lt;b&gt;NOTICE!!&lt;/b&gt;
+ *
+ * &lt;p&gt;
+ * You should never rely on this class directly when using or extending Dubbo, the implementation of {@link AsyncRpcResult}
+ * is only a workaround for compatibility purpose. It may be changed or even get removed from the next major version.
+ * Please only use {@link Result} or {@link RpcResult}.
+ *
+ * Extending the {@link Filter} is one typical use case:
+ * &lt;pre&gt;
+ * {@code
+ * public class YourFilter implements Filter {
+ *     @Override
+ *     public Result onResponse(Result result, Invoker&lt;?&gt; invoker, Invocation invocation) {
+ *         System.out.println(&quot;Filter get the return value: &quot; + result.getValue());
+ *         // Don't do this
+ *         // AsyncRpcResult asyncRpcResult = ((AsyncRpcResult)result;
+ *         // System.out.println(&quot;Filter get the return value: &quot; + asyncRpcResult.getValue());
+ *         return result;
+ *     }
+ *
+ *     @Override
+ *     public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+ *         return invoker.invoke(invocation);
+ *     }
+ * }
+ * }
+ * &lt;/pre&gt;
+ * &lt;/p&gt;
+ * TODO RpcResult can be an instance of {@link java.util.concurrent.CompletionStage} instead of composing CompletionStage inside.
+ */
+public class AsyncRpcResult extends AbstractResult {
+<span class="nc" id="L59">    private static final Logger logger = LoggerFactory.getLogger(AsyncRpcResult.class);</span>
+
+    /**
+     * RpcContext can be changed, because thread may have been used by other thread. It should be cloned before store.
+     * So we use Invocation instead, Invocation will create for every invoke, but invocation only support attachments of string type.
+     */
+    private RpcContext storedContext;
+    private RpcContext storedServerContext;
+
+    protected CompletableFuture&lt;Object&gt; valueFuture;
+
+    protected CompletableFuture&lt;Result&gt; resultFuture;
+
+    public AsyncRpcResult(CompletableFuture&lt;Object&gt; future) {
+<span class="nc" id="L73">        this(future, true);</span>
+<span class="nc" id="L74">    }</span>
+
+    public AsyncRpcResult(CompletableFuture&lt;Object&gt; future, boolean registerCallback) {
+<span class="nc" id="L77">        this(future, new CompletableFuture&lt;&gt;(), registerCallback);</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * @param future
+     * @param rFuture
+     * @param registerCallback
+     */
+<span class="nc" id="L85">    public AsyncRpcResult(CompletableFuture&lt;Object&gt; future, final CompletableFuture&lt;Result&gt; rFuture, boolean registerCallback) {</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (rFuture == null) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException();</span>
+        }
+<span class="nc" id="L89">        resultFuture = rFuture;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (registerCallback) {</span>
+            /**
+             * We do not know whether future already completed or not, it's a future exposed or even created by end user.
+             * 1. future complete before whenComplete. whenComplete fn (resultFuture.complete) will be executed in thread subscribing, in our case, it's Dubbo thread.
+             * 2. future complete after whenComplete. whenComplete fn (resultFuture.complete) will be executed in thread calling complete, normally its User thread.
+             */
+<span class="nc" id="L96">            future.whenComplete((v, t) -&gt; {</span>
+                RpcResult rpcResult;
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (t != null) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                    if (t instanceof CompletionException) {</span>
+<span class="nc" id="L100">                        rpcResult = new RpcResult(t.getCause());</span>
+                    } else {
+<span class="nc" id="L102">                        rpcResult = new RpcResult(t);</span>
+                    }
+                } else {
+<span class="nc" id="L105">                    rpcResult = new RpcResult(v);</span>
+                }
+                // instead of resultFuture we must use rFuture here, resultFuture may being changed before complete when building filter chain, but rFuture was guaranteed never changed by closure.
+<span class="nc" id="L108">                rFuture.complete(rpcResult);</span>
+<span class="nc" id="L109">            });</span>
+        }
+<span class="nc" id="L111">        this.valueFuture = future;</span>
+        // employ copy of context avoid the other call may modify the context content
+<span class="nc" id="L113">        this.storedContext = RpcContext.getContext().copyOf();</span>
+<span class="nc" id="L114">        this.storedServerContext = RpcContext.getServerContext().copyOf();</span>
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public Object getValue() {
+<span class="nc" id="L119">        return getRpcResult().getValue();</span>
+    }
+
+    @Override
+    public Throwable getException() {
+<span class="nc" id="L124">        return getRpcResult().getException();</span>
+    }
+
+    @Override
+    public boolean hasException() {
+<span class="nc" id="L129">        return getRpcResult().hasException();</span>
+    }
+
+    @Override
+    public Object getResult() {
+<span class="nc" id="L134">        return getRpcResult().getResult();</span>
+    }
+
+    public CompletableFuture getValueFuture() {
+<span class="nc" id="L138">        return valueFuture;</span>
+    }
+
+    public CompletableFuture&lt;Result&gt; getResultFuture() {
+<span class="nc" id="L142">        return resultFuture;</span>
+    }
+
+    public void setResultFuture(CompletableFuture&lt;Result&gt; resultFuture) {
+<span class="nc" id="L146">        this.resultFuture = resultFuture;</span>
+<span class="nc" id="L147">    }</span>
+
+    public Result getRpcResult() {
+        try {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (resultFuture.isDone()) {</span>
+<span class="nc" id="L152">                return resultFuture.get();</span>
+            }
+<span class="nc" id="L154">        } catch (Exception e) {</span>
+            // This should never happen;
+<span class="nc" id="L156">            logger.error(&quot;Got exception when trying to fetch the underlying result from AsyncRpcResult.&quot;, e);</span>
+<span class="nc" id="L157">        }</span>
+<span class="nc" id="L158">        return new RpcResult();</span>
+    }
+
+    @Override
+    public Object recreate() throws Throwable {
+<span class="nc" id="L163">        return valueFuture;</span>
+    }
+
+    public void thenApplyWithContext(Function&lt;Result, Result&gt; fn) {
+<span class="nc" id="L167">        this.resultFuture = resultFuture.thenApply(fn.compose(beforeContext).andThen(afterContext));</span>
+<span class="nc" id="L168">    }</span>
+
+    @Override
+    public Map&lt;String, String&gt; getAttachments() {
+<span class="nc" id="L172">        return getRpcResult().getAttachments();</span>
+    }
+
+    @Override
+    public void setAttachments(Map&lt;String, String&gt; map) {
+<span class="nc" id="L177">        getRpcResult().setAttachments(map);</span>
+<span class="nc" id="L178">    }</span>
+
+    @Override
+    public void addAttachments(Map&lt;String, String&gt; map) {
+<span class="nc" id="L182">        getRpcResult().addAttachments(map);</span>
+<span class="nc" id="L183">    }</span>
+
+    @Override
+    public String getAttachment(String key) {
+<span class="nc" id="L187">        return getRpcResult().getAttachment(key);</span>
+    }
+
+    @Override
+    public String getAttachment(String key, String defaultValue) {
+<span class="nc" id="L192">        return getRpcResult().getAttachment(key, defaultValue);</span>
+    }
+
+    @Override
+    public void setAttachment(String key, String value) {
+<span class="nc" id="L197">        getRpcResult().setAttachment(key, value);</span>
+<span class="nc" id="L198">    }</span>
+
+    /**
+     * tmp context to use when the thread switch to Dubbo thread.
+     */
+    private RpcContext tmpContext;
+    private RpcContext tmpServerContext;
+
+<span class="nc" id="L206">    private Function&lt;Result, Result&gt; beforeContext = (result) -&gt; {</span>
+<span class="nc" id="L207">        tmpContext = RpcContext.getContext();</span>
+<span class="nc" id="L208">        tmpServerContext = RpcContext.getServerContext();</span>
+<span class="nc" id="L209">        RpcContext.restoreContext(storedContext);</span>
+<span class="nc" id="L210">        RpcContext.restoreServerContext(storedServerContext);</span>
+<span class="nc" id="L211">        return result;</span>
+    };
+
+<span class="nc" id="L214">    private Function&lt;Result, Result&gt; afterContext = (result) -&gt; {</span>
+<span class="nc" id="L215">        RpcContext.restoreContext(tmpContext);</span>
+<span class="nc" id="L216">        RpcContext.restoreServerContext(tmpServerContext);</span>
+<span class="nc" id="L217">        return result;</span>
+    };
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

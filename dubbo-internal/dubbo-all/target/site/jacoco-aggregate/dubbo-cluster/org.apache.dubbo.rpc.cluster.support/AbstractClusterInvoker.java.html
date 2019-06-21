@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractClusterInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.support</a> &gt; <span class="el_source">AbstractClusterInvoker.java</span></div><h1>AbstractClusterInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.cluster.Directory;
+import org.apache.dubbo.rpc.cluster.LoadBalance;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * AbstractClusterInvoker
+ */
+public abstract class AbstractClusterInvoker&lt;T&gt; implements Invoker&lt;T&gt; {
+
+<span class="nc" id="L48">    private static final Logger logger = LoggerFactory.getLogger(AbstractClusterInvoker.class);</span>
+
+    protected final Directory&lt;T&gt; directory;
+
+    protected final boolean availablecheck;
+
+<span class="nc" id="L54">    private AtomicBoolean destroyed = new AtomicBoolean(false);</span>
+
+<span class="nc" id="L56">    private volatile Invoker&lt;T&gt; stickyInvoker = null;</span>
+
+    public AbstractClusterInvoker(Directory&lt;T&gt; directory) {
+<span class="nc" id="L59">        this(directory, directory.getUrl());</span>
+<span class="nc" id="L60">    }</span>
+
+<span class="nc" id="L62">    public AbstractClusterInvoker(Directory&lt;T&gt; directory, URL url) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (directory == null) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;service directory == null&quot;);</span>
+        }
+
+<span class="nc" id="L67">        this.directory = directory;</span>
+        //sticky: invoker.isAvailable() should always be checked before using when availablecheck is true.
+<span class="nc" id="L69">        this.availablecheck = url.getParameter(Constants.CLUSTER_AVAILABLE_CHECK_KEY, Constants.DEFAULT_CLUSTER_AVAILABLE_CHECK);</span>
+<span class="nc" id="L70">    }</span>
+
+    @Override
+    public Class&lt;T&gt; getInterface() {
+<span class="nc" id="L74">        return directory.getInterface();</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L79">        return directory.getUrl();</span>
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L84">        Invoker&lt;T&gt; invoker = stickyInvoker;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (invoker != null) {</span>
+<span class="nc" id="L86">            return invoker.isAvailable();</span>
+        }
+<span class="nc" id="L88">        return directory.isAvailable();</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (destroyed.compareAndSet(false, true)) {</span>
+<span class="nc" id="L94">            directory.destroy();</span>
+        }
+<span class="nc" id="L96">    }</span>
+
+    /**
+     * Select a invoker using loadbalance policy.&lt;/br&gt;
+     * a) Firstly, select an invoker using loadbalance. If this invoker is in previously selected list, or,
+     * if this invoker is unavailable, then continue step b (reselect), otherwise return the first selected invoker&lt;/br&gt;
+     * &lt;p&gt;
+     * b) Reselection, the validation rule for reselection: selected &gt; available. This rule guarantees that
+     * the selected invoker has the minimum chance to be one in the previously selected list, and also
+     * guarantees this invoker is available.
+     *
+     * @param loadbalance load balance policy
+     * @param invocation  invocation
+     * @param invokers    invoker candidates
+     * @param selected    exclude selected invokers or not
+     * @return the invoker which will final to do invoke.
+     * @throws RpcException exception
+     */
+    protected Invoker&lt;T&gt; select(LoadBalance loadbalance, Invocation invocation,
+                                List&lt;Invoker&lt;T&gt;&gt; invokers, List&lt;Invoker&lt;T&gt;&gt; selected) throws RpcException {
+
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(invokers)) {</span>
+<span class="nc" id="L118">            return null;</span>
+        }
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        String methodName = invocation == null ? StringUtils.EMPTY : invocation.getMethodName();</span>
+
+<span class="nc" id="L122">        boolean sticky = invokers.get(0).getUrl()</span>
+<span class="nc" id="L123">                .getMethodParameter(methodName, Constants.CLUSTER_STICKY_KEY, Constants.DEFAULT_CLUSTER_STICKY);</span>
+
+        //ignore overloaded method
+<span class="nc bnc" id="L126" title="All 4 branches missed.">        if (stickyInvoker != null &amp;&amp; !invokers.contains(stickyInvoker)) {</span>
+<span class="nc" id="L127">            stickyInvoker = null;</span>
+        }
+        //ignore concurrency problem
+<span class="nc bnc" id="L130" title="All 8 branches missed.">        if (sticky &amp;&amp; stickyInvoker != null &amp;&amp; (selected == null || !selected.contains(stickyInvoker))) {</span>
+<span class="nc bnc" id="L131" title="All 4 branches missed.">            if (availablecheck &amp;&amp; stickyInvoker.isAvailable()) {</span>
+<span class="nc" id="L132">                return stickyInvoker;</span>
+            }
+        }
+
+<span class="nc" id="L136">        Invoker&lt;T&gt; invoker = doSelect(loadbalance, invocation, invokers, selected);</span>
+
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (sticky) {</span>
+<span class="nc" id="L139">            stickyInvoker = invoker;</span>
+        }
+<span class="nc" id="L141">        return invoker;</span>
+    }
+
+    private Invoker&lt;T&gt; doSelect(LoadBalance loadbalance, Invocation invocation,
+                                List&lt;Invoker&lt;T&gt;&gt; invokers, List&lt;Invoker&lt;T&gt;&gt; selected) throws RpcException {
+
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(invokers)) {</span>
+<span class="nc" id="L148">            return null;</span>
+        }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (invokers.size() == 1) {</span>
+<span class="nc" id="L151">            return invokers.get(0);</span>
+        }
+<span class="nc" id="L153">        Invoker&lt;T&gt; invoker = loadbalance.select(invokers, getUrl(), invocation);</span>
+
+        //If the `invoker` is in the  `selected` or invoker is unavailable &amp;&amp; availablecheck is true, reselect.
+<span class="nc bnc" id="L156" title="All 4 branches missed.">        if ((selected != null &amp;&amp; selected.contains(invoker))</span>
+<span class="nc bnc" id="L157" title="All 6 branches missed.">                || (!invoker.isAvailable() &amp;&amp; getUrl() != null &amp;&amp; availablecheck)) {</span>
+            try {
+<span class="nc" id="L159">                Invoker&lt;T&gt; rInvoker = reselect(loadbalance, invocation, invokers, selected, availablecheck);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (rInvoker != null) {</span>
+<span class="nc" id="L161">                    invoker = rInvoker;</span>
+                } else {
+                    //Check the index of current selected invoker, if it's not the last one, choose the one at index+1.
+<span class="nc" id="L164">                    int index = invokers.indexOf(invoker);</span>
+                    try {
+                        //Avoid collision
+<span class="nc" id="L167">                        invoker = invokers.get((index + 1) % invokers.size());</span>
+<span class="nc" id="L168">                    } catch (Exception e) {</span>
+<span class="nc" id="L169">                        logger.warn(e.getMessage() + &quot; may because invokers list dynamic change, ignore.&quot;, e);</span>
+<span class="nc" id="L170">                    }</span>
+                }
+<span class="nc" id="L172">            } catch (Throwable t) {</span>
+<span class="nc" id="L173">                logger.error(&quot;cluster reselect fail reason is :&quot; + t.getMessage() + &quot; if can not solve, you can set cluster.availablecheck=false in url&quot;, t);</span>
+<span class="nc" id="L174">            }</span>
+        }
+<span class="nc" id="L176">        return invoker;</span>
+    }
+
+    /**
+     * Reselect, use invokers not in `selected` first, if all invokers are in `selected`,
+     * just pick an available one using loadbalance policy.
+     *
+     * @param loadbalance    load balance policy
+     * @param invocation     invocation
+     * @param invokers       invoker candidates
+     * @param selected       exclude selected invokers or not
+     * @param availablecheck check invoker available if true
+     * @return the reselect result to do invoke
+     * @throws RpcException exception
+     */
+    private Invoker&lt;T&gt; reselect(LoadBalance loadbalance, Invocation invocation,
+                                List&lt;Invoker&lt;T&gt;&gt; invokers, List&lt;Invoker&lt;T&gt;&gt; selected, boolean availablecheck) throws RpcException {
+
+        //Allocating one in advance, this list is certain to be used.
+<span class="nc" id="L195">        List&lt;Invoker&lt;T&gt;&gt; reselectInvokers = new ArrayList&lt;&gt;(</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                invokers.size() &gt; 1 ? (invokers.size() - 1) : invokers.size());</span>
+
+        // First, try picking a invoker not in `selected`.
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        for (Invoker&lt;T&gt; invoker : invokers) {</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">            if (availablecheck &amp;&amp; !invoker.isAvailable()) {</span>
+<span class="nc" id="L201">                continue;</span>
+            }
+
+<span class="nc bnc" id="L204" title="All 4 branches missed.">            if (selected == null || !selected.contains(invoker)) {</span>
+<span class="nc" id="L205">                reselectInvokers.add(invoker);</span>
+            }
+<span class="nc" id="L207">        }</span>
+
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (!reselectInvokers.isEmpty()) {</span>
+<span class="nc" id="L210">            return loadbalance.select(reselectInvokers, getUrl(), invocation);</span>
+        }
+
+        // Just pick an available invoker using loadbalance policy
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (selected != null) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            for (Invoker&lt;T&gt; invoker : selected) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                if ((invoker.isAvailable()) // available first</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                        &amp;&amp; !reselectInvokers.contains(invoker)) {</span>
+<span class="nc" id="L218">                    reselectInvokers.add(invoker);</span>
+                }
+<span class="nc" id="L220">            }</span>
+        }
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (!reselectInvokers.isEmpty()) {</span>
+<span class="nc" id="L223">            return loadbalance.select(reselectInvokers, getUrl(), invocation);</span>
+        }
+
+<span class="nc" id="L226">        return null;</span>
+    }
+
+    @Override
+    public Result invoke(final Invocation invocation) throws RpcException {
+<span class="nc" id="L231">        checkWhetherDestroyed();</span>
+
+        // binding attachments into invocation.
+<span class="nc" id="L234">        Map&lt;String, String&gt; contextAttachments = RpcContext.getContext().getAttachments();</span>
+<span class="nc bnc" id="L235" title="All 4 branches missed.">        if (contextAttachments != null &amp;&amp; contextAttachments.size() != 0) {</span>
+<span class="nc" id="L236">            ((RpcInvocation) invocation).addAttachments(contextAttachments);</span>
+        }
+
+<span class="nc" id="L239">        List&lt;Invoker&lt;T&gt;&gt; invokers = list(invocation);</span>
+<span class="nc" id="L240">        LoadBalance loadbalance = initLoadBalance(invokers, invocation);</span>
+<span class="nc" id="L241">        RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);</span>
+<span class="nc" id="L242">        return doInvoke(invocation, invokers, loadbalance);</span>
+    }
+
+    protected void checkWhetherDestroyed() {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (destroyed.get()) {</span>
+<span class="nc" id="L247">            throw new RpcException(&quot;Rpc cluster invoker for &quot; + getInterface() + &quot; on consumer &quot; + NetUtils.getLocalHost()</span>
+<span class="nc" id="L248">                    + &quot; use dubbo version &quot; + Version.getVersion()</span>
+                    + &quot; is now destroyed! Can not invoke any more.&quot;);
+        }
+<span class="nc" id="L251">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L255">        return getInterface() + &quot; -&gt; &quot; + getUrl().toString();</span>
+    }
+
+    protected void checkInvokers(List&lt;Invoker&lt;T&gt;&gt; invokers, Invocation invocation) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(invokers)) {</span>
+<span class="nc" id="L260">            throw new RpcException(RpcException.NO_INVOKER_AVAILABLE_AFTER_FILTER, &quot;Failed to invoke the method &quot;</span>
+<span class="nc" id="L261">                    + invocation.getMethodName() + &quot; in the service &quot; + getInterface().getName()</span>
+<span class="nc" id="L262">                    + &quot;. No provider available for the service &quot; + directory.getUrl().getServiceKey()</span>
+<span class="nc" id="L263">                    + &quot; from registry &quot; + directory.getUrl().getAddress()</span>
+<span class="nc" id="L264">                    + &quot; on the consumer &quot; + NetUtils.getLocalHost()</span>
+<span class="nc" id="L265">                    + &quot; using the dubbo version &quot; + Version.getVersion()</span>
+                    + &quot;. Please check if the providers have been started and registered.&quot;);
+        }
+<span class="nc" id="L268">    }</span>
+
+    protected abstract Result doInvoke(Invocation invocation, List&lt;Invoker&lt;T&gt;&gt; invokers,
+                                       LoadBalance loadbalance) throws RpcException;
+
+    protected List&lt;Invoker&lt;T&gt;&gt; list(Invocation invocation) throws RpcException {
+<span class="nc" id="L274">        return directory.list(invocation);</span>
+    }
+
+    /**
+     * Init LoadBalance.
+     * &lt;p&gt;
+     * if invokers is not empty, init from the first invoke's url and invocation
+     * if invokes is empty, init a default LoadBalance(RandomLoadBalance)
+     * &lt;/p&gt;
+     *
+     * @param invokers   invokers
+     * @param invocation invocation
+     * @return LoadBalance instance. if not need init, return null.
+     */
+    protected LoadBalance initLoadBalance(List&lt;Invoker&lt;T&gt;&gt; invokers, Invocation invocation) {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(invokers)) {</span>
+<span class="nc" id="L290">            return ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(invokers.get(0).getUrl()</span>
+<span class="nc" id="L291">                    .getMethodParameter(RpcUtils.getMethodName(invocation), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));</span>
+        } else {
+<span class="nc" id="L293">            return ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(Constants.DEFAULT_LOADBALANCE);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

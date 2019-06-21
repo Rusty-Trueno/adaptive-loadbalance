@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpringExtensionFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.extension</a> &gt; <span class="el_source">SpringExtensionFactory.java</span></div><h1>SpringExtensionFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.extension;
+
+import org.apache.dubbo.common.extension.ExtensionFactory;
+import org.apache.dubbo.common.extension.SPI;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.config.DubboShutdownHook;
+import org.apache.dubbo.config.spring.util.BeanFactoryUtils;
+
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.event.ContextClosedEvent;
+
+import java.util.Set;
+
+/**
+ * SpringExtensionFactory
+ */
+<span class="nc" id="L40">public class SpringExtensionFactory implements ExtensionFactory {</span>
+<span class="nc" id="L41">    private static final Logger logger = LoggerFactory.getLogger(SpringExtensionFactory.class);</span>
+
+<span class="nc" id="L43">    private static final Set&lt;ApplicationContext&gt; CONTEXTS = new ConcurrentHashSet&lt;ApplicationContext&gt;();</span>
+<span class="nc" id="L44">    private static final ApplicationListener SHUTDOWN_HOOK_LISTENER = new ShutdownHookListener();</span>
+
+    public static void addApplicationContext(ApplicationContext context) {
+<span class="nc" id="L47">        CONTEXTS.add(context);</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (context instanceof ConfigurableApplicationContext) {</span>
+<span class="nc" id="L49">            ((ConfigurableApplicationContext) context).registerShutdownHook();</span>
+<span class="nc" id="L50">            DubboShutdownHook.getDubboShutdownHook().unregister();</span>
+        }
+<span class="nc" id="L52">        BeanFactoryUtils.addApplicationListener(context, SHUTDOWN_HOOK_LISTENER);</span>
+<span class="nc" id="L53">    }</span>
+
+    public static void removeApplicationContext(ApplicationContext context) {
+<span class="nc" id="L56">        CONTEXTS.remove(context);</span>
+<span class="nc" id="L57">    }</span>
+
+    public static Set&lt;ApplicationContext&gt; getContexts() {
+<span class="nc" id="L60">        return CONTEXTS;</span>
+    }
+
+    // currently for test purpose
+    public static void clearContexts() {
+<span class="nc" id="L65">        CONTEXTS.clear();</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T getExtension(Class&lt;T&gt; type, String name) {
+
+        //SPI should be get from SpiExtensionFactory
+<span class="nc bnc" id="L73" title="All 4 branches missed.">        if (type.isInterface() &amp;&amp; type.isAnnotationPresent(SPI.class)) {</span>
+<span class="nc" id="L74">            return null;</span>
+        }
+
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (ApplicationContext context : CONTEXTS) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (context.containsBean(name)) {</span>
+<span class="nc" id="L79">                Object bean = context.getBean(name);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                if (type.isInstance(bean)) {</span>
+<span class="nc" id="L81">                    return (T) bean;</span>
+                }
+            }
+<span class="nc" id="L84">        }</span>
+
+<span class="nc" id="L86">        logger.warn(&quot;No spring extension (bean) named:&quot; + name + &quot;, try to find an extension (bean) of type &quot; + type.getName());</span>
+
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (Object.class == type) {</span>
+<span class="nc" id="L89">            return null;</span>
+        }
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (ApplicationContext context : CONTEXTS) {</span>
+            try {
+<span class="nc" id="L94">                return context.getBean(type);</span>
+<span class="nc" id="L95">            } catch (NoUniqueBeanDefinitionException multiBeanExe) {</span>
+<span class="nc" id="L96">                logger.warn(&quot;Find more than 1 spring extensions (beans) of type &quot; + type.getName() + &quot;, will stop auto injection. Please make sure you have specified the concrete parameter type and there's only one extension of that type.&quot;);</span>
+<span class="nc" id="L97">            } catch (NoSuchBeanDefinitionException noBeanExe) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L99">                    logger.debug(&quot;Error when get spring extension(bean) for type:&quot; + type.getName(), noBeanExe);</span>
+                }
+<span class="nc" id="L101">            }</span>
+<span class="nc" id="L102">        }</span>
+
+<span class="nc" id="L104">        logger.warn(&quot;No spring extension (bean) named:&quot; + name + &quot;, type:&quot; + type.getName() + &quot; found, stop get bean.&quot;);</span>
+
+<span class="nc" id="L106">        return null;</span>
+    }
+
+    private static class ShutdownHookListener implements ApplicationListener {
+        @Override
+        public void onApplicationEvent(ApplicationEvent event) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (event instanceof ContextClosedEvent) {</span>
+<span class="nc" id="L113">                DubboShutdownHook shutdownHook = DubboShutdownHook.getDubboShutdownHook();</span>
+<span class="nc" id="L114">                shutdownHook.doDestroy();</span>
+            }
+<span class="nc" id="L116">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

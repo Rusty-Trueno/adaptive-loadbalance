@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MetadataIdentifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-redis</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-report-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.identifier</a> &gt; <span class="el_source">MetadataIdentifier.java</span></div><h1>MetadataIdentifier.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.identifier;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+
+/**
+ * 2018/10/25
+ */
+public class MetadataIdentifier {
+
+    public static final String SEPARATOR = &quot;:&quot;;
+    final static String DEFAULT_PATH_TAG = &quot;metadata&quot;;
+    final static String META_DATA_STORE_TAG = &quot;.metaData&quot;;
+
+    private String serviceInterface;
+    private String version;
+    private String group;
+    private String side;
+    private String application;
+
+<span class="nc" id="L37">    public MetadataIdentifier() {</span>
+<span class="nc" id="L38">    }</span>
+
+<span class="nc" id="L40">    public MetadataIdentifier(String serviceInterface, String version, String group, String side, String application) {</span>
+<span class="nc" id="L41">        this.serviceInterface = serviceInterface;</span>
+<span class="nc" id="L42">        this.version = version;</span>
+<span class="nc" id="L43">        this.group = group;</span>
+<span class="nc" id="L44">        this.side = side;</span>
+<span class="nc" id="L45">        this.application = application;</span>
+<span class="nc" id="L46">    }</span>
+
+<span class="nc" id="L48">    public MetadataIdentifier(URL url) {</span>
+<span class="nc" id="L49">        this.serviceInterface = url.getServiceInterface();</span>
+<span class="nc" id="L50">        this.version = url.getParameter(Constants.VERSION_KEY);</span>
+<span class="nc" id="L51">        this.group = url.getParameter(Constants.GROUP_KEY);</span>
+<span class="nc" id="L52">        this.side = url.getParameter(Constants.SIDE_KEY);</span>
+<span class="nc" id="L53">        setApplication(url.getParameter(Constants.APPLICATION_KEY));</span>
+<span class="nc" id="L54">    }</span>
+
+    public String getUniqueKey(KeyTypeEnum keyType) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (keyType == KeyTypeEnum.PATH) {</span>
+<span class="nc" id="L58">            return getFilePathKey() + Constants.PATH_SEPARATOR + DEFAULT_PATH_TAG;</span>
+        }
+<span class="nc" id="L60">        return getIdentifierKey() + META_DATA_STORE_TAG;</span>
+    }
+
+    public String getIdentifierKey() {
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        return serviceInterface + SEPARATOR + (version == null ? &quot;&quot; : version + SEPARATOR) + (group == null ? &quot;&quot; : group + SEPARATOR) + side + SEPARATOR + application;</span>
+    }
+
+    private String getFilePathKey() {
+<span class="nc" id="L68">        return getFilePathKey(DEFAULT_PATH_TAG);</span>
+    }
+
+    private String getFilePathKey(String pathTag) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        return pathTag + Constants.PATH_SEPARATOR + toServicePath() + Constants.PATH_SEPARATOR + (version == null ? &quot;&quot; : (version + Constants.PATH_SEPARATOR))</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                + (group == null ? &quot;&quot; : (group + Constants.PATH_SEPARATOR)) + side + Constants.PATH_SEPARATOR + getApplication();</span>
+    }
+
+    private String toServicePath() {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(serviceInterface)) {</span>
+<span class="nc" id="L78">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L80">        return URL.encode(serviceInterface);</span>
+    }
+
+
+    public String getServiceInterface() {
+<span class="nc" id="L85">        return serviceInterface;</span>
+    }
+
+    public void setServiceInterface(String serviceInterface) {
+<span class="nc" id="L89">        this.serviceInterface = serviceInterface;</span>
+<span class="nc" id="L90">    }</span>
+
+    public String getVersion() {
+<span class="nc" id="L93">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L97">        this.version = version;</span>
+<span class="nc" id="L98">    }</span>
+
+    public String getGroup() {
+<span class="nc" id="L101">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L105">        this.group = group;</span>
+<span class="nc" id="L106">    }</span>
+
+    public String getSide() {
+<span class="nc" id="L109">        return side;</span>
+    }
+
+    public void setSide(String side) {
+<span class="nc" id="L113">        this.side = side;</span>
+<span class="nc" id="L114">    }</span>
+
+    public String getApplication() {
+<span class="nc" id="L117">        return application;</span>
+    }
+
+    public void setApplication(String application) {
+<span class="nc" id="L121">        this.application = application;</span>
+<span class="nc" id="L122">    }</span>
+
+<span class="nc" id="L124">    public static enum KeyTypeEnum {</span>
+<span class="nc" id="L125">        PATH, UNIQUE_KEY</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

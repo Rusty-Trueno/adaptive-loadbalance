@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractReferenceConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">AbstractReferenceConfig.java</span></div><h1>AbstractReferenceConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.rpc.InvokerListener;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+/**
+ * AbstractConsumerConfig
+ *
+ * @export
+ * @see org.apache.dubbo.config.ReferenceConfig
+ */
+<span class="nc" id="L30">public abstract class AbstractReferenceConfig extends AbstractInterfaceConfig {</span>
+
+    private static final long serialVersionUID = -2786526984373031126L;
+
+    // ======== Reference config default values, will take effect if reference's attribute is not set  ========
+
+    /**
+     * Check if service provider exists, if not exists, it will be fast fail
+     */
+    protected Boolean check;
+
+    /**
+     * Whether to eagle-init
+     */
+    protected Boolean init;
+
+    /**
+     * Whether to use generic interface
+     */
+    protected String generic;
+
+    /**
+     * Whether to find reference's instance from the current JVM
+     */
+    protected Boolean injvm;
+
+    /**
+     * Lazy create connection
+     */
+<span class="nc" id="L59">    protected Boolean lazy = false;</span>
+
+    protected String reconnect;
+
+<span class="nc" id="L63">    protected Boolean sticky = false;</span>
+
+    /**
+     * Whether to support event in stub.
+     */
+    //TODO solve merge problem
+    protected Boolean stubevent;//= Constants.DEFAULT_STUB_EVENT;
+
+    /**
+     * The remote service version the customer side will reference
+     */
+    protected String version;
+
+    /**
+     * The remote service group the customer side will reference
+     */
+    protected String group;
+
+    public Boolean isCheck() {
+<span class="nc" id="L82">        return check;</span>
+    }
+
+    public void setCheck(Boolean check) {
+<span class="nc" id="L86">        this.check = check;</span>
+<span class="nc" id="L87">    }</span>
+
+    public Boolean isInit() {
+<span class="nc" id="L90">        return init;</span>
+    }
+
+    public void setInit(Boolean init) {
+<span class="nc" id="L94">        this.init = init;</span>
+<span class="nc" id="L95">    }</span>
+
+    @Parameter(excluded = true)
+    public Boolean isGeneric() {
+<span class="nc" id="L99">        return ProtocolUtils.isGeneric(generic);</span>
+    }
+
+    public void setGeneric(Boolean generic) {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (generic != null) {</span>
+<span class="nc" id="L104">            this.generic = generic.toString();</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    public String getGeneric() {
+<span class="nc" id="L109">        return generic;</span>
+    }
+
+    public void setGeneric(String generic) {
+<span class="nc" id="L113">        this.generic = generic;</span>
+<span class="nc" id="L114">    }</span>
+
+    /**
+     * @return
+     * @deprecated instead, use the parameter &lt;b&gt;scope&lt;/&gt; to judge if it's in jvm, scope=local
+     */
+    @Deprecated
+    public Boolean isInjvm() {
+<span class="nc" id="L122">        return injvm;</span>
+    }
+
+    /**
+     * @param injvm
+     * @deprecated instead, use the parameter &lt;b&gt;scope&lt;/b&gt; to judge if it's in jvm, scope=local
+     */
+    @Deprecated
+    public void setInjvm(Boolean injvm) {
+<span class="nc" id="L131">        this.injvm = injvm;</span>
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    @Parameter(key = Constants.REFERENCE_FILTER_KEY, append = true)
+    public String getFilter() {
+<span class="nc" id="L137">        return super.getFilter();</span>
+    }
+
+    @Override
+    @Parameter(key = Constants.INVOKER_LISTENER_KEY, append = true)
+    public String getListener() {
+<span class="nc" id="L143">        return super.getListener();</span>
+    }
+
+    @Override
+    public void setListener(String listener) {
+<span class="nc" id="L148">        checkMultiExtension(InvokerListener.class, &quot;listener&quot;, listener);</span>
+<span class="nc" id="L149">        super.setListener(listener);</span>
+<span class="nc" id="L150">    }</span>
+
+    @Parameter(key = Constants.LAZY_CONNECT_KEY)
+    public Boolean getLazy() {
+<span class="nc" id="L154">        return lazy;</span>
+    }
+
+    public void setLazy(Boolean lazy) {
+<span class="nc" id="L158">        this.lazy = lazy;</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    public void setOnconnect(String onconnect) {
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        if (onconnect != null &amp;&amp; onconnect.length() &gt; 0) {</span>
+<span class="nc" id="L164">            this.stubevent = true;</span>
+        }
+<span class="nc" id="L166">        super.setOnconnect(onconnect);</span>
+<span class="nc" id="L167">    }</span>
+
+    @Override
+    public void setOndisconnect(String ondisconnect) {
+<span class="nc bnc" id="L171" title="All 4 branches missed.">        if (ondisconnect != null &amp;&amp; ondisconnect.length() &gt; 0) {</span>
+<span class="nc" id="L172">            this.stubevent = true;</span>
+        }
+<span class="nc" id="L174">        super.setOndisconnect(ondisconnect);</span>
+<span class="nc" id="L175">    }</span>
+
+    @Parameter(key = Constants.STUB_EVENT_KEY)
+    public Boolean getStubevent() {
+<span class="nc" id="L179">        return stubevent;</span>
+    }
+
+    @Parameter(key = Constants.RECONNECT_KEY)
+    public String getReconnect() {
+<span class="nc" id="L184">        return reconnect;</span>
+    }
+
+    public void setReconnect(String reconnect) {
+<span class="nc" id="L188">        this.reconnect = reconnect;</span>
+<span class="nc" id="L189">    }</span>
+
+    @Parameter(key = Constants.CLUSTER_STICKY_KEY)
+    public Boolean getSticky() {
+<span class="nc" id="L193">        return sticky;</span>
+    }
+
+    public void setSticky(Boolean sticky) {
+<span class="nc" id="L197">        this.sticky = sticky;</span>
+<span class="nc" id="L198">    }</span>
+
+    public String getVersion() {
+<span class="nc" id="L201">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L205">        checkKey(Constants.VERSION_KEY, version);</span>
+<span class="nc" id="L206">        this.version = version;</span>
+<span class="nc" id="L207">    }</span>
+
+    public String getGroup() {
+<span class="nc" id="L210">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L214">        checkKey(Constants.GROUP_KEY, group);</span>
+<span class="nc" id="L215">        this.group = group;</span>
+<span class="nc" id="L216">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

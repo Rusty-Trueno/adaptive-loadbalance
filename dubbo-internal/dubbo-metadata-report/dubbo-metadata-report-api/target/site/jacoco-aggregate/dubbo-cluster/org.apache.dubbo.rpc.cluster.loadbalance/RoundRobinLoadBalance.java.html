@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RoundRobinLoadBalance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.loadbalance</a> &gt; <span class="el_source">RoundRobinLoadBalance.java</span></div><h1>RoundRobinLoadBalance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.loadbalance;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Round robin load balance.
+ */
+<span class="nc" id="L36">public class RoundRobinLoadBalance extends AbstractLoadBalance {</span>
+    public static final String NAME = &quot;roundrobin&quot;;
+    
+    private static final int RECYCLE_PERIOD = 60000;
+    
+<span class="nc" id="L41">    protected static class WeightedRoundRobin {</span>
+        private int weight;
+<span class="nc" id="L43">        private AtomicLong current = new AtomicLong(0);</span>
+        private long lastUpdate;
+        public int getWeight() {
+<span class="nc" id="L46">            return weight;</span>
+        }
+        public void setWeight(int weight) {
+<span class="nc" id="L49">            this.weight = weight;</span>
+<span class="nc" id="L50">            current.set(0);</span>
+<span class="nc" id="L51">        }</span>
+        public long increaseCurrent() {
+<span class="nc" id="L53">            return current.addAndGet(weight);</span>
+        }
+        public void sel(int total) {
+<span class="nc" id="L56">            current.addAndGet(-1 * total);</span>
+<span class="nc" id="L57">        }</span>
+        public long getLastUpdate() {
+<span class="nc" id="L59">            return lastUpdate;</span>
+        }
+        public void setLastUpdate(long lastUpdate) {
+<span class="nc" id="L62">            this.lastUpdate = lastUpdate;</span>
+<span class="nc" id="L63">        }</span>
+    }
+
+<span class="nc" id="L66">    private ConcurrentMap&lt;String, ConcurrentMap&lt;String, WeightedRoundRobin&gt;&gt; methodWeightMap = new ConcurrentHashMap&lt;String, ConcurrentMap&lt;String, WeightedRoundRobin&gt;&gt;();</span>
+<span class="nc" id="L67">    private AtomicBoolean updateLock = new AtomicBoolean();</span>
+    
+    /**
+     * get invoker addr list cached for specified invocation
+     * &lt;p&gt;
+     * &lt;b&gt;for unit test only&lt;/b&gt;
+     * 
+     * @param invokers
+     * @param invocation
+     * @return
+     */
+    protected &lt;T&gt; Collection&lt;String&gt; getInvokerAddrList(List&lt;Invoker&lt;T&gt;&gt; invokers, Invocation invocation) {
+<span class="nc" id="L79">        String key = invokers.get(0).getUrl().getServiceKey() + &quot;.&quot; + invocation.getMethodName();</span>
+<span class="nc" id="L80">        Map&lt;String, WeightedRoundRobin&gt; map = methodWeightMap.get(key);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (map != null) {</span>
+<span class="nc" id="L82">            return map.keySet();</span>
+        }
+<span class="nc" id="L84">        return null;</span>
+    }
+    
+    @Override
+    protected &lt;T&gt; Invoker&lt;T&gt; doSelect(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) {
+<span class="nc" id="L89">        String key = invokers.get(0).getUrl().getServiceKey() + &quot;.&quot; + invocation.getMethodName();</span>
+<span class="nc" id="L90">        ConcurrentMap&lt;String, WeightedRoundRobin&gt; map = methodWeightMap.get(key);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (map == null) {</span>
+<span class="nc" id="L92">            methodWeightMap.putIfAbsent(key, new ConcurrentHashMap&lt;String, WeightedRoundRobin&gt;());</span>
+<span class="nc" id="L93">            map = methodWeightMap.get(key);</span>
+        }
+<span class="nc" id="L95">        int totalWeight = 0;</span>
+<span class="nc" id="L96">        long maxCurrent = Long.MIN_VALUE;</span>
+<span class="nc" id="L97">        long now = System.currentTimeMillis();</span>
+<span class="nc" id="L98">        Invoker&lt;T&gt; selectedInvoker = null;</span>
+<span class="nc" id="L99">        WeightedRoundRobin selectedWRR = null;</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (Invoker&lt;T&gt; invoker : invokers) {</span>
+<span class="nc" id="L101">            String identifyString = invoker.getUrl().toIdentityString();</span>
+<span class="nc" id="L102">            WeightedRoundRobin weightedRoundRobin = map.get(identifyString);</span>
+<span class="nc" id="L103">            int weight = getWeight(invoker, invocation);</span>
+
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (weightedRoundRobin == null) {</span>
+<span class="nc" id="L106">                weightedRoundRobin = new WeightedRoundRobin();</span>
+<span class="nc" id="L107">                weightedRoundRobin.setWeight(weight);</span>
+<span class="nc" id="L108">                map.putIfAbsent(identifyString, weightedRoundRobin);</span>
+            }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (weight != weightedRoundRobin.getWeight()) {</span>
+                //weight changed
+<span class="nc" id="L112">                weightedRoundRobin.setWeight(weight);</span>
+            }
+<span class="nc" id="L114">            long cur = weightedRoundRobin.increaseCurrent();</span>
+<span class="nc" id="L115">            weightedRoundRobin.setLastUpdate(now);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (cur &gt; maxCurrent) {</span>
+<span class="nc" id="L117">                maxCurrent = cur;</span>
+<span class="nc" id="L118">                selectedInvoker = invoker;</span>
+<span class="nc" id="L119">                selectedWRR = weightedRoundRobin;</span>
+            }
+<span class="nc" id="L121">            totalWeight += weight;</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">        if (!updateLock.get() &amp;&amp; invokers.size() != map.size()) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            if (updateLock.compareAndSet(false, true)) {</span>
+                try {
+                    // copy -&gt; modify -&gt; update reference
+<span class="nc" id="L127">                    ConcurrentMap&lt;String, WeightedRoundRobin&gt; newMap = new ConcurrentHashMap&lt;String, WeightedRoundRobin&gt;();</span>
+<span class="nc" id="L128">                    newMap.putAll(map);</span>
+<span class="nc" id="L129">                    Iterator&lt;Entry&lt;String, WeightedRoundRobin&gt;&gt; it = newMap.entrySet().iterator();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                    while (it.hasNext()) {</span>
+<span class="nc" id="L131">                        Entry&lt;String, WeightedRoundRobin&gt; item = it.next();</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                        if (now - item.getValue().getLastUpdate() &gt; RECYCLE_PERIOD) {</span>
+<span class="nc" id="L133">                            it.remove();</span>
+                        }
+<span class="nc" id="L135">                    }</span>
+<span class="nc" id="L136">                    methodWeightMap.put(key, newMap);</span>
+                } finally {
+<span class="nc" id="L138">                    updateLock.set(false);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (selectedInvoker != null) {</span>
+<span class="nc" id="L143">            selectedWRR.sel(totalWeight);</span>
+<span class="nc" id="L144">            return selectedInvoker;</span>
+        }
+        // should not happen here
+<span class="nc" id="L147">        return invokers.get(0);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

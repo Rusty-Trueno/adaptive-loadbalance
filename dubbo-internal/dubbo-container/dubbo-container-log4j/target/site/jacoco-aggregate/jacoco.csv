@@ -1,0 +1,9 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-container-log4j/dubbo-container-api,org.apache.dubbo.container,Main.new Thread() {...},49,0,2,0,12,0,3,0,2,0
+dubbo-container-log4j/dubbo-container-api,org.apache.dubbo.container,Main,140,0,8,0,29,0,7,0,3,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter.support.nop,NopDynamicConfigurationFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter.support.nop,NopDynamicConfiguration,9,0,0,0,6,0,5,0,5,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter,AbstractDynamicConfigurationFactory,24,0,4,0,7,0,4,0,2,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter,ConfigChangeType,34,0,0,0,4,0,1,0,1,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter,ConfigChangeEvent,53,0,0,0,11,0,6,0,6,0
+dubbo-container-log4j/dubbo-configcenter-api,org.apache.dubbo.configcenter,DynamicConfiguration,39,0,0,0,10,0,6,0,6,0

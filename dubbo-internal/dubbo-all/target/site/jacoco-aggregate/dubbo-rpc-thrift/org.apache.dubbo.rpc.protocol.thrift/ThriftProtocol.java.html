@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ThriftProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift</a> &gt; <span class="el_source">ThriftProtocol.java</span></div><h1>ThriftProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.config.ConfigurationUtils;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Transporter;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.exchange.ExchangeServer;
+import org.apache.dubbo.remoting.exchange.Exchangers;
+import org.apache.dubbo.remoting.exchange.support.ExchangeHandlerAdapter;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.protocol.AbstractProtocol;
+import org.apache.dubbo.rpc.protocol.dubbo.DubboExporter;
+
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift instead
+ */
+@Deprecated
+<span class="nc" id="L49">public class ThriftProtocol extends AbstractProtocol {</span>
+
+    public static final int DEFAULT_PORT = 40880;
+
+    public static final String NAME = &quot;thrift&quot;;
+
+    // ip:port -&gt; ExchangeServer
+<span class="nc" id="L56">    private final ConcurrentMap&lt;String, ExchangeServer&gt; serverMap =</span>
+            new ConcurrentHashMap&lt;String, ExchangeServer&gt;();
+
+<span class="nc" id="L59">    private ExchangeHandler handler = new ExchangeHandlerAdapter() {</span>
+
+        @Override
+        public CompletableFuture&lt;Object&gt; reply(ExchangeChannel channel, Object msg) throws RemotingException {
+
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (msg instanceof Invocation) {</span>
+<span class="nc" id="L65">                Invocation inv = (Invocation) msg;</span>
+<span class="nc" id="L66">                String path = inv.getAttachments().get(Constants.PATH_KEY);</span>
+<span class="nc" id="L67">                String serviceKey = serviceKey(channel.getLocalAddress().getPort(),</span>
+                        path, null, null);
+<span class="nc" id="L69">                DubboExporter&lt;?&gt; exporter = (DubboExporter&lt;?&gt;) exporterMap.get(serviceKey);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (exporter == null) {</span>
+<span class="nc" id="L71">                    throw new RemotingException(channel,</span>
+                            &quot;Not found exported service: &quot;
+                                    + serviceKey
+                                    + &quot; in &quot;
+<span class="nc" id="L75">                                    + exporterMap.keySet()</span>
+                                    + &quot;, may be version or group mismatch &quot;
+                                    + &quot;, channel: consumer: &quot;
+<span class="nc" id="L78">                                    + channel.getRemoteAddress()</span>
+                                    + &quot; --&gt; provider: &quot;
+<span class="nc" id="L80">                                    + channel.getLocalAddress()</span>
+                                    + &quot;, message:&quot; + msg);
+                }
+
+<span class="nc" id="L84">                RpcContext.getContext().setRemoteAddress(channel.getRemoteAddress());</span>
+
+<span class="nc" id="L86">                return CompletableFuture.completedFuture(exporter.getInvoker().invoke(inv));</span>
+
+            }
+
+<span class="nc" id="L90">            throw new RemotingException(channel,</span>
+                    &quot;Unsupported request: &quot;
+<span class="nc" id="L92">                            + (msg.getClass().getName() + &quot;: &quot; + msg)</span>
+                            + &quot;, channel: consumer: &quot;
+<span class="nc" id="L94">                            + channel.getRemoteAddress()</span>
+                            + &quot; --&gt; provider: &quot;
+<span class="nc" id="L96">                            + channel.getLocalAddress());</span>
+        }
+
+        @Override
+        public void received(Channel channel, Object message) throws RemotingException {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (message instanceof Invocation) {</span>
+<span class="nc" id="L102">                reply((ExchangeChannel) channel, message);</span>
+            } else {
+<span class="nc" id="L104">                super.received(channel, message);</span>
+            }
+<span class="nc" id="L106">        }</span>
+
+    };
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L112">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(Invoker&lt;T&gt; invoker) throws RpcException {
+
+        // can use thrift codec only
+<span class="nc" id="L119">        URL url = invoker.getUrl().addParameter(Constants.CODEC_KEY, ThriftCodec.NAME);</span>
+        // find server.
+<span class="nc" id="L121">        String key = url.getAddress();</span>
+        // client can expose a service for server to invoke only.
+<span class="nc" id="L123">        boolean isServer = url.getParameter(Constants.IS_SERVER_KEY, true);</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">        if (isServer &amp;&amp; !serverMap.containsKey(key)) {</span>
+<span class="nc" id="L125">            serverMap.put(key, getServer(url));</span>
+        }
+        // export service.
+<span class="nc" id="L128">        key = serviceKey(url);</span>
+<span class="nc" id="L129">        DubboExporter&lt;T&gt; exporter = new DubboExporter&lt;T&gt;(invoker, key, exporterMap);</span>
+<span class="nc" id="L130">        exporterMap.put(key, exporter);</span>
+
+<span class="nc" id="L132">        return exporter;</span>
+    }
+
+    @Override
+    public void destroy() {
+
+<span class="nc" id="L138">        super.destroy();</span>
+
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        for (String key : new ArrayList&lt;String&gt;(serverMap.keySet())) {</span>
+
+<span class="nc" id="L142">            ExchangeServer server = serverMap.remove(key);</span>
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (server != null) {</span>
+                try {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                    if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L147">                        logger.info(&quot;Close dubbo server: &quot; + server.getLocalAddress());</span>
+                    }
+<span class="nc" id="L149">                    server.close(ConfigurationUtils.getServerShutdownTimeout());</span>
+<span class="nc" id="L150">                } catch (Throwable t) {</span>
+<span class="nc" id="L151">                    logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L152">                }</span>
+            } // ~ end of if ( server != null )
+
+<span class="nc" id="L155">        } // ~ end of loop serverMap</span>
+
+<span class="nc" id="L157">    } // ~ end of method destroy</span>
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(Class&lt;T&gt; type, URL url) throws RpcException {
+
+<span class="nc" id="L162">        ThriftInvoker&lt;T&gt; invoker = new ThriftInvoker&lt;T&gt;(type, url, getClients(url), invokers);</span>
+
+<span class="nc" id="L164">        invokers.add(invoker);</span>
+
+<span class="nc" id="L166">        return invoker;</span>
+
+    }
+
+    private ExchangeClient[] getClients(URL url) {
+
+<span class="nc" id="L172">        int connections = url.getParameter(Constants.CONNECTIONS_KEY, 1);</span>
+
+<span class="nc" id="L174">        ExchangeClient[] clients = new ExchangeClient[connections];</span>
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (int i = 0; i &lt; clients.length; i++) {</span>
+<span class="nc" id="L177">            clients[i] = initClient(url);</span>
+        }
+<span class="nc" id="L179">        return clients;</span>
+    }
+
+    private ExchangeClient initClient(URL url) {
+
+        ExchangeClient client;
+
+<span class="nc" id="L186">        url = url.addParameter(Constants.CODEC_KEY, ThriftCodec.NAME);</span>
+
+        try {
+<span class="nc" id="L189">            client = Exchangers.connect(url);</span>
+<span class="nc" id="L190">        } catch (RemotingException e) {</span>
+<span class="nc" id="L191">            throw new RpcException(&quot;Fail to create remoting client for service(&quot; + url</span>
+<span class="nc" id="L192">                    + &quot;): &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L193">        }</span>
+
+<span class="nc" id="L195">        return client;</span>
+
+    }
+
+    private ExchangeServer getServer(URL url) {
+        // enable sending readonly event when server closes by default
+<span class="nc" id="L201">        url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());</span>
+<span class="nc" id="L202">        String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);</span>
+
+<span class="nc bnc" id="L204" title="All 6 branches missed.">        if (str != null &amp;&amp; str.length() &gt; 0 &amp;&amp; !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {</span>
+<span class="nc" id="L205">            throw new RpcException(&quot;Unsupported server type: &quot; + str + &quot;, url: &quot; + url);</span>
+        }
+
+        ExchangeServer server;
+        try {
+<span class="nc" id="L210">            server = Exchangers.bind(url, handler);</span>
+<span class="nc" id="L211">        } catch (RemotingException e) {</span>
+<span class="nc" id="L212">            throw new RpcException(&quot;Fail to start server(url: &quot; + url + &quot;) &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L213">        }</span>
+<span class="nc" id="L214">        str = url.getParameter(Constants.CLIENT_KEY);</span>
+<span class="nc bnc" id="L215" title="All 4 branches missed.">        if (str != null &amp;&amp; str.length() &gt; 0) {</span>
+<span class="nc" id="L216">            Set&lt;String&gt; supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (!supportedTypes.contains(str)) {</span>
+<span class="nc" id="L218">                throw new RpcException(&quot;Unsupported client type: &quot; + str);</span>
+            }
+        }
+<span class="nc" id="L221">        return server;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

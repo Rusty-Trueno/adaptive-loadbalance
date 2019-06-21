@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractKryoFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-kryo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.kryo.utils</a> &gt; <span class="el_source">AbstractKryoFactory.java</span></div><h1>AbstractKryoFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.serialize.kryo.utils;
+
+import org.apache.dubbo.common.serialize.kryo.CompatibleKryo;
+import org.apache.dubbo.common.serialize.support.SerializableClassRegistry;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.pool.KryoFactory;
+import com.esotericsoftware.kryo.serializers.DefaultSerializers;
+import de.javakaffee.kryoserializers.ArraysAsListSerializer;
+import de.javakaffee.kryoserializers.BitSetSerializer;
+import de.javakaffee.kryoserializers.GregorianCalendarSerializer;
+import de.javakaffee.kryoserializers.JdkProxySerializer;
+import de.javakaffee.kryoserializers.RegexSerializer;
+import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
+import de.javakaffee.kryoserializers.URISerializer;
+import de.javakaffee.kryoserializers.UUIDSerializer;
+import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
+
+import java.lang.reflect.InvocationHandler;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URI;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+
+public abstract class AbstractKryoFactory implements KryoFactory {
+
+<span class="nc" id="L61">    private final Set&lt;Class&gt; registrations = new LinkedHashSet&lt;Class&gt;();</span>
+
+    private boolean registrationRequired;
+
+    private volatile boolean kryoCreated;
+
+<span class="nc" id="L67">    public AbstractKryoFactory() {</span>
+
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * only supposed to be called at startup time
+     *
+     *  later may consider adding support for custom serializer, custom id, etc
+     */
+    public void registerClass(Class clazz) {
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (kryoCreated) {</span>
+<span class="nc" id="L79">            throw new IllegalStateException(&quot;Can't register class after creating kryo instance&quot;);</span>
+        }
+<span class="nc" id="L81">        registrations.add(clazz);</span>
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    public Kryo create() {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (!kryoCreated) {</span>
+<span class="nc" id="L87">            kryoCreated = true;</span>
+        }
+
+<span class="nc" id="L90">        Kryo kryo = new CompatibleKryo();</span>
+
+        // TODO
+//        kryo.setReferences(false);
+<span class="nc" id="L94">        kryo.setRegistrationRequired(registrationRequired);</span>
+
+<span class="nc" id="L96">        kryo.register(Arrays.asList(&quot;&quot;).getClass(), new ArraysAsListSerializer());</span>
+<span class="nc" id="L97">        kryo.register(GregorianCalendar.class, new GregorianCalendarSerializer());</span>
+<span class="nc" id="L98">        kryo.register(InvocationHandler.class, new JdkProxySerializer());</span>
+<span class="nc" id="L99">        kryo.register(BigDecimal.class, new DefaultSerializers.BigDecimalSerializer());</span>
+<span class="nc" id="L100">        kryo.register(BigInteger.class, new DefaultSerializers.BigIntegerSerializer());</span>
+<span class="nc" id="L101">        kryo.register(Pattern.class, new RegexSerializer());</span>
+<span class="nc" id="L102">        kryo.register(BitSet.class, new BitSetSerializer());</span>
+<span class="nc" id="L103">        kryo.register(URI.class, new URISerializer());</span>
+<span class="nc" id="L104">        kryo.register(UUID.class, new UUIDSerializer());</span>
+<span class="nc" id="L105">        UnmodifiableCollectionsSerializer.registerSerializers(kryo);</span>
+<span class="nc" id="L106">        SynchronizedCollectionsSerializer.registerSerializers(kryo);</span>
+
+        // now just added some very common classes
+        // TODO optimization
+<span class="nc" id="L110">        kryo.register(HashMap.class);</span>
+<span class="nc" id="L111">        kryo.register(ArrayList.class);</span>
+<span class="nc" id="L112">        kryo.register(LinkedList.class);</span>
+<span class="nc" id="L113">        kryo.register(HashSet.class);</span>
+<span class="nc" id="L114">        kryo.register(TreeSet.class);</span>
+<span class="nc" id="L115">        kryo.register(Hashtable.class);</span>
+<span class="nc" id="L116">        kryo.register(Date.class);</span>
+<span class="nc" id="L117">        kryo.register(Calendar.class);</span>
+<span class="nc" id="L118">        kryo.register(ConcurrentHashMap.class);</span>
+<span class="nc" id="L119">        kryo.register(SimpleDateFormat.class);</span>
+<span class="nc" id="L120">        kryo.register(GregorianCalendar.class);</span>
+<span class="nc" id="L121">        kryo.register(Vector.class);</span>
+<span class="nc" id="L122">        kryo.register(BitSet.class);</span>
+<span class="nc" id="L123">        kryo.register(StringBuffer.class);</span>
+<span class="nc" id="L124">        kryo.register(StringBuilder.class);</span>
+<span class="nc" id="L125">        kryo.register(Object.class);</span>
+<span class="nc" id="L126">        kryo.register(Object[].class);</span>
+<span class="nc" id="L127">        kryo.register(String[].class);</span>
+<span class="nc" id="L128">        kryo.register(byte[].class);</span>
+<span class="nc" id="L129">        kryo.register(char[].class);</span>
+<span class="nc" id="L130">        kryo.register(int[].class);</span>
+<span class="nc" id="L131">        kryo.register(float[].class);</span>
+<span class="nc" id="L132">        kryo.register(double[].class);</span>
+
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (Class clazz : registrations) {</span>
+<span class="nc" id="L135">            kryo.register(clazz);</span>
+<span class="nc" id="L136">        }</span>
+
+<span class="nc" id="L138">        SerializableClassRegistry.getRegisteredClasses().forEach((clazz, ser) -&gt; {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (ser == null) {</span>
+<span class="nc" id="L140">                kryo.register(clazz);</span>
+            } else {
+<span class="nc" id="L142">                kryo.register(clazz, (Serializer) ser);</span>
+            }
+<span class="nc" id="L144">        });</span>
+
+<span class="nc" id="L146">        return kryo;</span>
+    }
+
+    public void setRegistrationRequired(boolean registrationRequired) {
+<span class="nc" id="L150">        this.registrationRequired = registrationRequired;</span>
+<span class="nc" id="L151">    }</span>
+
+    public abstract void returnKryo(Kryo kryo);
+
+    public abstract Kryo getKryo();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

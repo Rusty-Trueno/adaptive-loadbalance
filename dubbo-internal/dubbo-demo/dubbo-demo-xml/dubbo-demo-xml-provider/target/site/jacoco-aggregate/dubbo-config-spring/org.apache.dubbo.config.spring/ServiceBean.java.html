@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceBean.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring</a> &gt; <span class="el_source">ServiceBean.java</span></div><h1>ServiceBean.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.ProtocolConfig;
+import org.apache.dubbo.config.ProviderConfig;
+import org.apache.dubbo.config.ServiceConfig;
+import org.apache.dubbo.config.MetricsConfig;
+import org.apache.dubbo.config.RegistryConfig;
+import org.apache.dubbo.config.ConfigCenterConfig;
+import org.apache.dubbo.config.MetadataReportConfig;
+import org.apache.dubbo.config.MonitorConfig;
+import org.apache.dubbo.config.ModuleConfig;
+import org.apache.dubbo.config.ApplicationConfig;
+import org.apache.dubbo.config.annotation.Service;
+import org.apache.dubbo.config.spring.context.event.ServiceBeanExportedEvent;
+import org.apache.dubbo.config.spring.extension.SpringExtensionFactory;
+
+import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.BeanFactoryUtils;
+import org.springframework.beans.factory.BeanNameAware;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationEventPublisherAware;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.addApplicationListener;
+
+/**
+ * ServiceFactoryBean
+ *
+ * @export
+ */
+public class ServiceBean&lt;T&gt; extends ServiceConfig&lt;T&gt; implements InitializingBean, DisposableBean,
+        ApplicationContextAware, ApplicationListener&lt;ContextRefreshedEvent&gt;, BeanNameAware,
+        ApplicationEventPublisherAware {
+
+
+    private static final long serialVersionUID = 213195494150089726L;
+
+    private final transient Service service;
+
+    private transient ApplicationContext applicationContext;
+
+    private transient String beanName;
+
+    private transient boolean supportedApplicationListener;
+
+    private ApplicationEventPublisher applicationEventPublisher;
+
+    public ServiceBean() {
+<span class="nc" id="L78">        super();</span>
+<span class="nc" id="L79">        this.service = null;</span>
+<span class="nc" id="L80">    }</span>
+
+    public ServiceBean(Service service) {
+<span class="nc" id="L83">        super(service);</span>
+<span class="nc" id="L84">        this.service = service;</span>
+<span class="nc" id="L85">    }</span>
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) {
+<span class="nc" id="L89">        this.applicationContext = applicationContext;</span>
+<span class="nc" id="L90">        SpringExtensionFactory.addApplicationContext(applicationContext);</span>
+<span class="nc" id="L91">        supportedApplicationListener = addApplicationListener(applicationContext, this);</span>
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public void setBeanName(String name) {
+<span class="nc" id="L96">        this.beanName = name;</span>
+<span class="nc" id="L97">    }</span>
+
+    /**
+     * Gets associated {@link Service}
+     *
+     * @return associated {@link Service}
+     */
+    public Service getService() {
+<span class="nc" id="L105">        return service;</span>
+    }
+
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (!isExported() &amp;&amp; !isUnexported()) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L112">                logger.info(&quot;The service ready on spring started. service: &quot; + getInterface());</span>
+            }
+<span class="nc" id="L114">            export();</span>
+        }
+<span class="nc" id="L116">    }</span>
+
+    @Override
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;deprecation&quot;})
+    public void afterPropertiesSet() throws Exception {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (getProvider() == null) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            Map&lt;String, ProviderConfig&gt; providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (providerConfigMap != null &amp;&amp; providerConfigMap.size() &gt; 0) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                Map&lt;String, ProtocolConfig&gt; protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (CollectionUtils.isEmptyMap(protocolConfigMap)</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                        &amp;&amp; providerConfigMap.size() &gt; 1) { // backward compatibility</span>
+<span class="nc" id="L127">                    List&lt;ProviderConfig&gt; providerConfigs = new ArrayList&lt;ProviderConfig&gt;();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                    for (ProviderConfig config : providerConfigMap.values()) {</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">                        if (config.isDefault() != null &amp;&amp; config.isDefault()) {</span>
+<span class="nc" id="L130">                            providerConfigs.add(config);</span>
+                        }
+<span class="nc" id="L132">                    }</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                    if (!providerConfigs.isEmpty()) {</span>
+<span class="nc" id="L134">                        setProviders(providerConfigs);</span>
+                    }
+<span class="nc" id="L136">                } else {</span>
+<span class="nc" id="L137">                    ProviderConfig providerConfig = null;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                    for (ProviderConfig config : providerConfigMap.values()) {</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">                        if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                            if (providerConfig != null) {</span>
+<span class="nc" id="L141">                                throw new IllegalStateException(&quot;Duplicate provider configs: &quot; + providerConfig + &quot; and &quot; + config);</span>
+                            }
+<span class="nc" id="L143">                            providerConfig = config;</span>
+                        }
+<span class="nc" id="L145">                    }</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                    if (providerConfig != null) {</span>
+<span class="nc" id="L147">                        setProvider(providerConfig);</span>
+                    }
+                }
+            }
+        }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (getApplication() == null</span>
+<span class="nc bnc" id="L153" title="All 4 branches missed.">                &amp;&amp; (getProvider() == null || getProvider().getApplication() == null)) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            Map&lt;String, ApplicationConfig&gt; applicationConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ApplicationConfig.class, false, false);</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">            if (applicationConfigMap != null &amp;&amp; applicationConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L156">                ApplicationConfig applicationConfig = null;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                for (ApplicationConfig config : applicationConfigMap.values()) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (applicationConfig != null) {</span>
+<span class="nc" id="L159">                        throw new IllegalStateException(&quot;Duplicate application configs: &quot; + applicationConfig + &quot; and &quot; + config);</span>
+                    }
+<span class="nc" id="L161">                    applicationConfig = config;</span>
+<span class="nc" id="L162">                }</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                if (applicationConfig != null) {</span>
+<span class="nc" id="L164">                    setApplication(applicationConfig);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (getModule() == null</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">                &amp;&amp; (getProvider() == null || getProvider().getModule() == null)) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            Map&lt;String, ModuleConfig&gt; moduleConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ModuleConfig.class, false, false);</span>
+<span class="nc bnc" id="L171" title="All 4 branches missed.">            if (moduleConfigMap != null &amp;&amp; moduleConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L172">                ModuleConfig moduleConfig = null;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                for (ModuleConfig config : moduleConfigMap.values()) {</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                    if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                        if (moduleConfig != null) {</span>
+<span class="nc" id="L176">                            throw new IllegalStateException(&quot;Duplicate module configs: &quot; + moduleConfig + &quot; and &quot; + config);</span>
+                        }
+<span class="nc" id="L178">                        moduleConfig = config;</span>
+                    }
+<span class="nc" id="L180">                }</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                if (moduleConfig != null) {</span>
+<span class="nc" id="L182">                    setModule(moduleConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (StringUtils.isEmpty(getRegistryIds())) {</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">            if (getApplication() != null &amp;&amp; StringUtils.isNotEmpty(getApplication().getRegistryIds())) {</span>
+<span class="nc" id="L189">                setRegistryIds(getApplication().getRegistryIds());</span>
+            }
+<span class="nc bnc" id="L191" title="All 4 branches missed.">            if (getProvider() != null &amp;&amp; StringUtils.isNotEmpty(getProvider().getRegistryIds())) {</span>
+<span class="nc" id="L192">                setRegistryIds(getProvider().getRegistryIds());</span>
+            }
+        }
+
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if ((CollectionUtils.isEmpty(getRegistries()))</span>
+<span class="nc bnc" id="L197" title="All 4 branches missed.">                &amp;&amp; (getProvider() == null || CollectionUtils.isEmpty(getProvider().getRegistries()))</span>
+<span class="nc bnc" id="L198" title="All 4 branches missed.">                &amp;&amp; (getApplication() == null || CollectionUtils.isEmpty(getApplication().getRegistries()))) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            Map&lt;String, RegistryConfig&gt; registryConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, RegistryConfig.class, false, false);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (CollectionUtils.isNotEmptyMap(registryConfigMap)) {</span>
+<span class="nc" id="L201">                List&lt;RegistryConfig&gt; registryConfigs = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(registryIds)) {</span>
+<span class="nc" id="L203">                    Arrays.stream(Constants.COMMA_SPLIT_PATTERN.split(registryIds)).forEach(id -&gt; {</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                        if (registryConfigMap.containsKey(id)) {</span>
+<span class="nc" id="L205">                            registryConfigs.add(registryConfigMap.get(id));</span>
+                        }
+<span class="nc" id="L207">                    });</span>
+                }
+
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (registryConfigs.isEmpty()) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                    for (RegistryConfig config : registryConfigMap.values()) {</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                        if (StringUtils.isEmpty(registryIds)) {</span>
+<span class="nc" id="L213">                            registryConfigs.add(config);</span>
+                        }
+<span class="nc" id="L215">                    }</span>
+                }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (!registryConfigs.isEmpty()) {</span>
+<span class="nc" id="L218">                    super.setRegistries(registryConfigs);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (getMetadataReportConfig() == null) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            Map&lt;String, MetadataReportConfig&gt; metadataReportConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MetadataReportConfig.class, false, false);</span>
+<span class="nc bnc" id="L224" title="All 4 branches missed.">            if (metadataReportConfigMap != null &amp;&amp; metadataReportConfigMap.size() == 1) {</span>
+<span class="nc" id="L225">                super.setMetadataReportConfig(metadataReportConfigMap.values().iterator().next());</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">            } else if (metadataReportConfigMap != null &amp;&amp; metadataReportConfigMap.size() &gt; 1) {</span>
+<span class="nc" id="L227">                throw new IllegalStateException(&quot;Multiple MetadataReport configs: &quot; + metadataReportConfigMap);</span>
+            }
+        }
+
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (getConfigCenter() == null) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            Map&lt;String, ConfigCenterConfig&gt; configenterMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ConfigCenterConfig.class, false, false);</span>
+<span class="nc bnc" id="L233" title="All 4 branches missed.">            if (configenterMap != null &amp;&amp; configenterMap.size() == 1) {</span>
+<span class="nc" id="L234">                super.setConfigCenter(configenterMap.values().iterator().next());</span>
+<span class="nc bnc" id="L235" title="All 4 branches missed.">            } else if (configenterMap != null &amp;&amp; configenterMap.size() &gt; 1) {</span>
+<span class="nc" id="L236">                throw new IllegalStateException(&quot;Multiple ConfigCenter found:&quot; + configenterMap);</span>
+            }
+        }
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (getMonitor() == null</span>
+<span class="nc bnc" id="L241" title="All 4 branches missed.">                &amp;&amp; (getProvider() == null || getProvider().getMonitor() == null)</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">                &amp;&amp; (getApplication() == null || getApplication().getMonitor() == null)) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            Map&lt;String, MonitorConfig&gt; monitorConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MonitorConfig.class, false, false);</span>
+<span class="nc bnc" id="L244" title="All 4 branches missed.">            if (monitorConfigMap != null &amp;&amp; monitorConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L245">                MonitorConfig monitorConfig = null;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                for (MonitorConfig config : monitorConfigMap.values()) {</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">                    if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                        if (monitorConfig != null) {</span>
+<span class="nc" id="L249">                            throw new IllegalStateException(&quot;Duplicate monitor configs: &quot; + monitorConfig + &quot; and &quot; + config);</span>
+                        }
+<span class="nc" id="L251">                        monitorConfig = config;</span>
+                    }
+<span class="nc" id="L253">                }</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                if (monitorConfig != null) {</span>
+<span class="nc" id="L255">                    setMonitor(monitorConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (getMetrics() == null) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            Map&lt;String, MetricsConfig&gt; metricsConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MetricsConfig.class, false, false);</span>
+<span class="nc bnc" id="L262" title="All 4 branches missed.">            if (metricsConfigMap != null &amp;&amp; metricsConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L263">                MetricsConfig metricsConfig = null;</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                for (MetricsConfig config : metricsConfigMap.values()) {</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                    if (metricsConfig != null) {</span>
+<span class="nc" id="L266">                        throw new IllegalStateException(&quot;Duplicate metrics configs: &quot; + metricsConfig + &quot; and &quot; + config);</span>
+                    }
+<span class="nc" id="L268">                    metricsConfig = config;</span>
+<span class="nc" id="L269">                }</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                if (metricsConfig != null) {</span>
+<span class="nc" id="L271">                    setMetrics(metricsConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (StringUtils.isEmpty(getProtocolIds())) {</span>
+<span class="nc bnc" id="L277" title="All 4 branches missed.">            if (getProvider() != null &amp;&amp; StringUtils.isNotEmpty(getProvider().getProtocolIds())) {</span>
+<span class="nc" id="L278">                setProtocolIds(getProvider().getProtocolIds());</span>
+            }
+        }
+
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(getProtocols())</span>
+<span class="nc bnc" id="L283" title="All 4 branches missed.">                &amp;&amp; (getProvider() == null || CollectionUtils.isEmpty(getProvider().getProtocols()))) {</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            Map&lt;String, ProtocolConfig&gt; protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);</span>
+<span class="nc bnc" id="L285" title="All 4 branches missed.">            if (protocolConfigMap != null &amp;&amp; protocolConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L286">                List&lt;ProtocolConfig&gt; protocolConfigs = new ArrayList&lt;ProtocolConfig&gt;();</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(getProtocolIds())) {</span>
+<span class="nc" id="L288">                    Arrays.stream(Constants.COMMA_SPLIT_PATTERN.split(getProtocolIds()))</span>
+<span class="nc" id="L289">                            .forEach(id -&gt; {</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                                if (protocolConfigMap.containsKey(id)) {</span>
+<span class="nc" id="L291">                                    protocolConfigs.add(protocolConfigMap.get(id));</span>
+                                }
+<span class="nc" id="L293">                            });</span>
+                }
+
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                if (protocolConfigs.isEmpty()) {</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                    for (ProtocolConfig config : protocolConfigMap.values()) {</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                        if (StringUtils.isEmpty(protocolIds)) {</span>
+<span class="nc" id="L299">                            protocolConfigs.add(config);</span>
+                        }
+<span class="nc" id="L301">                    }</span>
+                }
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                if (!protocolConfigs.isEmpty()) {</span>
+<span class="nc" id="L305">                    super.setProtocols(protocolConfigs);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (StringUtils.isEmpty(getPath())) {</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(beanName)</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    &amp;&amp; StringUtils.isNotEmpty(getInterface())</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                    &amp;&amp; beanName.startsWith(getInterface())) {</span>
+<span class="nc" id="L313">                setPath(beanName);</span>
+            }
+        }
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (!supportedApplicationListener) {</span>
+<span class="nc" id="L317">            export();</span>
+        }
+<span class="nc" id="L319">    }</span>
+
+    /**
+     * Get the name of {@link ServiceBean}
+     *
+     * @return {@link ServiceBean}'s name
+     * @since 2.6.5
+     */
+    public String getBeanName() {
+<span class="nc" id="L328">        return this.beanName;</span>
+    }
+
+    /**
+     * @since 2.6.5
+     */
+    @Override
+    public void export() {
+<span class="nc" id="L336">        super.export();</span>
+        // Publish ServiceBeanExportedEvent
+<span class="nc" id="L338">        publishExportEvent();</span>
+<span class="nc" id="L339">    }</span>
+
+    /**
+     * @since 2.6.5
+     */
+    private void publishExportEvent() {
+<span class="nc" id="L345">        ServiceBeanExportedEvent exportEvent = new ServiceBeanExportedEvent(this);</span>
+<span class="nc" id="L346">        applicationEventPublisher.publishEvent(exportEvent);</span>
+<span class="nc" id="L347">    }</span>
+
+    @Override
+    public void destroy() throws Exception {
+        // no need to call unexport() here, see
+        // org.apache.dubbo.config.spring.extension.SpringExtensionFactory.ShutdownHookListener
+<span class="nc" id="L353">    }</span>
+
+    // merged from dubbox
+    @Override
+    protected Class getServiceClass(T ref) {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (AopUtils.isAopProxy(ref)) {</span>
+<span class="nc" id="L359">            return AopUtils.getTargetClass(ref);</span>
+        }
+<span class="nc" id="L361">        return super.getServiceClass(ref);</span>
+    }
+
+    /**
+     * @param applicationEventPublisher
+     * @since 2.6.5
+     */
+    @Override
+    public void setApplicationEventPublisher(ApplicationEventPublisher applicationEventPublisher) {
+<span class="nc" id="L370">        this.applicationEventPublisher = applicationEventPublisher;</span>
+<span class="nc" id="L371">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

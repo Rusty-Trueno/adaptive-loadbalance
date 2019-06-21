@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InjvmProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-injvm</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.injvm</a> &gt; <span class="el_source">InjvmProtocol.java</span></div><h1>InjvmProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.injvm;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.protocol.AbstractProtocol;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import java.util.Map;
+
+/**
+ * InjvmProtocol
+ */
+public class InjvmProtocol extends AbstractProtocol implements Protocol {
+
+    public static final String NAME = Constants.LOCAL_PROTOCOL;
+
+    public static final int DEFAULT_PORT = 0;
+    private static InjvmProtocol INSTANCE;
+
+<span class="nc" id="L43">    public InjvmProtocol() {</span>
+<span class="nc" id="L44">        INSTANCE = this;</span>
+<span class="nc" id="L45">    }</span>
+
+    public static InjvmProtocol getInjvmProtocol() {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (INSTANCE == null) {</span>
+<span class="nc" id="L49">            ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(InjvmProtocol.NAME); // load</span>
+        }
+<span class="nc" id="L51">        return INSTANCE;</span>
+    }
+
+    static Exporter&lt;?&gt; getExporter(Map&lt;String, Exporter&lt;?&gt;&gt; map, URL key) {
+<span class="nc" id="L55">        Exporter&lt;?&gt; result = null;</span>
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (!key.getServiceKey().contains(&quot;*&quot;)) {</span>
+<span class="nc" id="L58">            result = map.get(key.getServiceKey());</span>
+        } else {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (CollectionUtils.isNotEmptyMap(map)) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                for (Exporter&lt;?&gt; exporter : map.values()) {</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                    if (UrlUtils.isServiceKeyMatch(key, exporter.getInvoker().getUrl())) {</span>
+<span class="nc" id="L63">                        result = exporter;</span>
+<span class="nc" id="L64">                        break;</span>
+                    }
+<span class="nc" id="L66">                }</span>
+            }
+        }
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L71">            return null;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        } else if (ProtocolUtils.isGeneric(</span>
+<span class="nc" id="L73">                result.getInvoker().getUrl().getParameter(Constants.GENERIC_KEY))) {</span>
+<span class="nc" id="L74">            return null;</span>
+        } else {
+<span class="nc" id="L76">            return result;</span>
+        }
+    }
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L82">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc" id="L87">        return new InjvmExporter&lt;T&gt;(invoker, invoker.getUrl().getServiceKey(), exporterMap);</span>
+    }
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(Class&lt;T&gt; serviceType, URL url) throws RpcException {
+<span class="nc" id="L92">        return new InjvmInvoker&lt;T&gt;(serviceType, url, url.getServiceKey(), exporterMap);</span>
+    }
+
+    public boolean isInjvmRefer(URL url) {
+<span class="nc" id="L96">        String scope = url.getParameter(Constants.SCOPE_KEY);</span>
+        // Since injvm protocol is configured explicitly, we don't need to set any extra flag, use normal refer process.
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        if (Constants.SCOPE_LOCAL.equals(scope) || (url.getParameter(Constants.LOCAL_PROTOCOL, false))) {</span>
+            // if it's declared as local reference
+            // 'scope=local' is equivalent to 'injvm=true', injvm will be deprecated in the future release
+<span class="nc" id="L101">            return true;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        } else if (Constants.SCOPE_REMOTE.equals(scope)) {</span>
+            // it's declared as remote reference
+<span class="nc" id="L104">            return false;</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        } else if (url.getParameter(Constants.GENERIC_KEY, false)) {</span>
+            // generic invocation is not local reference
+<span class="nc" id="L107">            return false;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        } else if (getExporter(exporterMap, url) != null) {</span>
+            // by default, go through local reference if there's the service exposed locally
+<span class="nc" id="L110">            return true;</span>
+        } else {
+<span class="nc" id="L112">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

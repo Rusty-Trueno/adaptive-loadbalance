@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AllChannelHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.dispatcher.all</a> &gt; <span class="el_source">AllChannelHandler.java</span></div><h1>AllChannelHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.dispatcher.all;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.ExecutionException;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.transport.RequestLimiter;
+import org.apache.dubbo.remoting.transport.dispatcher.ChannelEventRunnable;
+import org.apache.dubbo.remoting.transport.dispatcher.ChannelEventRunnable.ChannelState;
+import org.apache.dubbo.remoting.transport.dispatcher.WrappedChannelHandler;
+
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+
+public class AllChannelHandler extends WrappedChannelHandler {
+
+
+    public AllChannelHandler(ChannelHandler handler, URL url) {
+<span class="nc" id="L41">        super(handler, url);</span>
+<span class="nc" id="L42">    }</span>
+
+    @Override
+    public void connected(Channel channel) throws RemotingException {
+<span class="nc" id="L46">        ExecutorService executor = getExecutorService();</span>
+        try {
+<span class="nc" id="L48">            executor.execute(new ChannelEventRunnable(channel, handler, ChannelState.CONNECTED));</span>
+<span class="nc" id="L49">        } catch (Throwable t) {</span>
+<span class="nc" id="L50">            throw new ExecutionException(&quot;connect event&quot;, channel, getClass() + &quot; error when process connected event .&quot;, t);</span>
+<span class="nc" id="L51">        }</span>
+<span class="nc" id="L52">    }</span>
+
+    @Override
+    public void disconnected(Channel channel) throws RemotingException {
+<span class="nc" id="L56">        ExecutorService executor = getExecutorService();</span>
+        try {
+<span class="nc" id="L58">            executor.execute(new ChannelEventRunnable(channel, handler, ChannelState.DISCONNECTED));</span>
+<span class="nc" id="L59">        } catch (Throwable t) {</span>
+<span class="nc" id="L60">            throw new ExecutionException(&quot;disconnect event&quot;, channel, getClass() + &quot; error when process disconnected event .&quot;, t);</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    public void received(Channel channel, Object message) throws RemotingException {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (message instanceof Request) {</span>
+<span class="nc" id="L67">            Set&lt;String&gt; supportedExtensions =</span>
+<span class="nc" id="L68">                    ExtensionLoader.getExtensionLoader(RequestLimiter.class).getSupportedExtensions();</span>
+<span class="nc bnc" id="L69" title="All 4 branches missed.">            if (supportedExtensions != null &amp;&amp; supportedExtensions.size() &gt; 0) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                for (String supportedExtension : supportedExtensions) {</span>
+<span class="nc" id="L71">                    RequestLimiter requestLimiter = ExtensionLoader.getExtensionLoader(RequestLimiter.class).getExtension(supportedExtension);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                    if (!requestLimiter.tryAcquire((Request) message, ((ThreadPoolExecutor) executor).getActiveCount())) {</span>
+<span class="nc" id="L73">                        Request request = (Request) message;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                        if (request.isTwoWay()) {</span>
+<span class="nc" id="L75">                            String msg = &quot;Server side(&quot; + url.getIp() + &quot;,&quot; + url.getPort() + &quot;) request limiter acquired failed&quot;;</span>
+<span class="nc" id="L76">                            Response response = new Response(request.getId(), request.getVersion());</span>
+<span class="nc" id="L77">                            response.setStatus(Response.SERVER_REQUEST_LIMIT);</span>
+<span class="nc" id="L78">                            response.setErrorMessage(msg);</span>
+<span class="nc" id="L79">                            channel.send(response);</span>
+<span class="nc" id="L80">                            return;</span>
+                        }
+<span class="nc" id="L82">                        throw new ExecutionException(message, channel, getClass() + &quot; error when process received event .&quot;);</span>
+                    }
+<span class="nc" id="L84">                }</span>
+
+            }
+        }
+<span class="nc" id="L88">        ExecutorService executor = getExecutorService();</span>
+        try {
+<span class="nc" id="L90">            executor.execute(new ChannelEventRunnable(channel, handler, ChannelState.RECEIVED, message));</span>
+<span class="nc" id="L91">        } catch (Throwable t) {</span>
+            //TODO A temporary solution to the problem that the exception information can not be sent to the opposite end after the thread pool is full. Need a refactoring
+            //fix The thread pool is full, refuses to call, does not return, and causes the consumer to wait for time out
+<span class="nc bnc" id="L94" title="All 4 branches missed.">            if (message instanceof Request &amp;&amp; t instanceof RejectedExecutionException) {</span>
+<span class="nc" id="L95">                Request request = (Request) message;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                if (request.isTwoWay()) {</span>
+<span class="nc" id="L97">                    String msg = &quot;Server side(&quot; + url.getIp() + &quot;,&quot; + url.getPort() + &quot;) threadpool is exhausted ,detail msg:&quot; + t.getMessage();</span>
+<span class="nc" id="L98">                    Response response = new Response(request.getId(), request.getVersion());</span>
+<span class="nc" id="L99">                    response.setStatus(Response.SERVER_THREADPOOL_EXHAUSTED_ERROR);</span>
+<span class="nc" id="L100">                    response.setErrorMessage(msg);</span>
+<span class="nc" id="L101">                    channel.send(response);</span>
+<span class="nc" id="L102">                    return;</span>
+                }
+            }
+<span class="nc" id="L105">            throw new ExecutionException(message, channel, getClass() + &quot; error when process received event .&quot;, t);</span>
+<span class="nc" id="L106">        }</span>
+<span class="nc" id="L107">    }</span>
+
+    @Override
+    public void caught(Channel channel, Throwable exception) throws RemotingException {
+<span class="nc" id="L111">        ExecutorService executor = getExecutorService();</span>
+        try {
+<span class="nc" id="L113">            executor.execute(new ChannelEventRunnable(channel, handler, ChannelState.CAUGHT, exception));</span>
+<span class="nc" id="L114">        } catch (Throwable t) {</span>
+<span class="nc" id="L115">            throw new ExecutionException(&quot;caught event&quot;, channel, getClass() + &quot; error when process caught event .&quot;, t);</span>
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

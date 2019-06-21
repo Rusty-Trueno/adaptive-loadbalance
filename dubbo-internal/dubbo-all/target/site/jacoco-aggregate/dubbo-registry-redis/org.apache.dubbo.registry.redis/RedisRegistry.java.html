@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RedisRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-redis</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.redis</a> &gt; <span class="el_source">RedisRegistry.java</span></div><h1>RedisRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.redis;
+
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+import org.apache.dubbo.rpc.RpcException;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPubSub;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * RedisRegistry
+ */
+public class RedisRegistry extends FailbackRegistry {
+
+<span class="nc" id="L62">    private static final Logger logger = LoggerFactory.getLogger(RedisRegistry.class);</span>
+
+    private static final int DEFAULT_REDIS_PORT = 6379;
+
+    private final static String DEFAULT_ROOT = &quot;dubbo&quot;;
+
+<span class="nc" id="L68">    private final ScheduledExecutorService expireExecutor = Executors.newScheduledThreadPool(1, new NamedThreadFactory(&quot;DubboRegistryExpireTimer&quot;, true));</span>
+
+    private final ScheduledFuture&lt;?&gt; expireFuture;
+
+    private final String root;
+
+<span class="nc" id="L74">    private final Map&lt;String, JedisPool&gt; jedisPools = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L76">    private final ConcurrentMap&lt;String, Notifier&gt; notifiers = new ConcurrentHashMap&lt;&gt;();</span>
+
+    private final int reconnectPeriod;
+
+    private final int expirePeriod;
+
+<span class="nc" id="L82">    private volatile boolean admin = false;</span>
+
+    private boolean replicate;
+
+    public RedisRegistry(URL url) {
+<span class="nc" id="L87">        super(url);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (url.isAnyHost()) {</span>
+<span class="nc" id="L89">            throw new IllegalStateException(&quot;registry address == null&quot;);</span>
+        }
+<span class="nc" id="L91">        GenericObjectPoolConfig config = new GenericObjectPoolConfig();</span>
+<span class="nc" id="L92">        config.setTestOnBorrow(url.getParameter(&quot;test.on.borrow&quot;, true));</span>
+<span class="nc" id="L93">        config.setTestOnReturn(url.getParameter(&quot;test.on.return&quot;, false));</span>
+<span class="nc" id="L94">        config.setTestWhileIdle(url.getParameter(&quot;test.while.idle&quot;, false));</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (url.getParameter(&quot;max.idle&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L96">            config.setMaxIdle(url.getParameter(&quot;max.idle&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (url.getParameter(&quot;min.idle&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L99">            config.setMinIdle(url.getParameter(&quot;min.idle&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (url.getParameter(&quot;max.active&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L102">            config.setMaxTotal(url.getParameter(&quot;max.active&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (url.getParameter(&quot;max.total&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L105">            config.setMaxTotal(url.getParameter(&quot;max.total&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (url.getParameter(&quot;max.wait&quot;, url.getParameter(&quot;timeout&quot;, 0)) &gt; 0) {</span>
+<span class="nc" id="L108">            config.setMaxWaitMillis(url.getParameter(&quot;max.wait&quot;, url.getParameter(&quot;timeout&quot;, 0)));</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (url.getParameter(&quot;num.tests.per.eviction.run&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L111">            config.setNumTestsPerEvictionRun(url.getParameter(&quot;num.tests.per.eviction.run&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (url.getParameter(&quot;time.between.eviction.runs.millis&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L114">            config.setTimeBetweenEvictionRunsMillis(url.getParameter(&quot;time.between.eviction.runs.millis&quot;, 0));</span>
+        }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (url.getParameter(&quot;min.evictable.idle.time.millis&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L117">            config.setMinEvictableIdleTimeMillis(url.getParameter(&quot;min.evictable.idle.time.millis&quot;, 0));</span>
+        }
+
+<span class="nc" id="L120">        String cluster = url.getParameter(&quot;cluster&quot;, &quot;failover&quot;);</span>
+<span class="nc bnc" id="L121" title="All 4 branches missed.">        if (!&quot;failover&quot;.equals(cluster) &amp;&amp; !&quot;replicate&quot;.equals(cluster)) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(&quot;Unsupported redis cluster: &quot; + cluster + &quot;. The redis cluster only supported failover or replicate.&quot;);</span>
+        }
+<span class="nc" id="L124">        replicate = &quot;replicate&quot;.equals(cluster);</span>
+
+<span class="nc" id="L126">        List&lt;String&gt; addresses = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L127">        addresses.add(url.getAddress());</span>
+<span class="nc" id="L128">        String[] backups = url.getParameter(Constants.BACKUP_KEY, new String[0]);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (ArrayUtils.isNotEmpty(backups)) {</span>
+<span class="nc" id="L130">            addresses.addAll(Arrays.asList(backups));</span>
+        }
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        for (String address : addresses) {</span>
+<span class="nc" id="L134">            int i = address.indexOf(':');</span>
+            String host;
+            int port;
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L138">                host = address.substring(0, i);</span>
+<span class="nc" id="L139">                port = Integer.parseInt(address.substring(i + 1));</span>
+            } else {
+<span class="nc" id="L141">                host = address;</span>
+<span class="nc" id="L142">                port = DEFAULT_REDIS_PORT;</span>
+            }
+<span class="nc" id="L144">            this.jedisPools.put(address, new JedisPool(config, host, port,</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                    url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT), StringUtils.isEmpty(url.getPassword()) ? null : url.getPassword(),</span>
+<span class="nc" id="L146">                    url.getParameter(&quot;db.index&quot;, 0)));</span>
+<span class="nc" id="L147">        }</span>
+
+<span class="nc" id="L149">        this.reconnectPeriod = url.getParameter(Constants.REGISTRY_RECONNECT_PERIOD_KEY, Constants.DEFAULT_REGISTRY_RECONNECT_PERIOD);</span>
+<span class="nc" id="L150">        String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (!group.startsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L152">            group = Constants.PATH_SEPARATOR + group;</span>
+        }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (!group.endsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L155">            group = group + Constants.PATH_SEPARATOR;</span>
+        }
+<span class="nc" id="L157">        this.root = group;</span>
+
+<span class="nc" id="L159">        this.expirePeriod = url.getParameter(Constants.SESSION_TIMEOUT_KEY, Constants.DEFAULT_SESSION_TIMEOUT);</span>
+<span class="nc" id="L160">        this.expireFuture = expireExecutor.scheduleWithFixedDelay(() -&gt; {</span>
+            try {
+<span class="nc" id="L162">                deferExpired(); // Extend the expiration time</span>
+<span class="nc" id="L163">            } catch (Throwable t) { // Defensive fault tolerance</span>
+<span class="nc" id="L164">                logger.error(&quot;Unexpected exception occur at defer expire time, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L165">            }</span>
+<span class="nc" id="L166">        }, expirePeriod / 2, expirePeriod / 2, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L167">    }</span>
+
+    private void deferExpired() {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L171">            JedisPool jedisPool = entry.getValue();</span>
+            try {
+<span class="nc" id="L173">                try (Jedis jedis = jedisPool.getResource()) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                    for (URL url : new HashSet&lt;&gt;(getRegistered())) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                        if (url.getParameter(Constants.DYNAMIC_KEY, true)) {</span>
+<span class="nc" id="L176">                            String key = toCategoryPath(url);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                            if (jedis.hset(key, url.toFullString(), String.valueOf(System.currentTimeMillis() + expirePeriod)) == 1) {</span>
+<span class="nc" id="L178">                                jedis.publish(key, Constants.REGISTER);</span>
+                            }
+                        }
+<span class="nc" id="L181">                    }</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                    if (admin) {</span>
+<span class="nc" id="L183">                        clean(jedis);</span>
+                    }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                    if (!replicate) {</span>
+<span class="nc" id="L186">                        break;//  If the server side has synchronized data, just write a single machine</span>
+                    }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                }</span>
+<span class="nc" id="L189">            } catch (Throwable t) {</span>
+<span class="nc" id="L190">                logger.warn(&quot;Failed to write provider heartbeat to redis registry. registry: &quot; + entry.getKey() + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L191">            }</span>
+<span class="nc" id="L192">        }</span>
+<span class="nc" id="L193">    }</span>
+
+    // The monitoring center is responsible for deleting outdated dirty data
+    private void clean(Jedis jedis) {
+<span class="nc" id="L197">        Set&lt;String&gt; keys = jedis.keys(root + Constants.ANY_VALUE);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(keys)) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            for (String key : keys) {</span>
+<span class="nc" id="L200">                Map&lt;String, String&gt; values = jedis.hgetAll(key);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (CollectionUtils.isNotEmptyMap(values)) {</span>
+<span class="nc" id="L202">                    boolean delete = false;</span>
+<span class="nc" id="L203">                    long now = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                    for (Map.Entry&lt;String, String&gt; entry : values.entrySet()) {</span>
+<span class="nc" id="L205">                        URL url = URL.valueOf(entry.getKey());</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                        if (url.getParameter(Constants.DYNAMIC_KEY, true)) {</span>
+<span class="nc" id="L207">                            long expire = Long.parseLong(entry.getValue());</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                            if (expire &lt; now) {</span>
+<span class="nc" id="L209">                                jedis.hdel(key, entry.getKey());</span>
+<span class="nc" id="L210">                                delete = true;</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L212">                                    logger.warn(&quot;Delete expired key: &quot; + key + &quot; -&gt; value: &quot; + entry.getKey() + &quot;, expire: &quot; + new Date(expire) + &quot;, now: &quot; + new Date(now));</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L216">                    }</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                    if (delete) {</span>
+<span class="nc" id="L218">                        jedis.publish(key, Constants.UNREGISTER);</span>
+                    }
+                }
+<span class="nc" id="L221">            }</span>
+        }
+<span class="nc" id="L223">    }</span>
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (JedisPool jedisPool : jedisPools.values()) {</span>
+<span class="nc" id="L228">            try (Jedis jedis = jedisPool.getResource()) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (jedis.isConnected()) {</span>
+<span class="nc" id="L230">                    return true; // At least one single machine is available.</span>
+                }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            } catch (Throwable t) {</span>
+<span class="nc" id="L233">            }</span>
+<span class="nc" id="L234">        }</span>
+<span class="nc" id="L235">        return false;</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L240">        super.destroy();</span>
+        try {
+<span class="nc" id="L242">            expireFuture.cancel(true);</span>
+<span class="nc" id="L243">        } catch (Throwable t) {</span>
+<span class="nc" id="L244">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L245">        }</span>
+        try {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            for (Notifier notifier : notifiers.values()) {</span>
+<span class="nc" id="L248">                notifier.shutdown();</span>
+<span class="nc" id="L249">            }</span>
+<span class="nc" id="L250">        } catch (Throwable t) {</span>
+<span class="nc" id="L251">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L252">        }</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L254">            JedisPool jedisPool = entry.getValue();</span>
+            try {
+<span class="nc" id="L256">                jedisPool.destroy();</span>
+<span class="nc" id="L257">            } catch (Throwable t) {</span>
+<span class="nc" id="L258">                logger.warn(&quot;Failed to destroy the redis registry client. registry: &quot; + entry.getKey() + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L259">            }</span>
+<span class="nc" id="L260">        }</span>
+<span class="nc" id="L261">        ExecutorUtil.gracefulShutdown(expireExecutor, expirePeriod);</span>
+<span class="nc" id="L262">    }</span>
+
+    @Override
+    public void doRegister(URL url) {
+<span class="nc" id="L266">        String key = toCategoryPath(url);</span>
+<span class="nc" id="L267">        String value = url.toFullString();</span>
+<span class="nc" id="L268">        String expire = String.valueOf(System.currentTimeMillis() + expirePeriod);</span>
+<span class="nc" id="L269">        boolean success = false;</span>
+<span class="nc" id="L270">        RpcException exception = null;</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L272">            JedisPool jedisPool = entry.getValue();</span>
+            try {
+<span class="nc" id="L274">                try (Jedis jedis = jedisPool.getResource()) {</span>
+<span class="nc" id="L275">                    jedis.hset(key, value, expire);</span>
+<span class="nc" id="L276">                    jedis.publish(key, Constants.REGISTER);</span>
+<span class="nc" id="L277">                    success = true;</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                    if (!replicate) {</span>
+<span class="nc" id="L279">                        break; //  If the server side has synchronized data, just write a single machine</span>
+                    }
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                }</span>
+<span class="nc" id="L282">            } catch (Throwable t) {</span>
+<span class="nc" id="L283">                exception = new RpcException(&quot;Failed to register service to redis registry. registry: &quot; + entry.getKey() + &quot;, service: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L284">            }</span>
+<span class="nc" id="L285">        }</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        if (exception != null) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L288">                logger.warn(exception.getMessage(), exception);</span>
+            } else {
+<span class="nc" id="L290">                throw exception;</span>
+            }
+        }
+<span class="nc" id="L293">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+<span class="nc" id="L297">        String key = toCategoryPath(url);</span>
+<span class="nc" id="L298">        String value = url.toFullString();</span>
+<span class="nc" id="L299">        RpcException exception = null;</span>
+<span class="nc" id="L300">        boolean success = false;</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L302">            JedisPool jedisPool = entry.getValue();</span>
+            try {
+<span class="nc" id="L304">                try (Jedis jedis = jedisPool.getResource()) {</span>
+<span class="nc" id="L305">                    jedis.hdel(key, value);</span>
+<span class="nc" id="L306">                    jedis.publish(key, Constants.UNREGISTER);</span>
+<span class="nc" id="L307">                    success = true;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                    if (!replicate) {</span>
+<span class="nc" id="L309">                        break; //  If the server side has synchronized data, just write a single machine</span>
+                    }
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                }</span>
+<span class="nc" id="L312">            } catch (Throwable t) {</span>
+<span class="nc" id="L313">                exception = new RpcException(&quot;Failed to unregister service to redis registry. registry: &quot; + entry.getKey() + &quot;, service: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L314">            }</span>
+<span class="nc" id="L315">        }</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (exception != null) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L318">                logger.warn(exception.getMessage(), exception);</span>
+            } else {
+<span class="nc" id="L320">                throw exception;</span>
+            }
+        }
+<span class="nc" id="L323">    }</span>
+
+    @Override
+    public void doSubscribe(final URL url, final NotifyListener listener) {
+<span class="nc" id="L327">        String service = toServicePath(url);</span>
+<span class="nc" id="L328">        Notifier notifier = notifiers.get(service);</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        if (notifier == null) {</span>
+<span class="nc" id="L330">            Notifier newNotifier = new Notifier(service);</span>
+<span class="nc" id="L331">            notifiers.putIfAbsent(service, newNotifier);</span>
+<span class="nc" id="L332">            notifier = notifiers.get(service);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (notifier == newNotifier) {</span>
+<span class="nc" id="L334">                notifier.start();</span>
+            }
+        }
+<span class="nc" id="L337">        boolean success = false;</span>
+<span class="nc" id="L338">        RpcException exception = null;</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L340">            JedisPool jedisPool = entry.getValue();</span>
+            try {
+<span class="nc" id="L342">                try (Jedis jedis = jedisPool.getResource()) {</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                    if (service.endsWith(Constants.ANY_VALUE)) {</span>
+<span class="nc" id="L344">                        admin = true;</span>
+<span class="nc" id="L345">                        Set&lt;String&gt; keys = jedis.keys(service);</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                        if (CollectionUtils.isNotEmpty(keys)) {</span>
+<span class="nc" id="L347">                            Map&lt;String, Set&lt;String&gt;&gt; serviceKeys = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                            for (String key : keys) {</span>
+<span class="nc" id="L349">                                String serviceKey = toServicePath(key);</span>
+<span class="nc" id="L350">                                Set&lt;String&gt; sk = serviceKeys.computeIfAbsent(serviceKey, k -&gt; new HashSet&lt;&gt;());</span>
+<span class="nc" id="L351">                                sk.add(key);</span>
+<span class="nc" id="L352">                            }</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                            for (Set&lt;String&gt; sk : serviceKeys.values()) {</span>
+<span class="nc" id="L354">                                doNotify(jedis, sk, url, Collections.singletonList(listener));</span>
+<span class="nc" id="L355">                            }</span>
+                        }
+<span class="nc" id="L357">                    } else {</span>
+<span class="nc" id="L358">                        doNotify(jedis, jedis.keys(service + Constants.PATH_SEPARATOR + Constants.ANY_VALUE), url, Collections.singletonList(listener));</span>
+                    }
+<span class="nc" id="L360">                    success = true;</span>
+                    break; // Just read one server's data
+                }
+<span class="nc" id="L363">            } catch (Throwable t) { // Try the next server</span>
+<span class="nc" id="L364">                exception = new RpcException(&quot;Failed to subscribe service from redis registry. registry: &quot; + entry.getKey() + &quot;, service: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+            }
+<span class="nc" id="L366">        }</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (exception != null) {</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L369">                logger.warn(exception.getMessage(), exception);</span>
+            } else {
+<span class="nc" id="L371">                throw exception;</span>
+            }
+        }
+<span class="nc" id="L374">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L378">    }</span>
+
+    private void doNotify(Jedis jedis, String key) {
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        for (Map.Entry&lt;URL, Set&lt;NotifyListener&gt;&gt; entry : new HashMap&lt;&gt;(getSubscribed()).entrySet()) {</span>
+<span class="nc" id="L382">            doNotify(jedis, Collections.singletonList(key), entry.getKey(), new HashSet&lt;&gt;(entry.getValue()));</span>
+<span class="nc" id="L383">        }</span>
+<span class="nc" id="L384">    }</span>
+
+    private void doNotify(Jedis jedis, Collection&lt;String&gt; keys, URL url, Collection&lt;NotifyListener&gt; listeners) {
+<span class="nc bnc" id="L387" title="All 6 branches missed.">        if (keys == null || keys.isEmpty()</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">                || listeners == null || listeners.isEmpty()) {</span>
+<span class="nc" id="L389">            return;</span>
+        }
+<span class="nc" id="L391">        long now = System.currentTimeMillis();</span>
+<span class="nc" id="L392">        List&lt;URL&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L393">        List&lt;String&gt; categories = Arrays.asList(url.getParameter(Constants.CATEGORY_KEY, new String[0]));</span>
+<span class="nc" id="L394">        String consumerService = url.getServiceInterface();</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        for (String key : keys) {</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">            if (!Constants.ANY_VALUE.equals(consumerService)) {</span>
+<span class="nc" id="L397">                String providerService = toServiceName(key);</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                if (!providerService.equals(consumerService)) {</span>
+<span class="nc" id="L399">                    continue;</span>
+                }
+            }
+<span class="nc" id="L402">            String category = toCategoryName(key);</span>
+<span class="nc bnc" id="L403" title="All 4 branches missed.">            if (!categories.contains(Constants.ANY_VALUE) &amp;&amp; !categories.contains(category)) {</span>
+<span class="nc" id="L404">                continue;</span>
+            }
+<span class="nc" id="L406">            List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L407">            Map&lt;String, String&gt; values = jedis.hgetAll(key);</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">            if (CollectionUtils.isNotEmptyMap(values)) {</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">                for (Map.Entry&lt;String, String&gt; entry : values.entrySet()) {</span>
+<span class="nc" id="L410">                    URL u = URL.valueOf(entry.getKey());</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                    if (!u.getParameter(Constants.DYNAMIC_KEY, true)</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                            || Long.parseLong(entry.getValue()) &gt;= now) {</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                        if (UrlUtils.isMatch(url, u)) {</span>
+<span class="nc" id="L414">                            urls.add(u);</span>
+                        }
+                    }
+<span class="nc" id="L417">                }</span>
+            }
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            if (urls.isEmpty()) {</span>
+<span class="nc" id="L420">                urls.add(URLBuilder.from(url)</span>
+<span class="nc" id="L421">                        .setProtocol(Constants.EMPTY_PROTOCOL)</span>
+<span class="nc" id="L422">                        .setAddress(Constants.ANYHOST_VALUE)</span>
+<span class="nc" id="L423">                        .setPath(toServiceName(key))</span>
+<span class="nc" id="L424">                        .addParameter(Constants.CATEGORY_KEY, category)</span>
+<span class="nc" id="L425">                        .build());</span>
+            }
+<span class="nc" id="L427">            result.addAll(urls);</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L429">                logger.info(&quot;redis notify: &quot; + key + &quot; = &quot; + urls);</span>
+            }
+<span class="nc" id="L431">        }</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(result)) {</span>
+<span class="nc" id="L433">            return;</span>
+        }
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        for (NotifyListener listener : listeners) {</span>
+<span class="nc" id="L436">            notify(url, listener, result);</span>
+<span class="nc" id="L437">        }</span>
+<span class="nc" id="L438">    }</span>
+
+    private String toServiceName(String categoryPath) {
+<span class="nc" id="L441">        String servicePath = toServicePath(categoryPath);</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">        return servicePath.startsWith(root) ? servicePath.substring(root.length()) : servicePath;</span>
+    }
+
+    private String toCategoryName(String categoryPath) {
+<span class="nc" id="L446">        int i = categoryPath.lastIndexOf(Constants.PATH_SEPARATOR);</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        return i &gt; 0 ? categoryPath.substring(i + 1) : categoryPath;</span>
+    }
+
+    private String toServicePath(String categoryPath) {
+        int i;
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        if (categoryPath.startsWith(root)) {</span>
+<span class="nc" id="L453">            i = categoryPath.indexOf(Constants.PATH_SEPARATOR, root.length());</span>
+        } else {
+<span class="nc" id="L455">            i = categoryPath.indexOf(Constants.PATH_SEPARATOR);</span>
+        }
+<span class="nc bnc" id="L457" title="All 2 branches missed.">        return i &gt; 0 ? categoryPath.substring(0, i) : categoryPath;</span>
+    }
+
+    private String toServicePath(URL url) {
+<span class="nc" id="L461">        return root + url.getServiceInterface();</span>
+    }
+
+    private String toCategoryPath(URL url) {
+<span class="nc" id="L465">        return toServicePath(url) + Constants.PATH_SEPARATOR + url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);</span>
+    }
+
+    private class NotifySub extends JedisPubSub {
+
+        private final JedisPool jedisPool;
+
+<span class="nc" id="L472">        public NotifySub(JedisPool jedisPool) {</span>
+<span class="nc" id="L473">            this.jedisPool = jedisPool;</span>
+<span class="nc" id="L474">        }</span>
+
+        @Override
+        public void onMessage(String key, String msg) {
+<span class="nc bnc" id="L478" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L479">                logger.info(&quot;redis event: &quot; + key + &quot; = &quot; + msg);</span>
+            }
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            if (msg.equals(Constants.REGISTER)</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">                    || msg.equals(Constants.UNREGISTER)) {</span>
+                try {
+<span class="nc" id="L484">                    Jedis jedis = jedisPool.getResource();</span>
+                    try {
+<span class="nc" id="L486">                        doNotify(jedis, key);</span>
+                    } finally {
+<span class="nc" id="L488">                        jedis.close();</span>
+                    }
+<span class="nc" id="L490">                } catch (Throwable t) { // TODO Notification failure does not restore mechanism guarantee</span>
+<span class="nc" id="L491">                    logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L492">                }</span>
+            }
+<span class="nc" id="L494">        }</span>
+
+        @Override
+        public void onPMessage(String pattern, String key, String msg) {
+<span class="nc" id="L498">            onMessage(key, msg);</span>
+<span class="nc" id="L499">        }</span>
+
+        @Override
+        public void onSubscribe(String key, int num) {
+<span class="nc" id="L503">        }</span>
+
+        @Override
+        public void onPSubscribe(String pattern, int num) {
+<span class="nc" id="L507">        }</span>
+
+        @Override
+        public void onUnsubscribe(String key, int num) {
+<span class="nc" id="L511">        }</span>
+
+        @Override
+        public void onPUnsubscribe(String pattern, int num) {
+<span class="nc" id="L515">        }</span>
+
+    }
+
+    private class Notifier extends Thread {
+
+        private final String service;
+<span class="nc" id="L522">        private final AtomicInteger connectSkip = new AtomicInteger();</span>
+<span class="nc" id="L523">        private final AtomicInteger connectSkipped = new AtomicInteger();</span>
+        private volatile Jedis jedis;
+<span class="nc" id="L525">        private volatile boolean first = true;</span>
+<span class="nc" id="L526">        private volatile boolean running = true;</span>
+        private volatile int connectRandom;
+
+<span class="nc" id="L529">        public Notifier(String service) {</span>
+<span class="nc" id="L530">            super.setDaemon(true);</span>
+<span class="nc" id="L531">            super.setName(&quot;DubboRedisSubscribe&quot;);</span>
+<span class="nc" id="L532">            this.service = service;</span>
+<span class="nc" id="L533">        }</span>
+
+        private void resetSkip() {
+<span class="nc" id="L536">            connectSkip.set(0);</span>
+<span class="nc" id="L537">            connectSkipped.set(0);</span>
+<span class="nc" id="L538">            connectRandom = 0;</span>
+<span class="nc" id="L539">        }</span>
+
+        private boolean isSkip() {
+<span class="nc" id="L542">            int skip = connectSkip.get(); // Growth of skipping times</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">            if (skip &gt;= 10) { // If the number of skipping times increases by more than 10, take the random number</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                if (connectRandom == 0) {</span>
+<span class="nc" id="L545">                    connectRandom = ThreadLocalRandom.current().nextInt(10);</span>
+                }
+<span class="nc" id="L547">                skip = 10 + connectRandom;</span>
+            }
+<span class="nc bnc" id="L549" title="All 2 branches missed.">            if (connectSkipped.getAndIncrement() &lt; skip) { // Check the number of skipping times</span>
+<span class="nc" id="L550">                return true;</span>
+            }
+<span class="nc" id="L552">            connectSkip.incrementAndGet();</span>
+<span class="nc" id="L553">            connectSkipped.set(0);</span>
+<span class="nc" id="L554">            connectRandom = 0;</span>
+<span class="nc" id="L555">            return false;</span>
+        }
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            while (running) {</span>
+                try {
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                    if (!isSkip()) {</span>
+                        try {
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                            for (Map.Entry&lt;String, JedisPool&gt; entry : jedisPools.entrySet()) {</span>
+<span class="nc" id="L565">                                JedisPool jedisPool = entry.getValue();</span>
+                                try {
+<span class="nc" id="L567">                                    jedis = jedisPool.getResource();</span>
+                                    try {
+<span class="nc bnc" id="L569" title="All 2 branches missed.">                                        if (service.endsWith(Constants.ANY_VALUE)) {</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                                            if (first) {</span>
+<span class="nc" id="L571">                                                first = false;</span>
+<span class="nc" id="L572">                                                Set&lt;String&gt; keys = jedis.keys(service);</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">                                                if (CollectionUtils.isNotEmpty(keys)) {</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">                                                    for (String s : keys) {</span>
+<span class="nc" id="L575">                                                        doNotify(jedis, s);</span>
+<span class="nc" id="L576">                                                    }</span>
+                                                }
+<span class="nc" id="L578">                                                resetSkip();</span>
+                                            }
+<span class="nc" id="L580">                                            jedis.psubscribe(new NotifySub(jedisPool), service); // blocking</span>
+                                        } else {
+<span class="nc bnc" id="L582" title="All 2 branches missed.">                                            if (first) {</span>
+<span class="nc" id="L583">                                                first = false;</span>
+<span class="nc" id="L584">                                                doNotify(jedis, service);</span>
+<span class="nc" id="L585">                                                resetSkip();</span>
+                                            }
+<span class="nc" id="L587">                                            jedis.psubscribe(new NotifySub(jedisPool), service + Constants.PATH_SEPARATOR + Constants.ANY_VALUE); // blocking</span>
+                                        }
+                                        break;
+                                    } finally {
+<span class="nc" id="L591">                                        jedis.close();</span>
+                                    }
+<span class="nc" id="L593">                                } catch (Throwable t) { // Retry another server</span>
+<span class="nc" id="L594">                                    logger.warn(&quot;Failed to subscribe service from redis registry. registry: &quot; + entry.getKey() + &quot;, cause: &quot; + t.getMessage(), t);</span>
+                                    // If you only have a single redis, you need to take a rest to avoid overtaking a lot of CPU resources
+<span class="nc" id="L596">                                    sleep(reconnectPeriod);</span>
+                                }
+<span class="nc" id="L598">                            }</span>
+<span class="nc" id="L599">                        } catch (Throwable t) {</span>
+<span class="nc" id="L600">                            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L601">                            sleep(reconnectPeriod);</span>
+<span class="nc" id="L602">                        }</span>
+                    }
+<span class="nc" id="L604">                } catch (Throwable t) {</span>
+<span class="nc" id="L605">                    logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L606">                }</span>
+            }
+<span class="nc" id="L608">        }</span>
+
+        public void shutdown() {
+            try {
+<span class="nc" id="L612">                running = false;</span>
+<span class="nc" id="L613">                jedis.disconnect();</span>
+<span class="nc" id="L614">            } catch (Throwable t) {</span>
+<span class="nc" id="L615">                logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L616">            }</span>
+<span class="nc" id="L617">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LoggingFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-rest</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.rest.support</a> &gt; <span class="el_source">LoggingFilter.java</span></div><h1>LoggingFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.rest.support;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+
+import org.apache.commons.io.IOUtils;
+
+import javax.annotation.Priority;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.client.ClientRequestContext;
+import javax.ws.rs.client.ClientRequestFilter;
+import javax.ws.rs.client.ClientResponseContext;
+import javax.ws.rs.client.ClientResponseFilter;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.ext.ReaderInterceptor;
+import javax.ws.rs.ext.ReaderInterceptorContext;
+import javax.ws.rs.ext.WriterInterceptor;
+import javax.ws.rs.ext.WriterInterceptorContext;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * This logging filter is not highly optimized for now
+ *
+ */
+@Priority(Integer.MIN_VALUE)
+<span class="nc" id="L51">public class LoggingFilter implements ContainerRequestFilter, ClientRequestFilter, ContainerResponseFilter, ClientResponseFilter, WriterInterceptor, ReaderInterceptor {</span>
+
+<span class="nc" id="L53">    private static final Logger logger = LoggerFactory.getLogger(LoggingFilter.class);</span>
+
+    @Override
+    public void filter(ClientRequestContext context) throws IOException {
+<span class="nc" id="L57">        logHttpHeaders(context.getStringHeaders());</span>
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public void filter(ClientRequestContext requestContext, ClientResponseContext responseContext) throws IOException {
+<span class="nc" id="L62">        logHttpHeaders(responseContext.getHeaders());</span>
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public void filter(ContainerRequestContext context) throws IOException {
+<span class="nc" id="L67">        logHttpHeaders(context.getHeaders());</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
+<span class="nc" id="L72">        logHttpHeaders(responseContext.getStringHeaders());</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public Object aroundReadFrom(ReaderInterceptorContext context) throws IOException, WebApplicationException {
+<span class="nc" id="L77">        byte[] buffer = IOUtils.toByteArray(context.getInputStream());</span>
+<span class="nc" id="L78">        logger.info(&quot;The contents of request body is: \n&quot; + new String(buffer, &quot;UTF-8&quot;) + &quot;\n&quot;);</span>
+<span class="nc" id="L79">        context.setInputStream(new ByteArrayInputStream(buffer));</span>
+<span class="nc" id="L80">        return context.proceed();</span>
+    }
+
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext context) throws IOException, WebApplicationException {
+<span class="nc" id="L85">        OutputStreamWrapper wrapper = new OutputStreamWrapper(context.getOutputStream());</span>
+<span class="nc" id="L86">        context.setOutputStream(wrapper);</span>
+<span class="nc" id="L87">        context.proceed();</span>
+<span class="nc" id="L88">        logger.info(&quot;The contents of response body is: \n&quot; + new String(wrapper.getBytes(), &quot;UTF-8&quot;) + &quot;\n&quot;);</span>
+<span class="nc" id="L89">    }</span>
+
+    protected void logHttpHeaders(MultivaluedMap&lt;String, String&gt; headers) {
+<span class="nc" id="L92">        StringBuilder msg = new StringBuilder(&quot;The HTTP headers are: \n&quot;);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : headers.entrySet()) {</span>
+<span class="nc" id="L94">            msg.append(entry.getKey()).append(&quot;: &quot;);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            for (int i = 0; i &lt; entry.getValue().size(); i++) {</span>
+<span class="nc" id="L96">                msg.append(entry.getValue().get(i));</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                if (i &lt; entry.getValue().size() - 1) {</span>
+<span class="nc" id="L98">                    msg.append(&quot;, &quot;);</span>
+                }
+            }
+<span class="nc" id="L101">            msg.append(&quot;\n&quot;);</span>
+<span class="nc" id="L102">        }</span>
+<span class="nc" id="L103">        logger.info(msg.toString());</span>
+<span class="nc" id="L104">    }</span>
+
+    protected static class OutputStreamWrapper extends OutputStream {
+
+<span class="nc" id="L108">        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
+        private final OutputStream output;
+
+<span class="nc" id="L111">        private OutputStreamWrapper(OutputStream output) {</span>
+<span class="nc" id="L112">            this.output = output;</span>
+<span class="nc" id="L113">        }</span>
+
+        @Override
+        public void write(int i) throws IOException {
+<span class="nc" id="L117">            buffer.write(i);</span>
+<span class="nc" id="L118">            output.write(i);</span>
+<span class="nc" id="L119">        }</span>
+
+        @Override
+        public void write(byte[] b) throws IOException {
+<span class="nc" id="L123">            buffer.write(b);</span>
+<span class="nc" id="L124">            output.write(b);</span>
+<span class="nc" id="L125">        }</span>
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+<span class="nc" id="L129">            buffer.write(b, off, len);</span>
+<span class="nc" id="L130">            output.write(b, off, len);</span>
+<span class="nc" id="L131">        }</span>
+
+        @Override
+        public void flush() throws IOException {
+<span class="nc" id="L135">            output.flush();</span>
+<span class="nc" id="L136">        }</span>
+
+        @Override
+        public void close() throws IOException {
+<span class="nc" id="L140">            output.close();</span>
+<span class="nc" id="L141">        }</span>
+
+        public byte[] getBytes() {
+<span class="nc" id="L144">            return buffer.toByteArray();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

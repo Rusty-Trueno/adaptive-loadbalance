@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SofaRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-sofa</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.sofa</a> &gt; <span class="el_source">SofaRegistry.java</span></div><h1>SofaRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.sofa;
+
+import com.alipay.sofa.registry.client.api.RegistryClient;
+import com.alipay.sofa.registry.client.api.RegistryClientConfig;
+import com.alipay.sofa.registry.client.api.Subscriber;
+import com.alipay.sofa.registry.client.api.model.RegistryType;
+import com.alipay.sofa.registry.client.api.model.UserData;
+import com.alipay.sofa.registry.client.api.registration.PublisherRegistration;
+import com.alipay.sofa.registry.client.api.registration.SubscriberRegistration;
+import com.alipay.sofa.registry.client.provider.DefaultRegistryClient;
+import com.alipay.sofa.registry.client.provider.DefaultRegistryClientConfigBuilder;
+import com.alipay.sofa.registry.core.model.ScopeEnum;
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.dubbo.registry.sofa.SofaRegistryConstants.ADDRESS_WAIT_TIME_KEY;
+import static org.apache.dubbo.registry.sofa.SofaRegistryConstants.DEFAULT_GROUP;
+import static org.apache.dubbo.registry.sofa.SofaRegistryConstants.LOCAL_DATA_CENTER;
+import static org.apache.dubbo.registry.sofa.SofaRegistryConstants.LOCAL_REGION;
+
+/**
+ * The Sofa registry.
+ *
+ * @since 2.7.2
+ */
+public class SofaRegistry extends FailbackRegistry {
+
+<span class="nc" id="L57">    private static final Logger LOGGER = LoggerFactory.getLogger(SofaRegistry.class);</span>
+
+    /**
+     * Cache subscriber by dataId
+     */
+<span class="nc" id="L62">    private final Map&lt;String, Subscriber&gt; subscribers = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /**
+     * Direct registry client
+     */
+    private RegistryClient registryClient;
+    /**
+     * wait address from registry
+     */
+    private int waitAddressTimeout;
+
+    /**
+     * Instantiates a new Sofa registry.
+     *
+     * @param url the url
+     */
+    public SofaRegistry(URL url) {
+<span class="nc" id="L79">        super(url);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (LOGGER.isInfoEnabled()) {</span>
+<span class="nc" id="L81">            LOGGER.info(&quot;Build sofa registry by url:&quot; + url);</span>
+        }
+<span class="nc" id="L83">        this.registryClient = buildClient(url);</span>
+<span class="nc" id="L84">        this.waitAddressTimeout = Integer.parseInt(ConfigUtils.getProperty(ADDRESS_WAIT_TIME_KEY, &quot;5000&quot;));</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * Build client registry client.
+     *
+     * @param url the url
+     * @return the registry client
+     */
+    protected RegistryClient buildClient(URL url) {
+<span class="nc" id="L94">        RegistryClientConfig config = DefaultRegistryClientConfigBuilder.start()</span>
+<span class="nc" id="L95">                .setDataCenter(LOCAL_DATA_CENTER)</span>
+<span class="nc" id="L96">                .setZone(LOCAL_REGION)</span>
+<span class="nc" id="L97">                .setRegistryEndpoint(url.getHost())</span>
+<span class="nc" id="L98">                .setRegistryEndpointPort(url.getPort()).build();</span>
+
+<span class="nc" id="L100">        DefaultRegistryClient registryClient = new DefaultRegistryClient(config);</span>
+<span class="nc" id="L101">        registryClient.init();</span>
+<span class="nc" id="L102">        return registryClient;</span>
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L107">        return true;</span>
+    }
+
+    @Override
+    public void doRegister(URL url) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (!url.getParameter(Constants.REGISTER_KEY, true)</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                || Constants.CONSUMER_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L114">            return;</span>
+        }
+
+<span class="nc" id="L117">        String serviceName = buildServiceName(url);</span>
+<span class="nc" id="L118">        String serviceData = url.toFullString();</span>
+
+<span class="nc" id="L120">        PublisherRegistration registration = new PublisherRegistration(serviceName);</span>
+<span class="nc" id="L121">        addAttributesForPub(registration);</span>
+
+<span class="nc" id="L123">        registryClient.register(registration, serviceData);</span>
+<span class="nc" id="L124">    }</span>
+
+    /**
+     * Add attributes for pub.
+     *
+     * @param publisherRegistration the publisher registration
+     */
+    protected void addAttributesForPub(PublisherRegistration publisherRegistration) {
+<span class="nc" id="L132">        publisherRegistration.setGroup(DEFAULT_GROUP);</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (!url.getParameter(Constants.REGISTER_KEY, true)</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                || Constants.CONSUMER_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L139">            return;</span>
+        }
+<span class="nc" id="L141">        String serviceName = buildServiceName(url);</span>
+<span class="nc" id="L142">        registryClient.unregister(serviceName, DEFAULT_GROUP, RegistryType.PUBLISHER);</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public void doSubscribe(URL url, final NotifyListener listener) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (!url.getParameter(Constants.SUBSCRIBE_KEY, true)</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                || Constants.PROVIDER_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L149">            return;</span>
+        }
+
+<span class="nc" id="L152">        String serviceName = buildServiceName(url);</span>
+        // com.alipay.test.TestService:1.0:group@dubbo
+<span class="nc" id="L154">        Subscriber listSubscriber = subscribers.get(serviceName);</span>
+
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (listSubscriber != null) {</span>
+<span class="nc" id="L157">            LOGGER.warn(&quot;Service name [&quot; + serviceName + &quot;] have bean registered in SOFARegistry.&quot;);</span>
+
+<span class="nc" id="L159">            CountDownLatch countDownLatch = new CountDownLatch(1);</span>
+<span class="nc" id="L160">            handleRegistryData(listSubscriber.peekData(), listener, countDownLatch);</span>
+<span class="nc" id="L161">            waitAddress(serviceName, countDownLatch);</span>
+<span class="nc" id="L162">            return;</span>
+        }
+
+<span class="nc" id="L165">        final CountDownLatch latch = new CountDownLatch(1);</span>
+<span class="nc" id="L166">        SubscriberRegistration subscriberRegistration = new SubscriberRegistration(serviceName,</span>
+                (dataId, data) -&gt; {
+                    //record change
+<span class="nc" id="L169">                    printAddressData(dataId, data);</span>
+<span class="nc" id="L170">                    handleRegistryData(data, listener, latch);</span>
+<span class="nc" id="L171">                });</span>
+
+<span class="nc" id="L173">        addAttributesForSub(subscriberRegistration);</span>
+<span class="nc" id="L174">        listSubscriber = registryClient.register(subscriberRegistration);</span>
+
+<span class="nc" id="L176">        subscribers.put(serviceName, listSubscriber);</span>
+
+<span class="nc" id="L178">        waitAddress(serviceName, latch);</span>
+<span class="nc" id="L179">    }</span>
+
+    private void waitAddress(String serviceName, CountDownLatch countDownLatch) {
+        try {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (!countDownLatch.await(waitAddressTimeout, TimeUnit.MILLISECONDS)) {</span>
+<span class="nc" id="L184">                LOGGER.warn(&quot;Subscribe data failed by dataId &quot; + serviceName);</span>
+            }
+<span class="nc" id="L186">        } catch (Exception e) {</span>
+<span class="nc" id="L187">            LOGGER.error(&quot;Error when wait Address!&quot;, e);</span>
+<span class="nc" id="L188">        }</span>
+<span class="nc" id="L189">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (!url.getParameter(Constants.SUBSCRIBE_KEY, true)</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                || Constants.PROVIDER_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L195">            return;</span>
+        }
+<span class="nc" id="L197">        String serviceName = buildServiceName(url);</span>
+
+<span class="nc" id="L199">        registryClient.unregister(serviceName, DEFAULT_GROUP, RegistryType.SUBSCRIBER);</span>
+<span class="nc" id="L200">    }</span>
+
+    private void handleRegistryData(UserData data, NotifyListener notifyListener,
+                                    CountDownLatch latch) {
+        try {
+<span class="nc" id="L205">            List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (null != data) {</span>
+
+<span class="nc" id="L208">                List&lt;String&gt; datas = flatUserData(data);</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                for (String serviceUrl : datas) {</span>
+<span class="nc" id="L210">                    URL url = URL.valueOf(serviceUrl);</span>
+<span class="nc" id="L211">                    String serverApplication = url.getParameter(Constants.APPLICATION_KEY);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                    if (StringUtils.isNotEmpty(serverApplication)) {</span>
+<span class="nc" id="L213">                        url = url.addParameter(&quot;dstApp&quot;, serverApplication);</span>
+                    }
+<span class="nc" id="L215">                    urls.add(url);</span>
+<span class="nc" id="L216">                }</span>
+            }
+<span class="nc" id="L218">            notifyListener.notify(urls);</span>
+        } finally {
+<span class="nc" id="L220">            latch.countDown();</span>
+        }
+<span class="nc" id="L222">    }</span>
+
+    private String buildServiceName(URL url) {
+        // return url.getServiceKey();
+<span class="nc" id="L226">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L227">        buf.append(url.getServiceInterface());</span>
+<span class="nc" id="L228">        String version = url.getParameter(Constants.VERSION_KEY);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(version)) {</span>
+<span class="nc" id="L230">            buf.append(&quot;:&quot;).append(version);</span>
+        }
+<span class="nc" id="L232">        String group = url.getParameter(Constants.GROUP_KEY);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(group)) {</span>
+<span class="nc" id="L234">            buf.append(&quot;:&quot;).append(group);</span>
+        }
+<span class="nc" id="L236">        buf.append(&quot;@&quot;).append(Constants.DUBBO);</span>
+<span class="nc" id="L237">        return buf.toString();</span>
+    }
+
+    /**
+     * Print address data.
+     *
+     * @param dataId   the data id
+     * @param userData the user data
+     */
+    protected void printAddressData(String dataId, UserData userData) {
+
+        List&lt;String&gt; datas;
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (userData == null) {</span>
+<span class="nc" id="L250">            datas = new ArrayList&lt;&gt;(0);</span>
+        } else {
+<span class="nc" id="L252">            datas = flatUserData(userData);</span>
+        }
+
+<span class="nc" id="L255">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        for (String provider : datas) {</span>
+<span class="nc" id="L257">            sb.append(&quot;  &gt;&gt;&gt; &quot;).append(provider).append(&quot;\n&quot;);</span>
+<span class="nc" id="L258">        }</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (LOGGER.isInfoEnabled()) {</span>
+<span class="nc" id="L260">            LOGGER.info(&quot;Receive updated RPC service addresses: service[&quot; + dataId</span>
+<span class="nc" id="L261">                    + &quot;]\n  .Available target addresses size [&quot; + datas.size() + &quot;]\n&quot;</span>
+<span class="nc" id="L262">                    + sb.toString());</span>
+        }
+<span class="nc" id="L264">    }</span>
+
+    /**
+     * Add attributes for sub.
+     *
+     * @param subscriberRegistration the subscriber registration
+     */
+    protected void addAttributesForSub(SubscriberRegistration subscriberRegistration) {
+<span class="nc" id="L272">        subscriberRegistration.setGroup(DEFAULT_GROUP);</span>
+<span class="nc" id="L273">        subscriberRegistration.setScopeEnum(ScopeEnum.global);</span>
+<span class="nc" id="L274">    }</span>
+
+    /**
+     * Flat user data list.
+     *
+     * @param userData the user data
+     * @return the list
+     */
+    protected List&lt;String&gt; flatUserData(UserData userData) {
+<span class="nc" id="L283">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L284">        Map&lt;String, List&lt;String&gt;&gt; zoneData = userData.getZoneData();</span>
+
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : zoneData.entrySet()) {</span>
+<span class="nc" id="L287">            result.addAll(entry.getValue());</span>
+<span class="nc" id="L288">        }</span>
+
+<span class="nc" id="L290">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

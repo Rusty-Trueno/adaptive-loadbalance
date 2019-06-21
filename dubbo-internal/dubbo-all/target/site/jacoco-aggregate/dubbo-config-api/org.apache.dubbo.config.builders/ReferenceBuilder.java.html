@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">ReferenceBuilder.java</span></div><h1>ReferenceBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.ConsumerConfig;
+import org.apache.dubbo.config.MethodConfig;
+import org.apache.dubbo.config.ReferenceConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * This is a builder for build {@link ReferenceConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L31">public class ReferenceBuilder&lt;T&gt; extends AbstractReferenceBuilder&lt;ReferenceConfig, ReferenceBuilder&lt;T&gt;&gt; {</span>
+    /**
+     * The interface name of the reference service
+     */
+    private String interfaceName;
+
+    /**
+     * The interface class of the reference service
+     */
+    private Class&lt;?&gt; interfaceClass;
+
+    /**
+     * client type
+     */
+    private String client;
+
+    /**
+     * The url for peer-to-peer invocation
+     */
+    private String url;
+
+    /**
+     * The method configs
+     */
+    private List&lt;MethodConfig&gt; methods;
+
+    /**
+     * The consumer config (default)
+     */
+    private ConsumerConfig consumer;
+
+    /**
+     * Only the service provider of the specified protocol is invoked, and other protocols are ignored.
+     */
+    private String protocol;
+
+    public ReferenceBuilder&lt;T&gt; interfaceName(String interfaceName) {
+<span class="nc" id="L68">        this.interfaceName = interfaceName;</span>
+<span class="nc" id="L69">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; interfaceClass(Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L73">        this.interfaceClass = interfaceClass;</span>
+<span class="nc" id="L74">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; client(String client) {
+<span class="nc" id="L78">        this.client = client;</span>
+<span class="nc" id="L79">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; url(String url) {
+<span class="nc" id="L83">        this.url = url;</span>
+<span class="nc" id="L84">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; addMethods(List&lt;MethodConfig&gt; methods) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (this.methods == null) {</span>
+<span class="nc" id="L89">            this.methods = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L91">        this.methods.addAll(methods);</span>
+<span class="nc" id="L92">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; addMethod(MethodConfig method) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (this.methods == null) {</span>
+<span class="nc" id="L97">            this.methods = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L99">        this.methods.add(method);</span>
+<span class="nc" id="L100">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; consumer(ConsumerConfig consumer) {
+<span class="nc" id="L104">        this.consumer = consumer;</span>
+<span class="nc" id="L105">        return getThis();</span>
+    }
+
+    public ReferenceBuilder&lt;T&gt; protocol(String protocol) {
+<span class="nc" id="L109">        this.protocol = protocol;</span>
+<span class="nc" id="L110">        return getThis();</span>
+    }
+
+    public ReferenceConfig&lt;T&gt; build() {
+<span class="nc" id="L114">        ReferenceConfig&lt;T&gt; reference = new ReferenceConfig&lt;&gt;();</span>
+<span class="nc" id="L115">        super.build(reference);</span>
+
+<span class="nc" id="L117">        reference.setInterface(interfaceName);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (interfaceClass != null) {</span>
+<span class="nc" id="L119">            reference.setInterface(interfaceClass);</span>
+        }
+<span class="nc" id="L121">        reference.setClient(client);</span>
+<span class="nc" id="L122">        reference.setUrl(url);</span>
+<span class="nc" id="L123">        reference.setMethods(methods);</span>
+<span class="nc" id="L124">        reference.setConsumer(consumer);</span>
+<span class="nc" id="L125">        reference.setProtocol(protocol);</span>
+
+<span class="nc" id="L127">        return reference;</span>
+    }
+
+    @Override
+    protected ReferenceBuilder&lt;T&gt; getThis() {
+<span class="nc" id="L132">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProtostuffObjectOutput.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-protostuff</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.protostuff</a> &gt; <span class="el_source">ProtostuffObjectOutput.java</span></div><h1>ProtostuffObjectOutput.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.common.serialize.protostuff;
+
+import io.protostuff.GraphIOUtil;
+import io.protostuff.LinkedBuffer;
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import org.apache.dubbo.common.serialize.ObjectOutput;
+import org.apache.dubbo.common.serialize.protostuff.utils.WrapperUtils;
+
+/**
+ * Protostuff object output implementation
+ */
+public class ProtostuffObjectOutput implements ObjectOutput {
+
+<span class="nc" id="L35">    private LinkedBuffer buffer = LinkedBuffer.allocate();</span>
+    private DataOutputStream dos;
+
+<span class="nc" id="L38">    public ProtostuffObjectOutput(OutputStream outputStream) {</span>
+<span class="nc" id="L39">        dos = new DataOutputStream(outputStream);</span>
+<span class="nc" id="L40">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    public void writeObject(Object obj) throws IOException {
+
+        byte[] bytes;
+        byte[] classNameBytes;
+
+        try {
+<span class="nc bnc" id="L50" title="All 4 branches missed.">            if (obj == null || WrapperUtils.needWrapper(obj)) {</span>
+<span class="nc" id="L51">                Schema&lt;Wrapper&gt; schema = RuntimeSchema.getSchema(Wrapper.class);</span>
+<span class="nc" id="L52">                Wrapper wrapper = new Wrapper(obj);</span>
+<span class="nc" id="L53">                bytes = GraphIOUtil.toByteArray(wrapper, schema, buffer);</span>
+<span class="nc" id="L54">                classNameBytes = Wrapper.class.getName().getBytes();</span>
+<span class="nc" id="L55">            } else {</span>
+<span class="nc" id="L56">                Schema schema = RuntimeSchema.getSchema(obj.getClass());</span>
+<span class="nc" id="L57">                bytes = GraphIOUtil.toByteArray(obj, schema, buffer);</span>
+<span class="nc" id="L58">                classNameBytes = obj.getClass().getName().getBytes();</span>
+            }
+        } finally {
+<span class="nc" id="L61">            buffer.clear();</span>
+        }
+
+<span class="nc" id="L64">        dos.writeInt(classNameBytes.length);</span>
+<span class="nc" id="L65">        dos.writeInt(bytes.length);</span>
+<span class="nc" id="L66">        dos.write(classNameBytes);</span>
+<span class="nc" id="L67">        dos.write(bytes);</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public void writeBool(boolean v) throws IOException {
+<span class="nc" id="L72">        dos.writeBoolean(v);</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public void writeByte(byte v) throws IOException {
+<span class="nc" id="L77">        dos.writeByte(v);</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void writeShort(short v) throws IOException {
+<span class="nc" id="L82">        dos.writeShort(v);</span>
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void writeInt(int v) throws IOException {
+<span class="nc" id="L87">        dos.writeInt(v);</span>
+<span class="nc" id="L88">    }</span>
+
+    @Override
+    public void writeLong(long v) throws IOException {
+<span class="nc" id="L92">        dos.writeLong(v);</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public void writeFloat(float v) throws IOException {
+<span class="nc" id="L97">        dos.writeFloat(v);</span>
+<span class="nc" id="L98">    }</span>
+
+    @Override
+    public void writeDouble(double v) throws IOException {
+<span class="nc" id="L102">        dos.writeDouble(v);</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void writeUTF(String v) throws IOException {
+<span class="nc" id="L107">        byte[] bytes = v.getBytes();</span>
+<span class="nc" id="L108">        dos.writeInt(bytes.length);</span>
+<span class="nc" id="L109">        dos.write(bytes);</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public void writeBytes(byte[] v) throws IOException {
+<span class="nc" id="L114">        dos.writeInt(v.length);</span>
+<span class="nc" id="L115">        dos.write(v);</span>
+<span class="nc" id="L116">    }</span>
+
+    @Override
+    public void writeBytes(byte[] v, int off, int len) throws IOException {
+<span class="nc" id="L120">        dos.writeInt(len);</span>
+<span class="nc" id="L121">        byte[] bytes = new byte[len];</span>
+<span class="nc" id="L122">        System.arraycopy(v, off, bytes, 0, len);</span>
+<span class="nc" id="L123">        dos.write(bytes);</span>
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public void flushBuffer() throws IOException {
+<span class="nc" id="L128">        dos.flush();</span>
+<span class="nc" id="L129">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

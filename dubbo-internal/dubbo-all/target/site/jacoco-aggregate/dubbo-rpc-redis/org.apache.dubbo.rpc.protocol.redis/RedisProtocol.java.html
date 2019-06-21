@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RedisProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-redis</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.redis</a> &gt; <span class="el_source">RedisProtocol.java</span></div><h1>RedisProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.redis;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.ObjectOutput;
+import org.apache.dubbo.common.serialize.Serialization;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.protocol.AbstractInvoker;
+import org.apache.dubbo.rpc.protocol.AbstractProtocol;
+
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.exceptions.JedisConnectionException;
+import redis.clients.jedis.exceptions.JedisDataException;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
+
+
+/**
+ * RedisProtocol
+ */
+<span class="nc" id="L52">public class RedisProtocol extends AbstractProtocol {</span>
+
+    public static final int DEFAULT_PORT = 6379;
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L58">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(final Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc" id="L63">        throw new UnsupportedOperationException(&quot;Unsupported export redis service. url: &quot; + invoker.getUrl());</span>
+    }
+
+    private Serialization getSerialization(URL url) {
+<span class="nc" id="L67">        return ExtensionLoader.getExtensionLoader(Serialization.class).getExtension(url.getParameter(Constants.SERIALIZATION_KEY, &quot;java&quot;));</span>
+    }
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(final Class&lt;T&gt; type, final URL url) throws RpcException {
+        try {
+<span class="nc" id="L73">            GenericObjectPoolConfig config = new GenericObjectPoolConfig();</span>
+<span class="nc" id="L74">            config.setTestOnBorrow(url.getParameter(&quot;test.on.borrow&quot;, true));</span>
+<span class="nc" id="L75">            config.setTestOnReturn(url.getParameter(&quot;test.on.return&quot;, false));</span>
+<span class="nc" id="L76">            config.setTestWhileIdle(url.getParameter(&quot;test.while.idle&quot;, false));</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (url.getParameter(&quot;max.idle&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L78">                config.setMaxIdle(url.getParameter(&quot;max.idle&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (url.getParameter(&quot;min.idle&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L81">                config.setMinIdle(url.getParameter(&quot;min.idle&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (url.getParameter(&quot;max.active&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L84">                config.setMaxTotal(url.getParameter(&quot;max.active&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (url.getParameter(&quot;max.total&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L87">                config.setMaxTotal(url.getParameter(&quot;max.total&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (url.getParameter(&quot;max.wait&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L90">                config.setMaxWaitMillis(url.getParameter(&quot;max.wait&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (url.getParameter(&quot;num.tests.per.eviction.run&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L93">                config.setNumTestsPerEvictionRun(url.getParameter(&quot;num.tests.per.eviction.run&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (url.getParameter(&quot;time.between.eviction.runs.millis&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L96">                config.setTimeBetweenEvictionRunsMillis(url.getParameter(&quot;time.between.eviction.runs.millis&quot;, 0));</span>
+            }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (url.getParameter(&quot;min.evictable.idle.time.millis&quot;, 0) &gt; 0) {</span>
+<span class="nc" id="L99">                config.setMinEvictableIdleTimeMillis(url.getParameter(&quot;min.evictable.idle.time.millis&quot;, 0));</span>
+            }
+<span class="nc" id="L101">            final JedisPool jedisPool = new JedisPool(config, url.getHost(), url.getPort(DEFAULT_PORT),</span>
+<span class="nc" id="L102">                    url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT),</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                    StringUtils.isBlank(url.getPassword()) ? null : url.getPassword(),</span>
+<span class="nc" id="L104">                    url.getParameter(&quot;db.index&quot;, 0));</span>
+<span class="nc" id="L105">            final int expiry = url.getParameter(&quot;expiry&quot;, 0);</span>
+<span class="nc" id="L106">            final String get = url.getParameter(&quot;get&quot;, &quot;get&quot;);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            final String set = url.getParameter(&quot;set&quot;, Map.class.equals(type) ? &quot;put&quot; : &quot;set&quot;);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            final String delete = url.getParameter(&quot;delete&quot;, Map.class.equals(type) ? &quot;remove&quot; : &quot;delete&quot;);</span>
+<span class="nc" id="L109">            return new AbstractInvoker&lt;T&gt;(type, url) {</span>
+                @Override
+                protected Result doInvoke(Invocation invocation) throws Throwable {
+<span class="nc" id="L112">                    Jedis jedis = null;</span>
+                    try {
+<span class="nc" id="L114">                        jedis = jedisPool.getResource();</span>
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                        if (get.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                            if (invocation.getArguments().length != 1) {</span>
+<span class="nc" id="L118">                                throw new IllegalArgumentException(&quot;The redis get method arguments mismatch, must only one arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L120">                            byte[] value = jedis.get(String.valueOf(invocation.getArguments()[0]).getBytes());</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                            if (value == null) {</span>
+<span class="nc" id="L122">                                return new RpcResult();</span>
+                            }
+<span class="nc" id="L124">                            ObjectInput oin = getSerialization(url).deserialize(url, new ByteArrayInputStream(value));</span>
+<span class="nc" id="L125">                            return new RpcResult(oin.readObject());</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                        } else if (set.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                            if (invocation.getArguments().length != 2) {</span>
+<span class="nc" id="L128">                                throw new IllegalArgumentException(&quot;The redis set method arguments mismatch, must be two arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L130">                            byte[] key = String.valueOf(invocation.getArguments()[0]).getBytes();</span>
+<span class="nc" id="L131">                            ByteArrayOutputStream output = new ByteArrayOutputStream();</span>
+<span class="nc" id="L132">                            ObjectOutput value = getSerialization(url).serialize(url, output);</span>
+<span class="nc" id="L133">                            value.writeObject(invocation.getArguments()[1]);</span>
+<span class="nc" id="L134">                            jedis.set(key, output.toByteArray());</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                            if (expiry &gt; 1000) {</span>
+<span class="nc" id="L136">                                jedis.expire(key, expiry / 1000);</span>
+                            }
+<span class="nc" id="L138">                            return new RpcResult();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                        } else if (delete.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                            if (invocation.getArguments().length != 1) {</span>
+<span class="nc" id="L141">                                throw new IllegalArgumentException(&quot;The redis delete method arguments mismatch, must only one arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L143">                            jedis.del(String.valueOf(invocation.getArguments()[0]).getBytes());</span>
+<span class="nc" id="L144">                            return new RpcResult();</span>
+                        } else {
+<span class="nc" id="L146">                            throw new UnsupportedOperationException(&quot;Unsupported method &quot; + invocation.getMethodName() + &quot; in redis service.&quot;);</span>
+                        }
+<span class="nc" id="L148">                    } catch (Throwable t) {</span>
+<span class="nc" id="L149">                        RpcException re = new RpcException(&quot;Failed to invoke redis service method. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc bnc" id="L150" title="All 4 branches missed.">                        if (t instanceof TimeoutException || t instanceof SocketTimeoutException) {</span>
+<span class="nc" id="L151">                            re.setCode(RpcException.TIMEOUT_EXCEPTION);</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">                        } else if (t instanceof JedisConnectionException || t instanceof IOException) {</span>
+<span class="nc" id="L153">                            re.setCode(RpcException.NETWORK_EXCEPTION);</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                        } else if (t instanceof JedisDataException) {</span>
+<span class="nc" id="L155">                            re.setCode(RpcException.SERIALIZATION_EXCEPTION);</span>
+                        }
+<span class="nc" id="L157">                        throw re;</span>
+                    } finally {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                        if (jedis != null) {</span>
+                            try {
+<span class="nc" id="L161">                                jedis.close();</span>
+<span class="nc" id="L162">                            } catch (Throwable t) {</span>
+<span class="nc" id="L163">                                logger.warn(&quot;returnResource error: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L164">                            }</span>
+                        }
+                    }
+                }
+
+                @Override
+                public void destroy() {
+<span class="nc" id="L171">                    super.destroy();</span>
+                    try {
+<span class="nc" id="L173">                        jedisPool.destroy();</span>
+<span class="nc" id="L174">                    } catch (Throwable e) {</span>
+<span class="nc" id="L175">                        logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L176">                    }</span>
+<span class="nc" id="L177">                }</span>
+            };
+<span class="nc" id="L179">        } catch (Throwable t) {</span>
+<span class="nc" id="L180">            throw new RpcException(&quot;Failed to refer redis service. interface: &quot; + type.getName() + &quot;, url: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

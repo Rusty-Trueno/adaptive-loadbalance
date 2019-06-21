@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboConfigBindingBeanPostProcessor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">DubboConfigBindingBeanPostProcessor.java</span></div><h1>DubboConfigBindingBeanPostProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.dubbo.common.utils.Assert;
+import org.apache.dubbo.config.AbstractConfig;
+import org.apache.dubbo.config.spring.context.annotation.DubboConfigBindingRegistrar;
+import org.apache.dubbo.config.spring.context.annotation.EnableDubboConfigBinding;
+import org.apache.dubbo.config.spring.context.config.DubboConfigBeanCustomizer;
+import org.apache.dubbo.config.spring.context.properties.DefaultDubboConfigBinder;
+import org.apache.dubbo.config.spring.context.properties.DubboConfigBinder;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import org.springframework.core.env.Environment;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+import static org.springframework.beans.factory.BeanFactoryUtils.beansOfTypeIncludingAncestors;
+
+/**
+ * Dubbo Config Binding {@link BeanPostProcessor}
+ *
+ * @see EnableDubboConfigBinding
+ * @see DubboConfigBindingRegistrar
+ * @since 2.5.8
+ */
+
+public class DubboConfigBindingBeanPostProcessor implements BeanPostProcessor, ApplicationContextAware, InitializingBean {
+
+<span class="nc" id="L54">    private final Log log = LogFactory.getLog(getClass());</span>
+
+    /**
+     * The prefix of Configuration Properties
+     */
+    private final String prefix;
+
+    /**
+     * Binding Bean Name
+     */
+    private final String beanName;
+
+    private DubboConfigBinder dubboConfigBinder;
+
+    private ApplicationContext applicationContext;
+
+<span class="nc" id="L70">    private boolean ignoreUnknownFields = true;</span>
+
+<span class="nc" id="L72">    private boolean ignoreInvalidFields = true;</span>
+
+<span class="nc" id="L74">    private List&lt;DubboConfigBeanCustomizer&gt; configBeanCustomizers = Collections.emptyList();</span>
+
+    /**
+     * @param prefix   the prefix of Configuration Properties
+     * @param beanName the binding Bean Name
+     */
+<span class="nc" id="L80">    public DubboConfigBindingBeanPostProcessor(String prefix, String beanName) {</span>
+<span class="nc" id="L81">        Assert.notNull(prefix, &quot;The prefix of Configuration Properties must not be null&quot;);</span>
+<span class="nc" id="L82">        Assert.notNull(beanName, &quot;The name of bean must not be null&quot;);</span>
+<span class="nc" id="L83">        this.prefix = prefix;</span>
+<span class="nc" id="L84">        this.beanName = beanName;</span>
+<span class="nc" id="L85">    }</span>
+
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (beanName.equals(this.beanName) &amp;&amp; bean instanceof AbstractConfig) {</span>
+
+<span class="nc" id="L92">            AbstractConfig dubboConfig = (AbstractConfig) bean;</span>
+
+<span class="nc" id="L94">            bind(prefix, dubboConfig);</span>
+
+<span class="nc" id="L96">            customize(beanName, dubboConfig);</span>
+
+        }
+
+<span class="nc" id="L100">        return bean;</span>
+
+    }
+
+    private void bind(String prefix, AbstractConfig dubboConfig) {
+
+<span class="nc" id="L106">        dubboConfigBinder.bind(prefix, dubboConfig);</span>
+
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (log.isInfoEnabled()) {</span>
+<span class="nc" id="L109">            log.info(&quot;The properties of bean [name : &quot; + beanName + &quot;] have been binding by prefix of &quot; +</span>
+                    &quot;configuration properties : &quot; + prefix);
+        }
+<span class="nc" id="L112">    }</span>
+
+    private void customize(String beanName, AbstractConfig dubboConfig) {
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (DubboConfigBeanCustomizer customizer : configBeanCustomizers) {</span>
+<span class="nc" id="L117">            customizer.customize(beanName, dubboConfig);</span>
+<span class="nc" id="L118">        }</span>
+
+<span class="nc" id="L120">    }</span>
+
+    public boolean isIgnoreUnknownFields() {
+<span class="nc" id="L123">        return ignoreUnknownFields;</span>
+    }
+
+    public void setIgnoreUnknownFields(boolean ignoreUnknownFields) {
+<span class="nc" id="L127">        this.ignoreUnknownFields = ignoreUnknownFields;</span>
+<span class="nc" id="L128">    }</span>
+
+    public boolean isIgnoreInvalidFields() {
+<span class="nc" id="L131">        return ignoreInvalidFields;</span>
+    }
+
+    public void setIgnoreInvalidFields(boolean ignoreInvalidFields) {
+<span class="nc" id="L135">        this.ignoreInvalidFields = ignoreInvalidFields;</span>
+<span class="nc" id="L136">    }</span>
+
+    public DubboConfigBinder getDubboConfigBinder() {
+<span class="nc" id="L139">        return dubboConfigBinder;</span>
+    }
+
+    public void setDubboConfigBinder(DubboConfigBinder dubboConfigBinder) {
+<span class="nc" id="L143">        this.dubboConfigBinder = dubboConfigBinder;</span>
+<span class="nc" id="L144">    }</span>
+
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+<span class="nc" id="L148">        return bean;</span>
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+<span class="nc" id="L153">        this.applicationContext = applicationContext;</span>
+<span class="nc" id="L154">    }</span>
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+
+<span class="nc" id="L159">        initDubboConfigBinder();</span>
+
+<span class="nc" id="L161">        initConfigBeanCustomizers();</span>
+
+<span class="nc" id="L163">    }</span>
+
+    private void initDubboConfigBinder() {
+
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (dubboConfigBinder == null) {</span>
+            try {
+<span class="nc" id="L169">                dubboConfigBinder = applicationContext.getBean(DubboConfigBinder.class);</span>
+<span class="nc" id="L170">            } catch (BeansException ignored) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L172">                    log.debug(&quot;DubboConfigBinder Bean can't be found in ApplicationContext.&quot;);</span>
+                }
+                // Use Default implementation
+<span class="nc" id="L175">                dubboConfigBinder = createDubboConfigBinder(applicationContext.getEnvironment());</span>
+<span class="nc" id="L176">            }</span>
+        }
+
+<span class="nc" id="L179">        dubboConfigBinder.setIgnoreUnknownFields(ignoreUnknownFields);</span>
+<span class="nc" id="L180">        dubboConfigBinder.setIgnoreInvalidFields(ignoreInvalidFields);</span>
+
+<span class="nc" id="L182">    }</span>
+
+    private void initConfigBeanCustomizers() {
+
+<span class="nc" id="L186">        Collection&lt;DubboConfigBeanCustomizer&gt; configBeanCustomizers =</span>
+<span class="nc" id="L187">                beansOfTypeIncludingAncestors(applicationContext, DubboConfigBeanCustomizer.class).values();</span>
+
+<span class="nc" id="L189">        this.configBeanCustomizers = new ArrayList&lt;&gt;(configBeanCustomizers);</span>
+
+<span class="nc" id="L191">        AnnotationAwareOrderComparator.sort(this.configBeanCustomizers);</span>
+<span class="nc" id="L192">    }</span>
+
+    /**
+     * Create {@link DubboConfigBinder} instance.
+     *
+     * @param environment
+     * @return {@link DefaultDubboConfigBinder}
+     */
+    protected DubboConfigBinder createDubboConfigBinder(Environment environment) {
+<span class="nc" id="L201">        DefaultDubboConfigBinder defaultDubboConfigBinder = new DefaultDubboConfigBinder();</span>
+<span class="nc" id="L202">        defaultDubboConfigBinder.setEnvironment(environment);</span>
+<span class="nc" id="L203">        return defaultDubboConfigBinder;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,2 @@
+org/apache/dubbo/metadata/store/zookeeper/ZookeeperMetadataReportFactory.class
+org/apache/dubbo/metadata/store/zookeeper/ZookeeperMetadataReport.class

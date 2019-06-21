@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MockInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.support</a> &gt; <span class="el_source">MockInvoker.java</span></div><h1>MockInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.PojoUtils;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+
+import com.alibaba.fastjson.JSON;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+final public class MockInvoker&lt;T&gt; implements Invoker&lt;T&gt; {
+<span class="nc" id="L44">    private final static ProxyFactory proxyFactory = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();</span>
+<span class="nc" id="L45">    private final static Map&lt;String, Invoker&lt;?&gt;&gt; mocks = new ConcurrentHashMap&lt;String, Invoker&lt;?&gt;&gt;();</span>
+<span class="nc" id="L46">    private final static Map&lt;String, Throwable&gt; throwables = new ConcurrentHashMap&lt;String, Throwable&gt;();</span>
+
+    private final URL url;
+    private final Class&lt;T&gt; type;
+
+<span class="nc" id="L51">    public MockInvoker(URL url, Class&lt;T&gt; type) {</span>
+<span class="nc" id="L52">        this.url = url;</span>
+<span class="nc" id="L53">        this.type = type;</span>
+<span class="nc" id="L54">    }</span>
+
+    public static Object parseMockValue(String mock) throws Exception {
+<span class="nc" id="L57">        return parseMockValue(mock, null);</span>
+    }
+
+    public static Object parseMockValue(String mock, Type[] returnTypes) throws Exception {
+<span class="nc" id="L61">        Object value = null;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (&quot;empty&quot;.equals(mock)) {</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">            value = ReflectUtils.getEmptyObject(returnTypes != null &amp;&amp; returnTypes.length &gt; 0 ? (Class&lt;?&gt;) returnTypes[0] : null);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        } else if (&quot;null&quot;.equals(mock)) {</span>
+<span class="nc" id="L65">            value = null;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        } else if (&quot;true&quot;.equals(mock)) {</span>
+<span class="nc" id="L67">            value = true;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        } else if (&quot;false&quot;.equals(mock)) {</span>
+<span class="nc" id="L69">            value = false;</span>
+<span class="nc bnc" id="L70" title="All 6 branches missed.">        } else if (mock.length() &gt;= 2 &amp;&amp; (mock.startsWith(&quot;\&quot;&quot;) &amp;&amp; mock.endsWith(&quot;\&quot;&quot;)</span>
+<span class="nc bnc" id="L71" title="All 4 branches missed.">                || mock.startsWith(&quot;\'&quot;) &amp;&amp; mock.endsWith(&quot;\'&quot;))) {</span>
+<span class="nc" id="L72">            value = mock.subSequence(1, mock.length() - 1);</span>
+<span class="nc bnc" id="L73" title="All 6 branches missed.">        } else if (returnTypes != null &amp;&amp; returnTypes.length &gt; 0 &amp;&amp; returnTypes[0] == String.class) {</span>
+<span class="nc" id="L74">            value = mock;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        } else if (StringUtils.isNumeric(mock, false)) {</span>
+<span class="nc" id="L76">            value = JSON.parse(mock);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        } else if (mock.startsWith(&quot;{&quot;)) {</span>
+<span class="nc" id="L78">            value = JSON.parseObject(mock, Map.class);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        } else if (mock.startsWith(&quot;[&quot;)) {</span>
+<span class="nc" id="L80">            value = JSON.parseObject(mock, List.class);</span>
+        } else {
+<span class="nc" id="L82">            value = mock;</span>
+        }
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (ArrayUtils.isNotEmpty(returnTypes)) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            value = PojoUtils.realize(value, (Class&lt;?&gt;) returnTypes[0], returnTypes.length &gt; 1 ? returnTypes[1] : null);</span>
+        }
+<span class="nc" id="L87">        return value;</span>
+    }
+
+    @Override
+    public Result invoke(Invocation invocation) throws RpcException {
+<span class="nc" id="L92">        String mock = getUrl().getParameter(invocation.getMethodName() + &quot;.&quot; + Constants.MOCK_KEY);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (invocation instanceof RpcInvocation) {</span>
+<span class="nc" id="L94">            ((RpcInvocation) invocation).setInvoker(this);</span>
+        }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (StringUtils.isBlank(mock)) {</span>
+<span class="nc" id="L97">            mock = getUrl().getParameter(Constants.MOCK_KEY);</span>
+        }
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (StringUtils.isBlank(mock)) {</span>
+<span class="nc" id="L101">            throw new RpcException(new IllegalAccessException(&quot;mock can not be null. url :&quot; + url));</span>
+        }
+<span class="nc" id="L103">        mock = normalizeMock(URL.decode(mock));</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (mock.startsWith(Constants.RETURN_PREFIX)) {</span>
+<span class="nc" id="L105">            mock = mock.substring(Constants.RETURN_PREFIX.length()).trim();</span>
+            try {
+<span class="nc" id="L107">                Type[] returnTypes = RpcUtils.getReturnTypes(invocation);</span>
+<span class="nc" id="L108">                Object value = parseMockValue(mock, returnTypes);</span>
+<span class="nc" id="L109">                return new RpcResult(value);</span>
+<span class="nc" id="L110">            } catch (Exception ew) {</span>
+<span class="nc" id="L111">                throw new RpcException(&quot;mock return invoke error. method :&quot; + invocation.getMethodName()</span>
+                        + &quot;, mock:&quot; + mock + &quot;, url: &quot; + url, ew);
+            }
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        } else if (mock.startsWith(Constants.THROW_PREFIX)) {</span>
+<span class="nc" id="L115">            mock = mock.substring(Constants.THROW_PREFIX.length()).trim();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (StringUtils.isBlank(mock)) {</span>
+<span class="nc" id="L117">                throw new RpcException(&quot;mocked exception for service degradation.&quot;);</span>
+            } else { // user customized class
+<span class="nc" id="L119">                Throwable t = getThrowable(mock);</span>
+<span class="nc" id="L120">                throw new RpcException(RpcException.BIZ_EXCEPTION, t);</span>
+            }
+        } else { //impl mock
+            try {
+<span class="nc" id="L124">                Invoker&lt;T&gt; invoker = getInvoker(mock);</span>
+<span class="nc" id="L125">                return invoker.invoke(invocation);</span>
+<span class="nc" id="L126">            } catch (Throwable t) {</span>
+<span class="nc" id="L127">                throw new RpcException(&quot;Failed to create mock implementation class &quot; + mock, t);</span>
+            }
+        }
+    }
+
+    public static Throwable getThrowable(String throwstr) {
+<span class="nc" id="L133">        Throwable throwable = throwables.get(throwstr);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (throwable != null) {</span>
+<span class="nc" id="L135">            return throwable;</span>
+        }
+
+        try {
+            Throwable t;
+<span class="nc" id="L140">            Class&lt;?&gt; bizException = ReflectUtils.forName(throwstr);</span>
+            Constructor&lt;?&gt; constructor;
+<span class="nc" id="L142">            constructor = ReflectUtils.findConstructor(bizException, String.class);</span>
+<span class="nc" id="L143">            t = (Throwable) constructor.newInstance(new Object[]{&quot;mocked exception for service degradation.&quot;});</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (throwables.size() &lt; 1000) {</span>
+<span class="nc" id="L145">                throwables.put(throwstr, t);</span>
+            }
+<span class="nc" id="L147">            return t;</span>
+<span class="nc" id="L148">        } catch (Exception e) {</span>
+<span class="nc" id="L149">            throw new RpcException(&quot;mock throw error :&quot; + throwstr + &quot; argument error.&quot;, e);</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private Invoker&lt;T&gt; getInvoker(String mockService) {
+<span class="nc" id="L155">        Invoker&lt;T&gt; invoker = (Invoker&lt;T&gt;) mocks.get(mockService);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (invoker != null) {</span>
+<span class="nc" id="L157">            return invoker;</span>
+        }
+
+<span class="nc" id="L160">        Class&lt;T&gt; serviceType = (Class&lt;T&gt;) ReflectUtils.forName(url.getServiceInterface());</span>
+<span class="nc" id="L161">        T mockObject = (T) getMockObject(mockService, serviceType);</span>
+<span class="nc" id="L162">        invoker = proxyFactory.getInvoker(mockObject, serviceType, url);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (mocks.size() &lt; 10000) {</span>
+<span class="nc" id="L164">            mocks.put(mockService, invoker);</span>
+        }
+<span class="nc" id="L166">        return invoker;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static Object getMockObject(String mockService, Class serviceType) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (ConfigUtils.isDefault(mockService)) {</span>
+<span class="nc" id="L172">            mockService = serviceType.getName() + &quot;Mock&quot;;</span>
+        }
+
+<span class="nc" id="L175">        Class&lt;?&gt; mockClass = ReflectUtils.forName(mockService);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (!serviceType.isAssignableFrom(mockClass)) {</span>
+<span class="nc" id="L177">            throw new IllegalStateException(&quot;The mock class &quot; + mockClass.getName() +</span>
+<span class="nc" id="L178">                    &quot; not implement interface &quot; + serviceType.getName());</span>
+        }
+
+        try {
+<span class="nc" id="L182">            return mockClass.newInstance();</span>
+<span class="nc" id="L183">        } catch (InstantiationException e) {</span>
+<span class="nc" id="L184">            throw new IllegalStateException(&quot;No default constructor from mock class &quot; + mockClass.getName(), e);</span>
+<span class="nc" id="L185">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L186">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+
+    /**
+     * Normalize mock string:
+     *
+     * &lt;ol&gt;
+     * &lt;li&gt;return =&gt; return null&lt;/li&gt;
+     * &lt;li&gt;fail =&gt; default&lt;/li&gt;
+     * &lt;li&gt;force =&gt; default&lt;/li&gt;
+     * &lt;li&gt;fail:throw/return foo =&gt; throw/return foo&lt;/li&gt;
+     * &lt;li&gt;force:throw/return foo =&gt; throw/return foo&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @param mock mock string
+     * @return normalized mock string
+     */
+    public static String normalizeMock(String mock) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (mock == null) {</span>
+<span class="nc" id="L207">            return mock;</span>
+        }
+
+<span class="nc" id="L210">        mock = mock.trim();</span>
+
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (mock.length() == 0) {</span>
+<span class="nc" id="L213">            return mock;</span>
+        }
+
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (Constants.RETURN_KEY.equalsIgnoreCase(mock)) {</span>
+<span class="nc" id="L217">            return Constants.RETURN_PREFIX + &quot;null&quot;;</span>
+        }
+
+<span class="nc bnc" id="L220" title="All 6 branches missed.">        if (ConfigUtils.isDefault(mock) || &quot;fail&quot;.equalsIgnoreCase(mock) || &quot;force&quot;.equalsIgnoreCase(mock)) {</span>
+<span class="nc" id="L221">            return &quot;default&quot;;</span>
+        }
+
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (mock.startsWith(Constants.FAIL_PREFIX)) {</span>
+<span class="nc" id="L225">            mock = mock.substring(Constants.FAIL_PREFIX.length()).trim();</span>
+        }
+
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (mock.startsWith(Constants.FORCE_PREFIX)) {</span>
+<span class="nc" id="L229">            mock = mock.substring(Constants.FORCE_PREFIX.length()).trim();</span>
+        }
+
+<span class="nc bnc" id="L232" title="All 4 branches missed.">        if (mock.startsWith(Constants.RETURN_PREFIX) || mock.startsWith(Constants.THROW_PREFIX)) {</span>
+<span class="nc" id="L233">            mock = mock.replace('`', '&quot;');</span>
+        }
+
+<span class="nc" id="L236">        return mock;</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L241">        return this.url;</span>
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L246">        return true;</span>
+    }
+
+    @Override
+    public void destroy() {
+        //do nothing
+<span class="nc" id="L252">    }</span>
+
+    @Override
+    public Class&lt;T&gt; getInterface() {
+<span class="nc" id="L256">        return type;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

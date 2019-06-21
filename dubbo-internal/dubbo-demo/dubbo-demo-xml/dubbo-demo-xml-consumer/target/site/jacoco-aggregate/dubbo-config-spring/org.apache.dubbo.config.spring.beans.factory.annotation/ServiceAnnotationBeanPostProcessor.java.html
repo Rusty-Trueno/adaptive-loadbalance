@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceAnnotationBeanPostProcessor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">ServiceAnnotationBeanPostProcessor.java</span></div><h1>ServiceAnnotationBeanPostProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.config.annotation.Service;
+import org.apache.dubbo.config.spring.ServiceBean;
+import org.apache.dubbo.config.spring.context.annotation.DubboClassPathBeanDefinitionScanner;
+
+import org.springframework.beans.BeansException;
+import org.springframework.beans.MutablePropertyValues;
+import org.springframework.beans.factory.BeanClassLoaderAware;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.RuntimeBeanReference;
+import org.springframework.beans.factory.config.SingletonBeanRegistry;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
+import org.springframework.beans.factory.support.BeanNameGenerator;
+import org.springframework.beans.factory.support.ManagedList;
+import org.springframework.context.EnvironmentAware;
+import org.springframework.context.ResourceLoaderAware;
+import org.springframework.context.annotation.AnnotationBeanNameGenerator;
+import org.springframework.context.annotation.AnnotationConfigUtils;
+import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
+import org.springframework.context.annotation.ConfigurationClassPostProcessor;
+import org.springframework.core.env.Environment;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.apache.dubbo.config.spring.util.ObjectUtils.of;
+import static org.springframework.beans.factory.support.BeanDefinitionBuilder.rootBeanDefinition;
+import static org.springframework.context.annotation.AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR;
+import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
+import static org.springframework.util.ClassUtils.resolveClassName;
+
+/**
+ * {@link Service} Annotation
+ * {@link BeanDefinitionRegistryPostProcessor Bean Definition Registry Post Processor}
+ *
+ * @since 2.5.8
+ */
+public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistryPostProcessor, EnvironmentAware,
+        ResourceLoaderAware, BeanClassLoaderAware {
+
+
+<span class="nc" id="L76">    private final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+    private final Set&lt;String&gt; packagesToScan;
+
+    private Environment environment;
+
+    private ResourceLoader resourceLoader;
+
+    private ClassLoader classLoader;
+
+    public ServiceAnnotationBeanPostProcessor(String... packagesToScan) {
+<span class="nc" id="L87">        this(Arrays.asList(packagesToScan));</span>
+<span class="nc" id="L88">    }</span>
+
+    public ServiceAnnotationBeanPostProcessor(Collection&lt;String&gt; packagesToScan) {
+<span class="nc" id="L91">        this(new LinkedHashSet&lt;&gt;(packagesToScan));</span>
+<span class="nc" id="L92">    }</span>
+
+<span class="nc" id="L94">    public ServiceAnnotationBeanPostProcessor(Set&lt;String&gt; packagesToScan) {</span>
+<span class="nc" id="L95">        this.packagesToScan = packagesToScan;</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+
+<span class="nc" id="L101">        Set&lt;String&gt; resolvedPackagesToScan = resolvePackagesToScan(packagesToScan);</span>
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (!CollectionUtils.isEmpty(resolvedPackagesToScan)) {</span>
+<span class="nc" id="L104">            registerServiceBeans(resolvedPackagesToScan, registry);</span>
+        } else {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L107">                logger.warn(&quot;packagesToScan is empty , ServiceBean registry will be ignored!&quot;);</span>
+            }
+        }
+
+<span class="nc" id="L111">    }</span>
+
+
+    /**
+     * Registers Beans whose classes was annotated {@link Service}
+     *
+     * @param packagesToScan The base packages to scan
+     * @param registry       {@link BeanDefinitionRegistry}
+     */
+    private void registerServiceBeans(Set&lt;String&gt; packagesToScan, BeanDefinitionRegistry registry) {
+
+<span class="nc" id="L122">        DubboClassPathBeanDefinitionScanner scanner =</span>
+                new DubboClassPathBeanDefinitionScanner(registry, environment, resourceLoader);
+
+<span class="nc" id="L125">        BeanNameGenerator beanNameGenerator = resolveBeanNameGenerator(registry);</span>
+
+<span class="nc" id="L127">        scanner.setBeanNameGenerator(beanNameGenerator);</span>
+
+<span class="nc" id="L129">        scanner.addIncludeFilter(new AnnotationTypeFilter(Service.class));</span>
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        for (String packageToScan : packagesToScan) {</span>
+
+            // Registers @Service Bean first
+<span class="nc" id="L134">            scanner.scan(packageToScan);</span>
+
+            // Finds all BeanDefinitionHolders of @Service whether @ComponentScan scans or not.
+<span class="nc" id="L137">            Set&lt;BeanDefinitionHolder&gt; beanDefinitionHolders =</span>
+<span class="nc" id="L138">                    findServiceBeanDefinitionHolders(scanner, packageToScan, registry, beanNameGenerator);</span>
+
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (!CollectionUtils.isEmpty(beanDefinitionHolders)) {</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                for (BeanDefinitionHolder beanDefinitionHolder : beanDefinitionHolders) {</span>
+<span class="nc" id="L143">                    registerServiceBean(beanDefinitionHolder, registry, scanner);</span>
+<span class="nc" id="L144">                }</span>
+
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L147">                    logger.info(beanDefinitionHolders.size() + &quot; annotated Dubbo's @Service Components { &quot; +</span>
+                            beanDefinitionHolders +
+                            &quot; } were scanned under package[&quot; + packageToScan + &quot;]&quot;);
+                }
+
+            } else {
+
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L155">                    logger.warn(&quot;No Spring Bean annotating Dubbo's @Service was found under package[&quot;</span>
+                            + packageToScan + &quot;]&quot;);
+                }
+
+            }
+
+<span class="nc" id="L161">        }</span>
+
+<span class="nc" id="L163">    }</span>
+
+    /**
+     * It'd better to use BeanNameGenerator instance that should reference
+     * {@link ConfigurationClassPostProcessor#componentScanBeanNameGenerator},
+     * thus it maybe a potential problem on bean name generation.
+     *
+     * @param registry {@link BeanDefinitionRegistry}
+     * @return {@link BeanNameGenerator} instance
+     * @see SingletonBeanRegistry
+     * @see AnnotationConfigUtils#CONFIGURATION_BEAN_NAME_GENERATOR
+     * @see ConfigurationClassPostProcessor#processConfigBeanDefinitions
+     * @since 2.5.8
+     */
+    private BeanNameGenerator resolveBeanNameGenerator(BeanDefinitionRegistry registry) {
+
+<span class="nc" id="L179">        BeanNameGenerator beanNameGenerator = null;</span>
+
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (registry instanceof SingletonBeanRegistry) {</span>
+<span class="nc" id="L182">            SingletonBeanRegistry singletonBeanRegistry = SingletonBeanRegistry.class.cast(registry);</span>
+<span class="nc" id="L183">            beanNameGenerator = (BeanNameGenerator) singletonBeanRegistry.getSingleton(CONFIGURATION_BEAN_NAME_GENERATOR);</span>
+        }
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (beanNameGenerator == null) {</span>
+
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+
+<span class="nc" id="L190">                logger.info(&quot;BeanNameGenerator bean can't be found in BeanFactory with name [&quot;</span>
+                        + CONFIGURATION_BEAN_NAME_GENERATOR + &quot;]&quot;);
+<span class="nc" id="L192">                logger.info(&quot;BeanNameGenerator will be a instance of &quot; +</span>
+<span class="nc" id="L193">                        AnnotationBeanNameGenerator.class.getName() +</span>
+                        &quot; , it maybe a potential problem on bean name generation.&quot;);
+            }
+
+<span class="nc" id="L197">            beanNameGenerator = new AnnotationBeanNameGenerator();</span>
+
+        }
+
+<span class="nc" id="L201">        return beanNameGenerator;</span>
+
+    }
+
+    /**
+     * Finds a {@link Set} of {@link BeanDefinitionHolder BeanDefinitionHolders} whose bean type annotated
+     * {@link Service} Annotation.
+     *
+     * @param scanner       {@link ClassPathBeanDefinitionScanner}
+     * @param packageToScan pachage to scan
+     * @param registry      {@link BeanDefinitionRegistry}
+     * @return non-null
+     * @since 2.5.8
+     */
+    private Set&lt;BeanDefinitionHolder&gt; findServiceBeanDefinitionHolders(
+            ClassPathBeanDefinitionScanner scanner, String packageToScan, BeanDefinitionRegistry registry,
+            BeanNameGenerator beanNameGenerator) {
+
+<span class="nc" id="L219">        Set&lt;BeanDefinition&gt; beanDefinitions = scanner.findCandidateComponents(packageToScan);</span>
+
+<span class="nc" id="L221">        Set&lt;BeanDefinitionHolder&gt; beanDefinitionHolders = new LinkedHashSet&lt;&gt;(beanDefinitions.size());</span>
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        for (BeanDefinition beanDefinition : beanDefinitions) {</span>
+
+<span class="nc" id="L225">            String beanName = beanNameGenerator.generateBeanName(beanDefinition, registry);</span>
+<span class="nc" id="L226">            BeanDefinitionHolder beanDefinitionHolder = new BeanDefinitionHolder(beanDefinition, beanName);</span>
+<span class="nc" id="L227">            beanDefinitionHolders.add(beanDefinitionHolder);</span>
+
+<span class="nc" id="L229">        }</span>
+
+<span class="nc" id="L231">        return beanDefinitionHolders;</span>
+
+    }
+
+    /**
+     * Registers {@link ServiceBean} from new annotated {@link Service} {@link BeanDefinition}
+     *
+     * @param beanDefinitionHolder
+     * @param registry
+     * @param scanner
+     * @see ServiceBean
+     * @see BeanDefinition
+     */
+    private void registerServiceBean(BeanDefinitionHolder beanDefinitionHolder, BeanDefinitionRegistry registry,
+                                     DubboClassPathBeanDefinitionScanner scanner) {
+
+<span class="nc" id="L247">        Class&lt;?&gt; beanClass = resolveClass(beanDefinitionHolder);</span>
+
+<span class="nc" id="L249">        Service service = findAnnotation(beanClass, Service.class);</span>
+
+<span class="nc" id="L251">        Class&lt;?&gt; interfaceClass = resolveServiceInterfaceClass(beanClass, service);</span>
+
+<span class="nc" id="L253">        String annotatedServiceBeanName = beanDefinitionHolder.getBeanName();</span>
+
+<span class="nc" id="L255">        AbstractBeanDefinition serviceBeanDefinition =</span>
+<span class="nc" id="L256">                buildServiceBeanDefinition(service, interfaceClass, annotatedServiceBeanName);</span>
+
+        // ServiceBean Bean name
+<span class="nc" id="L259">        String beanName = generateServiceBeanName(service, interfaceClass, annotatedServiceBeanName);</span>
+
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (scanner.checkCandidate(beanName, serviceBeanDefinition)) { // check duplicated candidate bean</span>
+<span class="nc" id="L262">            registry.registerBeanDefinition(beanName, serviceBeanDefinition);</span>
+
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L265">                logger.info(&quot;The BeanDefinition[&quot; + serviceBeanDefinition +</span>
+                        &quot;] of ServiceBean has been registered with name : &quot; + beanName);
+            }
+
+        } else {
+
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L272">                logger.warn(&quot;The Duplicated BeanDefinition[&quot; + serviceBeanDefinition +</span>
+                        &quot;] of ServiceBean[ bean name : &quot; + beanName +
+                        &quot;] was be found , Did @DubboComponentScan scan to same package in many times?&quot;);
+            }
+
+        }
+
+<span class="nc" id="L279">    }</span>
+
+    /**
+     * Generates the bean name of {@link ServiceBean}
+     *
+     * @param service
+     * @param interfaceClass           the class of interface annotated {@link Service}
+     * @param annotatedServiceBeanName the bean name of annotated {@link Service}
+     * @return ServiceBean@interfaceClassName#annotatedServiceBeanName
+     * @since 2.5.9
+     */
+    private String generateServiceBeanName(Service service, Class&lt;?&gt; interfaceClass, String annotatedServiceBeanName) {
+
+<span class="nc" id="L292">        AnnotationBeanNameBuilder builder = AnnotationBeanNameBuilder.create(service, interfaceClass);</span>
+
+<span class="nc" id="L294">        builder.environment(environment);</span>
+
+<span class="nc" id="L296">        return builder.build();</span>
+
+    }
+
+    private Class&lt;?&gt; resolveServiceInterfaceClass(Class&lt;?&gt; annotatedServiceBeanClass, Service service) {
+
+<span class="nc" id="L302">        Class&lt;?&gt; interfaceClass = service.interfaceClass();</span>
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (void.class.equals(interfaceClass)) {</span>
+
+<span class="nc" id="L306">            interfaceClass = null;</span>
+
+<span class="nc" id="L308">            String interfaceClassName = service.interfaceName();</span>
+
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (StringUtils.hasText(interfaceClassName)) {</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (ClassUtils.isPresent(interfaceClassName, classLoader)) {</span>
+<span class="nc" id="L312">                    interfaceClass = resolveClassName(interfaceClassName, classLoader);</span>
+                }
+            }
+
+        }
+
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (interfaceClass == null) {</span>
+            // Find all interfaces from the annotated class
+            // To resolve an issue : https://github.com/apache/incubator-dubbo/issues/3251
+<span class="nc" id="L321">            Class&lt;?&gt;[] allInterfaces = ClassUtils.getAllInterfacesForClass(annotatedServiceBeanClass);</span>
+
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            if (allInterfaces.length &gt; 0) {</span>
+<span class="nc" id="L324">                interfaceClass = allInterfaces[0];</span>
+            }
+
+        }
+
+<span class="nc" id="L329">        Assert.notNull(interfaceClass,</span>
+                &quot;@Service interfaceClass() or interfaceName() or interface class must be present!&quot;);
+
+<span class="nc" id="L332">        Assert.isTrue(interfaceClass.isInterface(),</span>
+                &quot;The type that was annotated @Service is not an interface!&quot;);
+
+<span class="nc" id="L335">        return interfaceClass;</span>
+    }
+
+    private Class&lt;?&gt; resolveClass(BeanDefinitionHolder beanDefinitionHolder) {
+
+<span class="nc" id="L340">        BeanDefinition beanDefinition = beanDefinitionHolder.getBeanDefinition();</span>
+
+<span class="nc" id="L342">        return resolveClass(beanDefinition);</span>
+
+    }
+
+    private Class&lt;?&gt; resolveClass(BeanDefinition beanDefinition) {
+
+<span class="nc" id="L348">        String beanClassName = beanDefinition.getBeanClassName();</span>
+
+<span class="nc" id="L350">        return resolveClassName(beanClassName, classLoader);</span>
+
+    }
+
+    private Set&lt;String&gt; resolvePackagesToScan(Set&lt;String&gt; packagesToScan) {
+<span class="nc" id="L355">        Set&lt;String&gt; resolvedPackagesToScan = new LinkedHashSet&lt;String&gt;(packagesToScan.size());</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        for (String packageToScan : packagesToScan) {</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (StringUtils.hasText(packageToScan)) {</span>
+<span class="nc" id="L358">                String resolvedPackageToScan = environment.resolvePlaceholders(packageToScan.trim());</span>
+<span class="nc" id="L359">                resolvedPackagesToScan.add(resolvedPackageToScan);</span>
+            }
+<span class="nc" id="L361">        }</span>
+<span class="nc" id="L362">        return resolvedPackagesToScan;</span>
+    }
+
+    private AbstractBeanDefinition buildServiceBeanDefinition(Service service, Class&lt;?&gt; interfaceClass,
+                                                              String annotatedServiceBeanName) {
+
+<span class="nc" id="L368">        BeanDefinitionBuilder builder = rootBeanDefinition(ServiceBean.class);</span>
+
+<span class="nc" id="L370">        AbstractBeanDefinition beanDefinition = builder.getBeanDefinition();</span>
+
+<span class="nc" id="L372">        MutablePropertyValues propertyValues = beanDefinition.getPropertyValues();</span>
+
+<span class="nc" id="L374">        String[] ignoreAttributeNames = of(&quot;provider&quot;, &quot;monitor&quot;, &quot;application&quot;, &quot;module&quot;, &quot;registry&quot;, &quot;protocol&quot;,</span>
+                &quot;interface&quot;, &quot;interfaceName&quot;);
+
+<span class="nc" id="L377">        propertyValues.addPropertyValues(new AnnotationPropertyValuesAdapter(service, environment, ignoreAttributeNames));</span>
+
+        // References &quot;ref&quot; property to annotated-@Service Bean
+<span class="nc" id="L380">        addPropertyReference(builder, &quot;ref&quot;, annotatedServiceBeanName);</span>
+        // Set interface
+<span class="nc" id="L382">        builder.addPropertyValue(&quot;interface&quot;, interfaceClass.getName());</span>
+
+        /**
+         * Add {@link org.apache.dubbo.config.ProviderConfig} Bean reference
+         */
+<span class="nc" id="L387">        String providerConfigBeanName = service.provider();</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (StringUtils.hasText(providerConfigBeanName)) {</span>
+<span class="nc" id="L389">            addPropertyReference(builder, &quot;provider&quot;, providerConfigBeanName);</span>
+        }
+
+        /**
+         * Add {@link org.apache.dubbo.config.MonitorConfig} Bean reference
+         */
+<span class="nc" id="L395">        String monitorConfigBeanName = service.monitor();</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        if (StringUtils.hasText(monitorConfigBeanName)) {</span>
+<span class="nc" id="L397">            addPropertyReference(builder, &quot;monitor&quot;, monitorConfigBeanName);</span>
+        }
+
+        /**
+         * Add {@link org.apache.dubbo.config.ApplicationConfig} Bean reference
+         */
+<span class="nc" id="L403">        String applicationConfigBeanName = service.application();</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (StringUtils.hasText(applicationConfigBeanName)) {</span>
+<span class="nc" id="L405">            addPropertyReference(builder, &quot;application&quot;, applicationConfigBeanName);</span>
+        }
+
+        /**
+         * Add {@link org.apache.dubbo.config.ModuleConfig} Bean reference
+         */
+<span class="nc" id="L411">        String moduleConfigBeanName = service.module();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (StringUtils.hasText(moduleConfigBeanName)) {</span>
+<span class="nc" id="L413">            addPropertyReference(builder, &quot;module&quot;, moduleConfigBeanName);</span>
+        }
+
+
+        /**
+         * Add {@link org.apache.dubbo.config.RegistryConfig} Bean reference
+         */
+<span class="nc" id="L420">        String[] registryConfigBeanNames = service.registry();</span>
+
+<span class="nc" id="L422">        List&lt;RuntimeBeanReference&gt; registryRuntimeBeanReferences = toRuntimeBeanReferences(registryConfigBeanNames);</span>
+
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (!registryRuntimeBeanReferences.isEmpty()) {</span>
+<span class="nc" id="L425">            builder.addPropertyValue(&quot;registries&quot;, registryRuntimeBeanReferences);</span>
+        }
+
+        /**
+         * Add {@link org.apache.dubbo.config.ProtocolConfig} Bean reference
+         */
+<span class="nc" id="L431">        String[] protocolConfigBeanNames = service.protocol();</span>
+
+<span class="nc" id="L433">        List&lt;RuntimeBeanReference&gt; protocolRuntimeBeanReferences = toRuntimeBeanReferences(protocolConfigBeanNames);</span>
+
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (!protocolRuntimeBeanReferences.isEmpty()) {</span>
+<span class="nc" id="L436">            builder.addPropertyValue(&quot;protocols&quot;, protocolRuntimeBeanReferences);</span>
+        }
+
+<span class="nc" id="L439">        return builder.getBeanDefinition();</span>
+
+    }
+
+
+    private ManagedList&lt;RuntimeBeanReference&gt; toRuntimeBeanReferences(String... beanNames) {
+
+<span class="nc" id="L446">        ManagedList&lt;RuntimeBeanReference&gt; runtimeBeanReferences = new ManagedList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        if (!ObjectUtils.isEmpty(beanNames)) {</span>
+
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            for (String beanName : beanNames) {</span>
+
+<span class="nc" id="L452">                String resolvedBeanName = environment.resolvePlaceholders(beanName);</span>
+
+<span class="nc" id="L454">                runtimeBeanReferences.add(new RuntimeBeanReference(resolvedBeanName));</span>
+            }
+
+        }
+
+<span class="nc" id="L459">        return runtimeBeanReferences;</span>
+
+    }
+
+    private void addPropertyReference(BeanDefinitionBuilder builder, String propertyName, String beanName) {
+<span class="nc" id="L464">        String resolvedBeanName = environment.resolvePlaceholders(beanName);</span>
+<span class="nc" id="L465">        builder.addPropertyReference(propertyName, resolvedBeanName);</span>
+<span class="nc" id="L466">    }</span>
+
+
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+
+<span class="nc" id="L472">    }</span>
+
+    @Override
+    public void setEnvironment(Environment environment) {
+<span class="nc" id="L476">        this.environment = environment;</span>
+<span class="nc" id="L477">    }</span>
+
+    @Override
+    public void setResourceLoader(ResourceLoader resourceLoader) {
+<span class="nc" id="L481">        this.resourceLoader = resourceLoader;</span>
+<span class="nc" id="L482">    }</span>
+
+    @Override
+    public void setBeanClassLoader(ClassLoader classLoader) {
+<span class="nc" id="L486">        this.classLoader = classLoader;</span>
+<span class="nc" id="L487">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

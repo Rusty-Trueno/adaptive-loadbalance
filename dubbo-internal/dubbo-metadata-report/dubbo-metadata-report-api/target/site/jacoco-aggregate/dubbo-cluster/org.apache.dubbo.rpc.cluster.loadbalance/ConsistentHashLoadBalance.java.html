@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConsistentHashLoadBalance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.loadbalance</a> &gt; <span class="el_source">ConsistentHashLoadBalance.java</span></div><h1>ConsistentHashLoadBalance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.loadbalance;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.apache.dubbo.common.Constants.HASH_ARGUMENTS;
+import static org.apache.dubbo.common.Constants.HASH_NODES;
+
+/**
+ * ConsistentHashLoadBalance
+ */
+<span class="nc" id="L40">public class ConsistentHashLoadBalance extends AbstractLoadBalance {</span>
+    public static final String NAME = &quot;consistenthash&quot;;
+
+<span class="nc" id="L43">    private final ConcurrentMap&lt;String, ConsistentHashSelector&lt;?&gt;&gt; selectors = new ConcurrentHashMap&lt;String, ConsistentHashSelector&lt;?&gt;&gt;();</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    protected &lt;T&gt; Invoker&lt;T&gt; doSelect(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) {
+<span class="nc" id="L48">        String methodName = RpcUtils.getMethodName(invocation);</span>
+<span class="nc" id="L49">        String key = invokers.get(0).getUrl().getServiceKey() + &quot;.&quot; + methodName;</span>
+<span class="nc" id="L50">        int identityHashCode = System.identityHashCode(invokers);</span>
+<span class="nc" id="L51">        ConsistentHashSelector&lt;T&gt; selector = (ConsistentHashSelector&lt;T&gt;) selectors.get(key);</span>
+<span class="nc bnc" id="L52" title="All 4 branches missed.">        if (selector == null || selector.identityHashCode != identityHashCode) {</span>
+<span class="nc" id="L53">            selectors.put(key, new ConsistentHashSelector&lt;T&gt;(invokers, methodName, identityHashCode));</span>
+<span class="nc" id="L54">            selector = (ConsistentHashSelector&lt;T&gt;) selectors.get(key);</span>
+        }
+<span class="nc" id="L56">        return selector.select(invocation);</span>
+    }
+
+    private static final class ConsistentHashSelector&lt;T&gt; {
+
+        private final TreeMap&lt;Long, Invoker&lt;T&gt;&gt; virtualInvokers;
+
+        private final int replicaNumber;
+
+        private final int identityHashCode;
+
+        private final int[] argumentIndex;
+
+<span class="nc" id="L69">        ConsistentHashSelector(List&lt;Invoker&lt;T&gt;&gt; invokers, String methodName, int identityHashCode) {</span>
+<span class="nc" id="L70">            this.virtualInvokers = new TreeMap&lt;Long, Invoker&lt;T&gt;&gt;();</span>
+<span class="nc" id="L71">            this.identityHashCode = identityHashCode;</span>
+<span class="nc" id="L72">            URL url = invokers.get(0).getUrl();</span>
+<span class="nc" id="L73">            this.replicaNumber = url.getMethodParameter(methodName, HASH_NODES, 160);</span>
+<span class="nc" id="L74">            String[] index = Constants.COMMA_SPLIT_PATTERN.split(url.getMethodParameter(methodName, HASH_ARGUMENTS, &quot;0&quot;));</span>
+<span class="nc" id="L75">            argumentIndex = new int[index.length];</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            for (int i = 0; i &lt; index.length; i++) {</span>
+<span class="nc" id="L77">                argumentIndex[i] = Integer.parseInt(index[i]);</span>
+            }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            for (Invoker&lt;T&gt; invoker : invokers) {</span>
+<span class="nc" id="L80">                String address = invoker.getUrl().getAddress();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                for (int i = 0; i &lt; replicaNumber / 4; i++) {</span>
+<span class="nc" id="L82">                    byte[] digest = md5(address + i);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                    for (int h = 0; h &lt; 4; h++) {</span>
+<span class="nc" id="L84">                        long m = hash(digest, h);</span>
+<span class="nc" id="L85">                        virtualInvokers.put(m, invoker);</span>
+                    }
+                }
+<span class="nc" id="L88">            }</span>
+<span class="nc" id="L89">        }</span>
+
+        public Invoker&lt;T&gt; select(Invocation invocation) {
+<span class="nc" id="L92">            String key = toKey(invocation.getArguments());</span>
+<span class="nc" id="L93">            byte[] digest = md5(key);</span>
+<span class="nc" id="L94">            return selectForKey(hash(digest, 0));</span>
+        }
+
+        private String toKey(Object[] args) {
+<span class="nc" id="L98">            StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            for (int i : argumentIndex) {</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">                if (i &gt;= 0 &amp;&amp; i &lt; args.length) {</span>
+<span class="nc" id="L101">                    buf.append(args[i]);</span>
+                }
+            }
+<span class="nc" id="L104">            return buf.toString();</span>
+        }
+
+        private Invoker&lt;T&gt; selectForKey(long hash) {
+<span class="nc" id="L108">            Map.Entry&lt;Long, Invoker&lt;T&gt;&gt; entry = virtualInvokers.ceilingEntry(hash);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (entry == null) {</span>
+<span class="nc" id="L110">                entry = virtualInvokers.firstEntry();</span>
+            }
+<span class="nc" id="L112">            return entry.getValue();</span>
+        }
+
+        private long hash(byte[] digest, int number) {
+<span class="nc" id="L116">            return (((long) (digest[3 + number * 4] &amp; 0xFF) &lt;&lt; 24)</span>
+                    | ((long) (digest[2 + number * 4] &amp; 0xFF) &lt;&lt; 16)
+                    | ((long) (digest[1 + number * 4] &amp; 0xFF) &lt;&lt; 8)
+                    | (digest[number * 4] &amp; 0xFF))
+                    &amp; 0xFFFFFFFFL;
+        }
+
+        private byte[] md5(String value) {
+            MessageDigest md5;
+            try {
+<span class="nc" id="L126">                md5 = MessageDigest.getInstance(&quot;MD5&quot;);</span>
+<span class="nc" id="L127">            } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L128">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L129">            }</span>
+<span class="nc" id="L130">            md5.reset();</span>
+<span class="nc" id="L131">            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L132">            md5.update(bytes);</span>
+<span class="nc" id="L133">            return md5.digest();</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

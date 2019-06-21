@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MonitorFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-monitor-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.monitor.support</a> &gt; <span class="el_source">MonitorFilter.java</span></div><h1>MonitorFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.monitor.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.monitor.Monitor;
+import org.apache.dubbo.monitor.MonitorFactory;
+import org.apache.dubbo.monitor.MonitorService;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * MonitorFilter. (SPI, Singleton, ThreadSafe)
+ */
+@Activate(group = {Constants.PROVIDER, Constants.CONSUMER})
+<span class="nc" id="L44">public class MonitorFilter implements Filter {</span>
+
+<span class="nc" id="L46">    private static final Logger logger = LoggerFactory.getLogger(MonitorFilter.class);</span>
+
+    /**
+     * The Concurrent counter
+     */
+<span class="nc" id="L51">    private final ConcurrentMap&lt;String, AtomicInteger&gt; concurrents = new ConcurrentHashMap&lt;String, AtomicInteger&gt;();</span>
+
+    /**
+     * The MonitorFactory
+     */
+    private MonitorFactory monitorFactory;
+
+    public void setMonitorFactory(MonitorFactory monitorFactory) {
+<span class="nc" id="L59">        this.monitorFactory = monitorFactory;</span>
+<span class="nc" id="L60">    }</span>
+
+    /**
+     * The invocation interceptor,it will collect the invoke data about this invocation and send it to monitor center
+     *
+     * @param invoker    service
+     * @param invocation invocation.
+     * @return {@link Result} the invoke result
+     * @throws RpcException
+     */
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (invoker.getUrl().hasParameter(Constants.MONITOR_KEY)) {</span>
+<span class="nc" id="L73">            RpcContext context = RpcContext.getContext(); // provider must fetch context before invoke() gets called</span>
+<span class="nc" id="L74">            String remoteHost = context.getRemoteHost();</span>
+<span class="nc" id="L75">            long start = System.currentTimeMillis(); // record start timestamp</span>
+<span class="nc" id="L76">            getConcurrent(invoker, invocation).incrementAndGet(); // count up</span>
+            try {
+<span class="nc" id="L78">                Result result = invoker.invoke(invocation); // proceed invocation chain</span>
+<span class="nc" id="L79">                collect(invoker, invocation, result, remoteHost, start, false);</span>
+<span class="nc" id="L80">                return result;</span>
+<span class="nc" id="L81">            } catch (RpcException e) {</span>
+<span class="nc" id="L82">                collect(invoker, invocation, null, remoteHost, start, true);</span>
+<span class="nc" id="L83">                throw e;</span>
+            } finally {
+<span class="nc" id="L85">                getConcurrent(invoker, invocation).decrementAndGet(); // count down</span>
+            }
+        } else {
+<span class="nc" id="L88">            return invoker.invoke(invocation);</span>
+        }
+    }
+
+    /**
+     * The collector logic, it will be handled by the default monitor
+     *
+     * @param invoker
+     * @param invocation
+     * @param result     the invoke result
+     * @param remoteHost the remote host address
+     * @param start      the timestamp the invoke begin
+     * @param error      if there is an error on the invoke
+     */
+    private void collect(Invoker&lt;?&gt; invoker, Invocation invocation, Result result, String remoteHost, long start, boolean error) {
+        try {
+<span class="nc" id="L104">            URL monitorUrl = invoker.getUrl().getUrlParameter(Constants.MONITOR_KEY);</span>
+<span class="nc" id="L105">            Monitor monitor = monitorFactory.getMonitor(monitorUrl);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L107">                return;</span>
+            }
+<span class="nc" id="L109">            URL statisticsURL = createStatisticsUrl(invoker, invocation, result, remoteHost, start, error);</span>
+<span class="nc" id="L110">            monitor.collect(statisticsURL);</span>
+<span class="nc" id="L111">        } catch (Throwable t) {</span>
+<span class="nc" id="L112">            logger.warn(&quot;Failed to monitor count service &quot; + invoker.getUrl() + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L113">        }</span>
+<span class="nc" id="L114">    }</span>
+
+    /**
+     * Create statistics url
+     *
+     * @param invoker
+     * @param invocation
+     * @param result
+     * @param remoteHost
+     * @param start
+     * @param error
+     * @return
+     */
+    private URL createStatisticsUrl(Invoker&lt;?&gt; invoker, Invocation invocation, Result result, String remoteHost, long start, boolean error) {
+        // ---- service statistics ----
+<span class="nc" id="L129">        long elapsed = System.currentTimeMillis() - start; // invocation cost</span>
+<span class="nc" id="L130">        int concurrent = getConcurrent(invoker, invocation).get(); // current concurrent count</span>
+<span class="nc" id="L131">        String application = invoker.getUrl().getParameter(Constants.APPLICATION_KEY);</span>
+<span class="nc" id="L132">        String service = invoker.getInterface().getName(); // service name</span>
+<span class="nc" id="L133">        String method = RpcUtils.getMethodName(invocation); // method name</span>
+<span class="nc" id="L134">        String group = invoker.getUrl().getParameter(Constants.GROUP_KEY);</span>
+<span class="nc" id="L135">        String version = invoker.getUrl().getParameter(Constants.VERSION_KEY);</span>
+
+        int localPort;
+        String remoteKey, remoteValue;
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (Constants.CONSUMER_SIDE.equals(invoker.getUrl().getParameter(Constants.SIDE_KEY))) {</span>
+            // ---- for service consumer ----
+<span class="nc" id="L141">            localPort = 0;</span>
+<span class="nc" id="L142">            remoteKey = MonitorService.PROVIDER;</span>
+<span class="nc" id="L143">            remoteValue = invoker.getUrl().getAddress();</span>
+        } else {
+            // ---- for service provider ----
+<span class="nc" id="L146">            localPort = invoker.getUrl().getPort();</span>
+<span class="nc" id="L147">            remoteKey = MonitorService.CONSUMER;</span>
+<span class="nc" id="L148">            remoteValue = remoteHost;</span>
+        }
+<span class="nc" id="L150">        String input = &quot;&quot;, output = &quot;&quot;;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (invocation.getAttachment(Constants.INPUT_KEY) != null) {</span>
+<span class="nc" id="L152">            input = invocation.getAttachment(Constants.INPUT_KEY);</span>
+        }
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        if (result != null &amp;&amp; result.getAttachment(Constants.OUTPUT_KEY) != null) {</span>
+<span class="nc" id="L155">            output = result.getAttachment(Constants.OUTPUT_KEY);</span>
+        }
+
+<span class="nc" id="L158">        return new URL(Constants.COUNT_PROTOCOL,</span>
+<span class="nc" id="L159">                NetUtils.getLocalHost(), localPort,</span>
+                service + Constants.PATH_SEPARATOR + method,
+                MonitorService.APPLICATION, application,
+                MonitorService.INTERFACE, service,
+                MonitorService.METHOD, method,
+                remoteKey, remoteValue,
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                error ? MonitorService.FAILURE : MonitorService.SUCCESS, &quot;1&quot;,</span>
+<span class="nc" id="L166">                MonitorService.ELAPSED, String.valueOf(elapsed),</span>
+<span class="nc" id="L167">                MonitorService.CONCURRENT, String.valueOf(concurrent),</span>
+                Constants.INPUT_KEY, input,
+                Constants.OUTPUT_KEY, output,
+                Constants.GROUP_KEY, group,
+                Constants.VERSION_KEY, version);
+    }
+
+    // concurrent counter
+    private AtomicInteger getConcurrent(Invoker&lt;?&gt; invoker, Invocation invocation) {
+<span class="nc" id="L176">        String key = invoker.getInterface().getName() + &quot;.&quot; + invocation.getMethodName();</span>
+<span class="nc" id="L177">        AtomicInteger concurrent = concurrents.get(key);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (concurrent == null) {</span>
+<span class="nc" id="L179">            concurrents.putIfAbsent(key, new AtomicInteger());</span>
+<span class="nc" id="L180">            concurrent = concurrents.get(key);</span>
+        }
+<span class="nc" id="L182">        return concurrent;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

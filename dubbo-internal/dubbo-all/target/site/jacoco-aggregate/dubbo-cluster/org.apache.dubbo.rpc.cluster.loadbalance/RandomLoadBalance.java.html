@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RandomLoadBalance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.loadbalance</a> &gt; <span class="el_source">RandomLoadBalance.java</span></div><h1>RandomLoadBalance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.loadbalance;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * random load balance.
+ */
+<span class="nc" id="L29">public class RandomLoadBalance extends AbstractLoadBalance {</span>
+
+    public static final String NAME = &quot;random&quot;;
+
+    @Override
+    protected &lt;T&gt; Invoker&lt;T&gt; doSelect(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) {
+        // Number of invokers
+<span class="nc" id="L36">        int length = invokers.size();</span>
+        // Every invoker has the same weight?
+<span class="nc" id="L38">        boolean sameWeight = true;</span>
+        // the weight of every invokers
+<span class="nc" id="L40">        int[] weights = new int[length];</span>
+        // the first invoker's weight
+<span class="nc" id="L42">        int firstWeight = getWeight(invokers.get(0), invocation);</span>
+<span class="nc" id="L43">        weights[0] = firstWeight;</span>
+        // The sum of weights
+<span class="nc" id="L45">        int totalWeight = firstWeight;</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        for (int i = 1; i &lt; length; i++) {</span>
+<span class="nc" id="L47">            int weight = getWeight(invokers.get(i), invocation);</span>
+            // save for later use
+<span class="nc" id="L49">            weights[i] = weight;</span>
+            // Sum
+<span class="nc" id="L51">            totalWeight += weight;</span>
+<span class="nc bnc" id="L52" title="All 4 branches missed.">            if (sameWeight &amp;&amp; weight != firstWeight) {</span>
+<span class="nc" id="L53">                sameWeight = false;</span>
+            }
+        }
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        if (totalWeight &gt; 0 &amp;&amp; !sameWeight) {</span>
+            // If (not every invoker has the same weight &amp; at least one invoker's weight&gt;0), select randomly based on totalWeight.
+<span class="nc" id="L58">            int offset = ThreadLocalRandom.current().nextInt(totalWeight);</span>
+            // Return a invoker based on the random value.
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L61">                offset -= weights[i];</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                if (offset &lt; 0) {</span>
+<span class="nc" id="L63">                    return invokers.get(i);</span>
+                }
+            }
+        }
+        // If all invokers have the same weight value or totalWeight=0, return evenly.
+<span class="nc" id="L68">        return invokers.get(ThreadLocalRandom.current().nextInt(length));</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

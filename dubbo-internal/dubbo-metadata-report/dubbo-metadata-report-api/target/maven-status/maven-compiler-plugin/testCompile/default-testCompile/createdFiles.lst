@@ -1,0 +1,14 @@
+org/apache/dubbo/metadata/integration/MetadataReportServiceTest$1.class
+org/apache/dubbo/metadata/integration/MetadataReportServiceTest.class
+org/apache/dubbo/metadata/integration/InterfaceNameTestService.class
+org/apache/dubbo/metadata/store/test/JTestMetadataReport4Test.class
+org/apache/dubbo/metadata/integration/RetryTestService.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportFactoryTest$1$1.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportTest$NewMetadataReport.class
+org/apache/dubbo/metadata/integration/InterfaceNameTestService2.class
+org/apache/dubbo/metadata/identifier/MetadataIdentifierTest.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportFactoryTest.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportTest.class
+org/apache/dubbo/metadata/store/test/JTestMetadataReportFactory4Test.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportTest$RetryMetadataReport.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportFactoryTest$1.class

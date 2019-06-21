@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HeapChannelBuffer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.buffer</a> &gt; <span class="el_source">HeapChannelBuffer.java</span></div><h1>HeapChannelBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.buffer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.GatheringByteChannel;
+import java.nio.channels.ScatteringByteChannel;
+
+public class HeapChannelBuffer extends AbstractChannelBuffer {
+
+    /**
+     * The underlying heap byte array that this buffer is wrapping.
+     */
+    protected final byte[] array;
+
+    /**
+     * Creates a new heap buffer with a newly allocated byte array.
+     *
+     * @param length the length of the new byte array
+     */
+    public HeapChannelBuffer(int length) {
+<span class="nc" id="L41">        this(new byte[length], 0, 0);</span>
+<span class="nc" id="L42">    }</span>
+
+    /**
+     * Creates a new heap buffer with an existing byte array.
+     *
+     * @param array the byte array to wrap
+     */
+    public HeapChannelBuffer(byte[] array) {
+<span class="nc" id="L50">        this(array, 0, array.length);</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Creates a new heap buffer with an existing byte array.
+     *
+     * @param array       the byte array to wrap
+     * @param readerIndex the initial reader index of this buffer
+     * @param writerIndex the initial writer index of this buffer
+     */
+<span class="nc" id="L60">    protected HeapChannelBuffer(byte[] array, int readerIndex, int writerIndex) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (array == null) {</span>
+<span class="nc" id="L62">            throw new NullPointerException(&quot;array&quot;);</span>
+        }
+<span class="nc" id="L64">        this.array = array;</span>
+<span class="nc" id="L65">        setIndex(readerIndex, writerIndex);</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public boolean isDirect() {
+<span class="nc" id="L70">        return false;</span>
+    }
+
+    @Override
+    public int capacity() {
+<span class="nc" id="L75">        return array.length;</span>
+    }
+
+    @Override
+    public boolean hasArray() {
+<span class="nc" id="L80">        return true;</span>
+    }
+
+    @Override
+    public byte[] array() {
+<span class="nc" id="L85">        return array;</span>
+    }
+
+    @Override
+    public int arrayOffset() {
+<span class="nc" id="L90">        return 0;</span>
+    }
+
+    @Override
+    public byte getByte(int index) {
+<span class="nc" id="L95">        return array[index];</span>
+    }
+
+    @Override
+    public void getBytes(int index, ChannelBuffer dst, int dstIndex, int length) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (dst instanceof HeapChannelBuffer) {</span>
+<span class="nc" id="L101">            getBytes(index, ((HeapChannelBuffer) dst).array, dstIndex, length);</span>
+        } else {
+<span class="nc" id="L103">            dst.setBytes(dstIndex, array, index, length);</span>
+        }
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void getBytes(int index, byte[] dst, int dstIndex, int length) {
+<span class="nc" id="L109">        System.arraycopy(array, index, dst, dstIndex, length);</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public void getBytes(int index, ByteBuffer dst) {
+<span class="nc" id="L114">        dst.put(array, index, Math.min(capacity() - index, dst.remaining()));</span>
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public void getBytes(int index, OutputStream out, int length)
+            throws IOException {
+<span class="nc" id="L120">        out.write(array, index, length);</span>
+<span class="nc" id="L121">    }</span>
+
+    public int getBytes(int index, GatheringByteChannel out, int length)
+            throws IOException {
+<span class="nc" id="L125">        return out.write(ByteBuffer.wrap(array, index, length));</span>
+    }
+
+    @Override
+    public void setByte(int index, int value) {
+<span class="nc" id="L130">        array[index] = (byte) value;</span>
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    public void setBytes(int index, ChannelBuffer src, int srcIndex, int length) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (src instanceof HeapChannelBuffer) {</span>
+<span class="nc" id="L136">            setBytes(index, ((HeapChannelBuffer) src).array, srcIndex, length);</span>
+        } else {
+<span class="nc" id="L138">            src.getBytes(srcIndex, array, index, length);</span>
+        }
+<span class="nc" id="L140">    }</span>
+
+    @Override
+    public void setBytes(int index, byte[] src, int srcIndex, int length) {
+<span class="nc" id="L144">        System.arraycopy(src, srcIndex, array, index, length);</span>
+<span class="nc" id="L145">    }</span>
+
+    @Override
+    public void setBytes(int index, ByteBuffer src) {
+<span class="nc" id="L149">        src.get(array, index, src.remaining());</span>
+<span class="nc" id="L150">    }</span>
+
+    @Override
+    public int setBytes(int index, InputStream in, int length) throws IOException {
+<span class="nc" id="L154">        int readBytes = 0;</span>
+        do {
+<span class="nc" id="L156">            int localReadBytes = in.read(array, index, length);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (localReadBytes &lt; 0) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                if (readBytes == 0) {</span>
+<span class="nc" id="L159">                    return -1;</span>
+                } else {
+                    break;
+                }
+            }
+<span class="nc" id="L164">            readBytes += localReadBytes;</span>
+<span class="nc" id="L165">            index += localReadBytes;</span>
+<span class="nc" id="L166">            length -= localReadBytes;</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        } while (length &gt; 0);</span>
+
+<span class="nc" id="L169">        return readBytes;</span>
+    }
+
+    public int setBytes(int index, ScatteringByteChannel in, int length) throws IOException {
+<span class="nc" id="L173">        ByteBuffer buf = ByteBuffer.wrap(array, index, length);</span>
+<span class="nc" id="L174">        int readBytes = 0;</span>
+
+        do {
+            int localReadBytes;
+            try {
+<span class="nc" id="L179">                localReadBytes = in.read(buf);</span>
+<span class="nc" id="L180">            } catch (ClosedChannelException e) {</span>
+<span class="nc" id="L181">                localReadBytes = -1;</span>
+<span class="nc" id="L182">            }</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (localReadBytes &lt; 0) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if (readBytes == 0) {</span>
+<span class="nc" id="L185">                    return -1;</span>
+                } else {
+                    break;
+                }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            } else if (localReadBytes == 0) {</span>
+<span class="nc" id="L190">                break;</span>
+            }
+<span class="nc" id="L192">            readBytes += localReadBytes;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        } while (readBytes &lt; length);</span>
+
+<span class="nc" id="L195">        return readBytes;</span>
+    }
+
+    @Override
+    public ChannelBuffer copy(int index, int length) {
+<span class="nc bnc" id="L200" title="All 6 branches missed.">        if (index &lt; 0 || length &lt; 0 || index + length &gt; array.length) {</span>
+<span class="nc" id="L201">            throw new IndexOutOfBoundsException();</span>
+        }
+
+<span class="nc" id="L204">        byte[] copiedArray = new byte[length];</span>
+<span class="nc" id="L205">        System.arraycopy(array, index, copiedArray, 0, length);</span>
+<span class="nc" id="L206">        return new HeapChannelBuffer(copiedArray);</span>
+    }
+
+    @Override
+    public ChannelBufferFactory factory() {
+<span class="nc" id="L211">        return HeapChannelBufferFactory.getInstance();</span>
+    }
+
+    @Override
+    public ByteBuffer toByteBuffer(int index, int length) {
+<span class="nc" id="L216">        return ByteBuffer.wrap(array, index, length);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

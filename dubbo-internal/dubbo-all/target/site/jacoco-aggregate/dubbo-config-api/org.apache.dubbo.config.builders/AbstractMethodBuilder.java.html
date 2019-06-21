@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMethodBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">AbstractMethodBuilder.java</span></div><h1>AbstractMethodBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.AbstractMethodConfig;
+
+import java.util.Map;
+
+/**
+ * AbstractBuilder
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L29">public abstract class AbstractMethodBuilder&lt;T extends AbstractMethodConfig, B extends AbstractMethodBuilder&lt;T, B&gt;&gt;</span>
+        extends AbstractBuilder&lt;T, B&gt;{
+    /**
+     * The timeout for remote invocation in milliseconds
+     */
+    protected Integer timeout;
+
+    /**
+     * The retry times
+     */
+    protected Integer retries;
+
+    /**
+     * max concurrent invocations
+     */
+    protected Integer actives;
+
+    /**
+     * The load balance
+     */
+    protected String loadbalance;
+
+    /**
+     * Whether to async
+     * note that: it is an unreliable asynchronism that ignores return values and does not block threads.
+     */
+    protected Boolean async;
+
+    /**
+     * Whether to ack async-sent
+     */
+    protected Boolean sent;
+
+    /**
+     * The name of mock class which gets called when a service fails to execute
+     *
+     * note that: the mock doesn't support on the provider side，and the mock is executed when a non-business exception
+     * occurs after a remote service call
+     */
+    protected String mock;
+
+    /**
+     * Merger
+     */
+    protected String merger;
+
+    /**
+     * Cache the return result with the call parameter as key, the following options are available: lru, threadlocal,
+     * jcache, etc.
+     */
+    protected String cache;
+
+    /**
+     * Whether JSR303 standard annotation validation is enabled or not, if enabled, annotations on method parameters will
+     * be validated
+     */
+    protected String validation;
+
+    /**
+     * The customized parameters
+     */
+    protected Map&lt;String, String&gt; parameters;
+
+    /**
+     * Forks for forking cluster
+     */
+    protected Integer forks;
+
+    public B timeout(Integer timeout) {
+<span class="nc" id="L98">        this.timeout = timeout;</span>
+<span class="nc" id="L99">        return getThis();</span>
+    }
+
+    public B retries(Integer retries) {
+<span class="nc" id="L103">        this.retries = retries;</span>
+<span class="nc" id="L104">        return getThis();</span>
+    }
+
+    public B actives(Integer actives) {
+<span class="nc" id="L108">        this.actives = actives;</span>
+<span class="nc" id="L109">        return getThis();</span>
+    }
+
+    public B loadbalance(String loadbalance) {
+<span class="nc" id="L113">        this.loadbalance = loadbalance;</span>
+<span class="nc" id="L114">        return getThis();</span>
+    }
+
+    public B async(Boolean async) {
+<span class="nc" id="L118">        this.async = async;</span>
+<span class="nc" id="L119">        return getThis();</span>
+    }
+
+    public B sent(Boolean sent) {
+<span class="nc" id="L123">        this.sent = sent;</span>
+<span class="nc" id="L124">        return getThis();</span>
+    }
+
+    public B mock(String mock) {
+<span class="nc" id="L128">        this.mock = mock;</span>
+<span class="nc" id="L129">        return getThis();</span>
+    }
+
+    public B mock(Boolean mock) {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (mock != null) {</span>
+<span class="nc" id="L134">            this.mock = mock.toString();</span>
+        } else {
+<span class="nc" id="L136">            this.mock = null;</span>
+        }
+<span class="nc" id="L138">        return getThis();</span>
+    }
+
+    public B merger(String merger) {
+<span class="nc" id="L142">        this.merger = merger;</span>
+<span class="nc" id="L143">        return getThis();</span>
+    }
+
+    public B cache(String cache) {
+<span class="nc" id="L147">        this.cache = cache;</span>
+<span class="nc" id="L148">        return getThis();</span>
+    }
+
+    public B validation(String validation) {
+<span class="nc" id="L152">        this.validation = validation;</span>
+<span class="nc" id="L153">        return getThis();</span>
+    }
+
+    public B appendParameters(Map&lt;String, String&gt; appendParameters) {
+<span class="nc" id="L157">        this.parameters = appendParameters(parameters, appendParameters);</span>
+<span class="nc" id="L158">        return getThis();</span>
+    }
+
+    public B appendParameter(String key, String value) {
+<span class="nc" id="L162">        this.parameters = appendParameter(parameters, key, value);</span>
+<span class="nc" id="L163">        return getThis();</span>
+    }
+
+    public B forks(Integer forks) {
+<span class="nc" id="L167">        this.forks = forks;</span>
+<span class="nc" id="L168">        return getThis();</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public void build(T instance) {
+<span class="nc" id="L174">        super.build(instance);</span>
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (actives != null) {</span>
+<span class="nc" id="L177">            instance.setActives(actives);</span>
+        }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (async != null) {</span>
+<span class="nc" id="L180">            instance.setAsync(async);</span>
+        }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (!StringUtils.isEmpty(cache)) {</span>
+<span class="nc" id="L183">            instance.setCache(cache);</span>
+        }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (forks != null) {</span>
+<span class="nc" id="L186">            instance.setForks(forks);</span>
+        }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (!StringUtils.isEmpty(loadbalance)) {</span>
+<span class="nc" id="L189">            instance.setLoadbalance(loadbalance);</span>
+        }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (!StringUtils.isEmpty(merger)) {</span>
+<span class="nc" id="L192">            instance.setMerger(merger);</span>
+        }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if(!StringUtils.isEmpty(mock)) {</span>
+<span class="nc" id="L195">            instance.setMock(mock);</span>
+        }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (retries != null) {</span>
+<span class="nc" id="L198">            instance.setRetries(retries);</span>
+        }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (sent != null) {</span>
+<span class="nc" id="L201">            instance.setSent(sent);</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (timeout != null) {</span>
+<span class="nc" id="L204">            instance.setTimeout(timeout);</span>
+        }
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (!StringUtils.isEmpty(validation)) {</span>
+<span class="nc" id="L207">            instance.setValidation(validation);</span>
+        }
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (parameters != null) {</span>
+<span class="nc" id="L210">            instance.setParameters(parameters);</span>
+        }
+<span class="nc" id="L212">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

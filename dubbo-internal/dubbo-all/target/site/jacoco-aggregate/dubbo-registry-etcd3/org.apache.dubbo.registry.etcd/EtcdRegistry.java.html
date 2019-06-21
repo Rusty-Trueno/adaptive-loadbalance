@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EtcdRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.etcd</a> &gt; <span class="el_source">EtcdRegistry.java</span></div><h1>EtcdRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.etcd;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+import org.apache.dubbo.remoting.etcd.ChildListener;
+import org.apache.dubbo.remoting.etcd.EtcdClient;
+import org.apache.dubbo.remoting.etcd.EtcdTransporter;
+import org.apache.dubbo.remoting.etcd.StateListener;
+import org.apache.dubbo.remoting.etcd.option.Constants;
+import org.apache.dubbo.remoting.etcd.option.OptionUtil;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+
+/**
+ * Support for ectd3 registry.
+ */
+public class EtcdRegistry extends FailbackRegistry {
+
+<span class="nc" id="L65">    private final static Logger logger = LoggerFactory.getLogger(EtcdRegistry.class);</span>
+
+    private final static int DEFAULT_ETCD_PORT = 2379;
+
+    private final static String DEFAULT_ROOT = &quot;dubbo&quot;;
+
+    private final String root;
+
+<span class="nc" id="L73">    private final Set&lt;String&gt; anyServices = new ConcurrentHashSet&lt;&gt;();</span>
+
+<span class="nc" id="L75">    private final ConcurrentMap&lt;URL, ConcurrentMap&lt;NotifyListener, ChildListener&gt;&gt; etcdListeners = new ConcurrentHashMap&lt;&gt;();</span>
+    private final EtcdClient etcdClient;
+
+    public EtcdRegistry(URL url, EtcdTransporter etcdTransporter) {
+<span class="nc" id="L79">        super(url);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (url.isAnyHost()) {</span>
+<span class="nc" id="L81">            throw new IllegalStateException(&quot;registry address is invalid, actual: '&quot; + url.getHost() + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L83">        String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (!group.startsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L85">            group = Constants.PATH_SEPARATOR + group;</span>
+        }
+<span class="nc" id="L87">        this.root = group;</span>
+<span class="nc" id="L88">        etcdClient = etcdTransporter.connect(url);</span>
+
+<span class="nc" id="L90">        etcdClient.addStateListener(state -&gt; {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (state == StateListener.CONNECTED) {</span>
+                try {
+<span class="nc" id="L93">                    recover();</span>
+<span class="nc" id="L94">                } catch (Exception e) {</span>
+<span class="nc" id="L95">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L96">                }</span>
+            }
+<span class="nc" id="L98">        });</span>
+<span class="nc" id="L99">    }</span>
+
+    protected static String appendDefaultPort(String address) {
+<span class="nc bnc" id="L102" title="All 4 branches missed.">        if (address != null &amp;&amp; address.length() &gt; 0) {</span>
+<span class="nc" id="L103">            int i = address.indexOf(':');</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (i &lt; 0) {</span>
+<span class="nc" id="L105">                return address + &quot;:&quot; + DEFAULT_ETCD_PORT;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            } else if (Integer.parseInt(address.substring(i + 1)) == 0) {</span>
+<span class="nc" id="L107">                return address.substring(0, i + 1) + DEFAULT_ETCD_PORT;</span>
+            }
+        }
+<span class="nc" id="L110">        return address;</span>
+    }
+
+    @Override
+    public void doRegister(URL url) {
+        try {
+<span class="nc" id="L116">            String path = toUrlPath(url);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (url.getParameter(Constants.DYNAMIC_KEY, true)) {</span>
+<span class="nc" id="L118">                etcdClient.createEphemeral(path);</span>
+<span class="nc" id="L119">                return;</span>
+            }
+<span class="nc" id="L121">            etcdClient.create(path);</span>
+<span class="nc" id="L122">        } catch (Throwable e) {</span>
+<span class="nc" id="L123">            throw new RpcException(&quot;Failed to register &quot; + url + &quot; to etcd &quot; + getUrl()</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    + &quot;, cause: &quot; + (OptionUtil.isProtocolError(e)</span>
+<span class="nc" id="L125">                    ? &quot;etcd3 registry may not be supported yet or etcd3 registry is not available.&quot;</span>
+<span class="nc" id="L126">                    : e.getMessage()), e);</span>
+<span class="nc" id="L127">        }</span>
+<span class="nc" id="L128">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+        try {
+<span class="nc" id="L133">            String path = toUrlPath(url);</span>
+<span class="nc" id="L134">            etcdClient.delete(path);</span>
+<span class="nc" id="L135">        } catch (Throwable e) {</span>
+<span class="nc" id="L136">            throw new RpcException(&quot;Failed to unregister &quot; + url + &quot; to etcd &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L137">        }</span>
+<span class="nc" id="L138">    }</span>
+
+    @Override
+    public void doSubscribe(URL url, NotifyListener listener) {
+        try {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L144">                String root = toRootPath();</span>
+
+                /*
+                 *  if we are interested in all interfaces,
+                 *  find out the current container or create one for the url, put or get only once.
+                 */
+<span class="nc" id="L150">                ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners =</span>
+<span class="nc" id="L151">                        Optional.ofNullable(etcdListeners.get(url))</span>
+<span class="nc" id="L152">                                .orElseGet(() -&gt; {</span>
+                                    ConcurrentMap&lt;NotifyListener, ChildListener&gt; container, prev;
+<span class="nc" id="L154">                                    prev = etcdListeners.putIfAbsent(url, container = new ConcurrentHashMap&lt;&gt;());</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                                    return prev != null ? prev : container;</span>
+                                });
+
+                /*
+                 *  if we have no interface watcher listener,
+                 *  find the current listener or create one for the current root, put or get only once.
+                 */
+<span class="nc" id="L162">                ChildListener interfaceListener =</span>
+<span class="nc" id="L163">                        Optional.ofNullable(listeners.get(listener))</span>
+<span class="nc" id="L164">                                .orElseGet(() -&gt; {</span>
+                                    ChildListener childListener, prev;
+<span class="nc" id="L166">                                    prev = listeners.putIfAbsent(listener, childListener = (parentPath, currentChildren) -&gt; {</span>
+                                        /*
+                                         *  because etcd3 does not support direct children watch events,
+                                         *  we should filter not interface events. if we watch /dubbo
+                                         *  and /dubbo/interface, when we put a key-value pair {/dubbo/interface/hello hello},
+                                         *  we will got events in watching path /dubbo.
+                                         */
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                                        for (String child : currentChildren) {</span>
+<span class="nc" id="L174">                                            child = URL.decode(child);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                                            if (!anyServices.contains(child)) {</span>
+<span class="nc" id="L176">                                                anyServices.add(child);</span>
+                                                /*
+                                                 *  if new interface event arrived, we watch their direct children,
+                                                 *  eg: /dubbo/interface, /dubbo/interface and so on.
+                                                 */
+<span class="nc" id="L181">                                                subscribe(url.setPath(child).addParameters(Constants.INTERFACE_KEY, child,</span>
+<span class="nc" id="L182">                                                        Constants.CHECK_KEY, String.valueOf(false)), listener);</span>
+                                            }
+<span class="nc" id="L184">                                        }</span>
+<span class="nc" id="L185">                                    });</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                                    return prev != null ? prev : childListener;</span>
+                                });
+
+<span class="nc" id="L189">                etcdClient.create(root);</span>
+                /*
+                 * at the first time, we want to pull already interface and then watch their direct children,
+                 *  eg: /dubbo/interface, /dubbo/interface and so on.
+                 */
+<span class="nc" id="L194">                List&lt;String&gt; services = etcdClient.addChildListener(root, interfaceListener);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                for (String service : services) {</span>
+<span class="nc" id="L196">                    service = URL.decode(service);</span>
+<span class="nc" id="L197">                    anyServices.add(service);</span>
+<span class="nc" id="L198">                    subscribe(url.setPath(service).addParameters(Constants.INTERFACE_KEY, service,</span>
+<span class="nc" id="L199">                            Constants.CHECK_KEY, String.valueOf(false)), listener);</span>
+<span class="nc" id="L200">                }</span>
+<span class="nc" id="L201">            } else {</span>
+<span class="nc" id="L202">                List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                for (String path : toCategoriesPath(url)) {</span>
+
+                    /*
+                     *  if we are interested in special categories (providers, consumers, routers and so on),
+                     *  we find out the current container or create one for the url, put or get only once.
+                     */
+<span class="nc" id="L209">                    ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners =</span>
+<span class="nc" id="L210">                            Optional.ofNullable(etcdListeners.get(url))</span>
+<span class="nc" id="L211">                                    .orElseGet(() -&gt; {</span>
+                                        ConcurrentMap&lt;NotifyListener, ChildListener&gt; container, prev;
+<span class="nc" id="L213">                                        prev = etcdListeners.putIfAbsent(url,</span>
+                                                container = new ConcurrentHashMap&lt;&gt;());
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                                        return prev != null ? prev : container;</span>
+                                    });
+
+                    /*
+                     *  if we have no category watcher listener,
+                     *  we find out the current listener or create one for the current category, put or get only once.
+                     */
+<span class="nc" id="L222">                    ChildListener childListener =</span>
+<span class="nc" id="L223">                            Optional.ofNullable(listeners.get(listener))</span>
+<span class="nc" id="L224">                                    .orElseGet(() -&gt; {</span>
+                                        ChildListener watchListener, prev;
+<span class="nc" id="L226">                                        prev = listeners.putIfAbsent(listener, watchListener = (parentPath, currentChildren) -&gt; EtcdRegistry.this.notify(url, listener,</span>
+<span class="nc" id="L227">                                                toUrlsWithEmpty(url, parentPath, currentChildren)));</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                                        return prev != null ? prev : watchListener;</span>
+                                    });
+
+<span class="nc" id="L231">                    etcdClient.create(path);</span>
+                    /*
+                     * at the first time, we want to pull already category and then watch their direct children,
+                     *  eg: /dubbo/interface/providers, /dubbo/interface/consumers and so on.
+                     */
+<span class="nc" id="L236">                    List&lt;String&gt; children = etcdClient.addChildListener(path, childListener);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                    if (children != null) {</span>
+<span class="nc" id="L238">                        urls.addAll(toUrlsWithEmpty(url, path, children));</span>
+                    }
+                }
+<span class="nc" id="L241">                notify(url, listener, urls);</span>
+            }
+<span class="nc" id="L243">        } catch (Throwable e) {</span>
+<span class="nc" id="L244">            throw new RpcException(&quot;Failed to subscribe &quot; + url + &quot; to etcd &quot; + getUrl()</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                    + &quot;, cause: &quot; + (OptionUtil.isProtocolError(e)</span>
+<span class="nc" id="L246">                    ? &quot;etcd3 registry may not be supported yet or etcd3 registry is not available.&quot;</span>
+<span class="nc" id="L247">                    : e.getMessage()), e);</span>
+<span class="nc" id="L248">        }</span>
+<span class="nc" id="L249">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L253">        ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners = etcdListeners.get(url);</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (listeners != null) {</span>
+<span class="nc" id="L255">            ChildListener etcdListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (etcdListener != null) {</span>
+                // maybe url has many subscribed paths
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                for (String path : toUnsubscribedPath(url)) {</span>
+<span class="nc" id="L259">                    etcdClient.removeChildListener(path, etcdListener);</span>
+<span class="nc" id="L260">                }</span>
+            }
+        }
+<span class="nc" id="L263">    }</span>
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L267">        return etcdClient.isConnected();</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L272">        super.destroy();</span>
+        try {
+<span class="nc" id="L274">            etcdClient.close();</span>
+<span class="nc" id="L275">        } catch (Exception e) {</span>
+<span class="nc" id="L276">            logger.warn(&quot;Failed to close etcd client &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L277">        }</span>
+<span class="nc" id="L278">    }</span>
+
+    protected String toRootDir() {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (root.startsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L282">            return root;</span>
+        }
+<span class="nc" id="L284">        return Constants.PATH_SEPARATOR + root;</span>
+    }
+
+    protected String toRootPath() {
+<span class="nc" id="L288">        return root;</span>
+    }
+
+    protected String toServicePath(URL url) {
+<span class="nc" id="L292">        String name = url.getServiceInterface();</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(name)) {</span>
+<span class="nc" id="L294">            return toRootPath();</span>
+        }
+<span class="nc" id="L296">        return toRootDir() + Constants.PATH_SEPARATOR + URL.encode(name);</span>
+    }
+
+    protected String[] toCategoriesPath(URL url) {
+        String[] categories;
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(url.getParameter(Constants.CATEGORY_KEY))) {</span>
+<span class="nc" id="L302">            categories = new String[]{Constants.PROVIDERS_CATEGORY, Constants.CONSUMERS_CATEGORY,</span>
+                    Constants.ROUTERS_CATEGORY, Constants.CONFIGURATORS_CATEGORY};
+        } else {
+<span class="nc" id="L305">            categories = url.getParameter(Constants.CATEGORY_KEY, new String[]{Constants.DEFAULT_CATEGORY});</span>
+        }
+<span class="nc" id="L307">        String[] paths = new String[categories.length];</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        for (int i = 0; i &lt; categories.length; i++) {</span>
+<span class="nc" id="L309">            paths[i] = toServicePath(url) + Constants.PATH_SEPARATOR + categories[i];</span>
+        }
+<span class="nc" id="L311">        return paths;</span>
+    }
+
+    protected String toCategoryPath(URL url) {
+<span class="nc" id="L315">        return toServicePath(url) + Constants.PATH_SEPARATOR + url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);</span>
+    }
+
+    protected String toUrlPath(URL url) {
+<span class="nc" id="L319">        return toCategoryPath(url) + Constants.PATH_SEPARATOR + URL.encode(url.toFullString());</span>
+    }
+
+    protected List&lt;String&gt; toUnsubscribedPath(URL url) {
+<span class="nc" id="L323">        List&lt;String&gt; categories = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L325">            String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">            if (!group.startsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L327">                group = Constants.PATH_SEPARATOR + group;</span>
+            }
+<span class="nc" id="L329">            categories.add(group);</span>
+<span class="nc" id="L330">            return categories;</span>
+        } else {
+<span class="nc" id="L332">            categories.addAll(Arrays.asList(toCategoriesPath(url)));</span>
+        }
+<span class="nc" id="L334">        return categories;</span>
+    }
+
+    protected List&lt;URL&gt; toUrlsWithoutEmpty(URL consumer, List&lt;String&gt; providers) {
+<span class="nc" id="L338">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">        if (providers != null &amp;&amp; providers.size() &gt; 0) {</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">            for (String provider : providers) {</span>
+<span class="nc" id="L341">                provider = URL.decode(provider);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (provider.contains(Constants.HTTP_SUBFIX_KEY)) {</span>
+<span class="nc" id="L343">                    URL url = URL.valueOf(provider);</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                    if (UrlUtils.isMatch(consumer, url)) {</span>
+<span class="nc" id="L345">                        urls.add(url);</span>
+                    }
+                }
+<span class="nc" id="L348">            }</span>
+        }
+<span class="nc" id="L350">        return urls;</span>
+    }
+
+    protected List&lt;URL&gt; toUrlsWithEmpty(URL consumer, String path, List&lt;String&gt; providers) {
+<span class="nc" id="L354">        List&lt;URL&gt; urls = toUrlsWithoutEmpty(consumer, providers);</span>
+<span class="nc bnc" id="L355" title="All 4 branches missed.">        if (urls == null || urls.isEmpty()) {</span>
+<span class="nc" id="L356">            int i = path.lastIndexOf('/');</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            String category = i &lt; 0 ? path : path.substring(i + 1);</span>
+<span class="nc" id="L358">            URL empty = consumer.setProtocol(Constants.EMPTY_PROTOCOL).addParameter(Constants.CATEGORY_KEY, category);</span>
+<span class="nc" id="L359">            urls.add(empty);</span>
+        }
+<span class="nc" id="L361">        return urls;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

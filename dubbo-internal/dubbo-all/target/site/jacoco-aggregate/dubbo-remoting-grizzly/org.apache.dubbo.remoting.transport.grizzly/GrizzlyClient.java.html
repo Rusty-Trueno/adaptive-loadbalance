@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GrizzlyClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-grizzly</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.grizzly</a> &gt; <span class="el_source">GrizzlyClient.java</span></div><h1>GrizzlyClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.grizzly;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractClient;
+
+import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.filterchain.FilterChainBuilder;
+import org.glassfish.grizzly.filterchain.TransportFilter;
+import org.glassfish.grizzly.nio.transport.TCPNIOTransport;
+import org.glassfish.grizzly.nio.transport.TCPNIOTransportBuilder;
+import org.glassfish.grizzly.strategies.SameThreadIOStrategy;
+import org.glassfish.grizzly.threadpool.ThreadPoolConfig;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * GrizzlyClient
+ *
+ *
+ */
+public class GrizzlyClient extends AbstractClient {
+
+<span class="nc" id="L45">    private static final Logger logger = LoggerFactory.getLogger(GrizzlyClient.class);</span>
+
+    private TCPNIOTransport transport;
+
+    private volatile Connection&lt;?&gt; connection; // volatile, please copy reference to use
+
+    public GrizzlyClient(URL url, ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L52">        super(url, handler);</span>
+<span class="nc" id="L53">    }</span>
+
+    @Override
+    protected void doOpen() throws Throwable {
+<span class="nc" id="L57">        FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();</span>
+<span class="nc" id="L58">        filterChainBuilder.add(new TransportFilter());</span>
+<span class="nc" id="L59">        filterChainBuilder.add(new GrizzlyCodecAdapter(getCodec(), getUrl(), this));</span>
+<span class="nc" id="L60">        filterChainBuilder.add(new GrizzlyHandler(getUrl(), this));</span>
+<span class="nc" id="L61">        TCPNIOTransportBuilder builder = TCPNIOTransportBuilder.newInstance();</span>
+<span class="nc" id="L62">        ThreadPoolConfig config = builder.getWorkerThreadPoolConfig();</span>
+<span class="nc" id="L63">        config.setPoolName(CLIENT_THREAD_POOL_NAME)</span>
+<span class="nc" id="L64">                .setQueueLimit(-1)</span>
+<span class="nc" id="L65">                .setCorePoolSize(0)</span>
+<span class="nc" id="L66">                .setMaxPoolSize(Integer.MAX_VALUE)</span>
+<span class="nc" id="L67">                .setKeepAliveTime(60L, TimeUnit.SECONDS);</span>
+<span class="nc" id="L68">        builder.setTcpNoDelay(true).setKeepAlive(true)</span>
+<span class="nc" id="L69">                .setConnectionTimeout(getConnectTimeout())</span>
+<span class="nc" id="L70">                .setIOStrategy(SameThreadIOStrategy.getInstance());</span>
+<span class="nc" id="L71">        transport = builder.build();</span>
+<span class="nc" id="L72">        transport.setProcessor(filterChainBuilder.build());</span>
+<span class="nc" id="L73">        transport.start();</span>
+<span class="nc" id="L74">    }</span>
+
+
+    @Override
+    protected void doConnect() throws Throwable {
+<span class="nc" id="L79">        connection = transport.connect(getConnectAddress())</span>
+<span class="nc" id="L80">                .get(getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    protected void doDisConnect() throws Throwable {
+        try {
+<span class="nc" id="L86">            GrizzlyChannel.removeChannelIfDisconnected(connection);</span>
+<span class="nc" id="L87">        } catch (Throwable t) {</span>
+<span class="nc" id="L88">            logger.warn(t.getMessage());</span>
+<span class="nc" id="L89">        }</span>
+<span class="nc" id="L90">    }</span>
+
+    @Override
+    protected void doClose() throws Throwable {
+        try {
+<span class="nc" id="L95">            transport.stop();</span>
+<span class="nc" id="L96">        } catch (Throwable e) {</span>
+<span class="nc" id="L97">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L98">        }</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    protected Channel getChannel() {
+<span class="nc" id="L103">        Connection&lt;?&gt; c = connection;</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        if (c == null || !c.isOpen()) {</span>
+<span class="nc" id="L105">            return null;</span>
+        }
+<span class="nc" id="L107">        return GrizzlyChannel.getOrAddChannel(c, getUrl(), this);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

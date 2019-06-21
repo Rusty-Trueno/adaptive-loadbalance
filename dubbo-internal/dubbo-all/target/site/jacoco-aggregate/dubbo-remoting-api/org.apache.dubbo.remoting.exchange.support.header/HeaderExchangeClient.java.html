@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HeaderExchangeClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support.header</a> &gt; <span class="el_source">HeaderExchangeClient.java</span></div><h1>HeaderExchangeClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.support.header;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.timer.HashedWheelTimer;
+import org.apache.dubbo.common.utils.Assert;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Client;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.exchange.ResponseFuture;
+
+import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.dubbo.common.utils.UrlUtils.getHeartbeat;
+import static org.apache.dubbo.common.utils.UrlUtils.getIdleTimeout;
+
+/**
+ * DefaultMessageClient
+ */
+public class HeaderExchangeClient implements ExchangeClient {
+
+    private final Client client;
+    private final ExchangeChannel channel;
+
+<span class="nc" id="L47">    private static final HashedWheelTimer IDLE_CHECK_TIMER = new HashedWheelTimer(</span>
+            new NamedThreadFactory(&quot;dubbo-client-idleCheck&quot;, true), 1, TimeUnit.SECONDS, Constants.TICKS_PER_WHEEL);
+    private HeartbeatTimerTask heartBeatTimerTask;
+    private ReconnectTimerTask reconnectTimerTask;
+
+<span class="nc" id="L52">    public HeaderExchangeClient(Client client, boolean startTimer) {</span>
+<span class="nc" id="L53">        Assert.notNull(client, &quot;Client can't be null&quot;);</span>
+<span class="nc" id="L54">        this.client = client;</span>
+<span class="nc" id="L55">        this.channel = new HeaderExchangeChannel(client);</span>
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (startTimer) {</span>
+<span class="nc" id="L58">            URL url = client.getUrl();</span>
+<span class="nc" id="L59">            startReconnectTask(url);</span>
+<span class="nc" id="L60">            startHeartBeatTask(url);</span>
+        }
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    public ResponseFuture request(Object request) throws RemotingException {
+<span class="nc" id="L66">        return channel.request(request);</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L71">        return channel.getUrl();</span>
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L76">        return channel.getRemoteAddress();</span>
+    }
+
+    @Override
+    public ResponseFuture request(Object request, int timeout) throws RemotingException {
+<span class="nc" id="L81">        return channel.request(request, timeout);</span>
+    }
+
+    @Override
+    public ChannelHandler getChannelHandler() {
+<span class="nc" id="L86">        return channel.getChannelHandler();</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc" id="L91">        return channel.isConnected();</span>
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L96">        return channel.getLocalAddress();</span>
+    }
+
+    @Override
+    public ExchangeHandler getExchangeHandler() {
+<span class="nc" id="L101">        return channel.getExchangeHandler();</span>
+    }
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc" id="L106">        channel.send(message);</span>
+<span class="nc" id="L107">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L111">        channel.send(message, sent);</span>
+<span class="nc" id="L112">    }</span>
+
+    @Override
+    public boolean isClosed() {
+<span class="nc" id="L116">        return channel.isClosed();</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L121">        doClose();</span>
+<span class="nc" id="L122">        channel.close();</span>
+<span class="nc" id="L123">    }</span>
+
+    @Override
+    public void close(int timeout) {
+        // Mark the client into the closure process
+<span class="nc" id="L128">        startClose();</span>
+<span class="nc" id="L129">        doClose();</span>
+<span class="nc" id="L130">        channel.close(timeout);</span>
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    public void startClose() {
+<span class="nc" id="L135">        channel.startClose();</span>
+<span class="nc" id="L136">    }</span>
+
+    @Override
+    public void reset(URL url) {
+<span class="nc" id="L140">        client.reset(url);</span>
+        // FIXME, should cancel and restart timer tasks if parameters in the new URL are different?
+<span class="nc" id="L142">    }</span>
+
+    @Override
+    @Deprecated
+    public void reset(org.apache.dubbo.common.Parameters parameters) {
+<span class="nc" id="L147">        reset(getUrl().addParameters(parameters.getParameters()));</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public void reconnect() throws RemotingException {
+<span class="nc" id="L152">        client.reconnect();</span>
+<span class="nc" id="L153">    }</span>
+
+    @Override
+    public Object getAttribute(String key) {
+<span class="nc" id="L157">        return channel.getAttribute(key);</span>
+    }
+
+    @Override
+    public void setAttribute(String key, Object value) {
+<span class="nc" id="L162">        channel.setAttribute(key, value);</span>
+<span class="nc" id="L163">    }</span>
+
+    @Override
+    public void removeAttribute(String key) {
+<span class="nc" id="L167">        channel.removeAttribute(key);</span>
+<span class="nc" id="L168">    }</span>
+
+    @Override
+    public boolean hasAttribute(String key) {
+<span class="nc" id="L172">        return channel.hasAttribute(key);</span>
+    }
+
+    private void startHeartBeatTask(URL url) {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (!client.canHandleIdle()) {</span>
+<span class="nc" id="L177">            AbstractTimerTask.ChannelProvider cp = () -&gt; Collections.singletonList(HeaderExchangeClient.this);</span>
+<span class="nc" id="L178">            int heartbeat = getHeartbeat(url);</span>
+<span class="nc" id="L179">            long heartbeatTick = calculateLeastDuration(heartbeat);</span>
+<span class="nc" id="L180">            this.heartBeatTimerTask = new HeartbeatTimerTask(cp, heartbeatTick, heartbeat);</span>
+<span class="nc" id="L181">            IDLE_CHECK_TIMER.newTimeout(heartBeatTimerTask, heartbeatTick, TimeUnit.MILLISECONDS);</span>
+        }
+<span class="nc" id="L183">    }</span>
+
+    private void startReconnectTask(URL url) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (shouldReconnect(url)) {</span>
+<span class="nc" id="L187">            AbstractTimerTask.ChannelProvider cp = () -&gt; Collections.singletonList(HeaderExchangeClient.this);</span>
+<span class="nc" id="L188">            int idleTimeout = getIdleTimeout(url);</span>
+<span class="nc" id="L189">            long heartbeatTimeoutTick = calculateLeastDuration(idleTimeout);</span>
+<span class="nc" id="L190">            this.reconnectTimerTask = new ReconnectTimerTask(cp, heartbeatTimeoutTick, idleTimeout);</span>
+<span class="nc" id="L191">            IDLE_CHECK_TIMER.newTimeout(reconnectTimerTask, heartbeatTimeoutTick, TimeUnit.MILLISECONDS);</span>
+        }
+<span class="nc" id="L193">    }</span>
+
+    private void doClose() {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (heartBeatTimerTask != null) {</span>
+<span class="nc" id="L197">            heartBeatTimerTask.cancel();</span>
+        }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (reconnectTimerTask != null) {</span>
+<span class="nc" id="L201">            reconnectTimerTask.cancel();</span>
+        }
+<span class="nc" id="L203">    }</span>
+
+    /**
+     * Each interval cannot be less than 1000ms.
+     */
+    private long calculateLeastDuration(int time) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (time / Constants.HEARTBEAT_CHECK_TICK &lt;= 0) {</span>
+<span class="nc" id="L210">            return Constants.LEAST_HEARTBEAT_DURATION;</span>
+        } else {
+<span class="nc" id="L212">            return time / Constants.HEARTBEAT_CHECK_TICK;</span>
+        }
+    }
+
+    private boolean shouldReconnect(URL url) {
+<span class="nc" id="L217">        return url.getParameter(Constants.RECONNECT_KEY, true);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L222">        return &quot;HeaderExchangeClient [channel=&quot; + channel + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpProcessHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.server.handler</a> &gt; <span class="el_source">HttpProcessHandler.java</span></div><h1>HttpProcessHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.server.handler;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.command.CommandExecutor;
+import org.apache.dubbo.qos.command.DefaultCommandExecutor;
+import org.apache.dubbo.qos.command.NoSuchCommandException;
+import org.apache.dubbo.qos.command.decoder.HttpCommandDecoder;
+
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+
+/**
+ * Parse HttpRequest for uri and parameters
+ * &lt;p&gt;
+ * &lt;ul&gt;
+ * &lt;li&gt;if command not found, return 404&lt;/li&gt;
+ * &lt;li&gt;if execution fails, return 500&lt;/li&gt;
+ * &lt;li&gt;if succeed, return 200&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * will disconnect after execution finishes
+ */
+<span class="nc" id="L49">public class HttpProcessHandler extends SimpleChannelInboundHandler&lt;HttpRequest&gt; {</span>
+
+<span class="nc" id="L51">    private static final Logger log = LoggerFactory.getLogger(HttpProcessHandler.class);</span>
+<span class="nc" id="L52">    private static CommandExecutor commandExecutor = new DefaultCommandExecutor();</span>
+
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
+<span class="nc" id="L57">        CommandContext commandContext = HttpCommandDecoder.decode(msg);</span>
+        // return 404 when fail to construct command context
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (commandContext == null) {</span>
+<span class="nc" id="L60">            log.warn(&quot;can not found commandContext url: &quot; + msg.getUri());</span>
+<span class="nc" id="L61">            FullHttpResponse response = http404();</span>
+<span class="nc" id="L62">            ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);</span>
+<span class="nc" id="L63">        } else {</span>
+<span class="nc" id="L64">            commandContext.setRemote(ctx.channel());</span>
+            try {
+<span class="nc" id="L66">                String result = commandExecutor.execute(commandContext);</span>
+<span class="nc" id="L67">                FullHttpResponse response = http200(result);</span>
+<span class="nc" id="L68">                ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);</span>
+<span class="nc" id="L69">            } catch (NoSuchCommandException ex) {</span>
+<span class="nc" id="L70">                log.error(&quot;can not find commandContext: &quot; + commandContext, ex);</span>
+<span class="nc" id="L71">                FullHttpResponse response = http404();</span>
+<span class="nc" id="L72">                ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);</span>
+<span class="nc" id="L73">            } catch (Exception qosEx) {</span>
+<span class="nc" id="L74">                log.error(&quot;execute commandContext: &quot; + commandContext + &quot; got exception&quot;, qosEx);</span>
+<span class="nc" id="L75">                FullHttpResponse response = http500(qosEx.getMessage());</span>
+<span class="nc" id="L76">                ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);</span>
+<span class="nc" id="L77">            }</span>
+        }
+<span class="nc" id="L79">    }</span>
+
+    private static final FullHttpResponse http200(String result) {
+<span class="nc" id="L82">        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK,</span>
+<span class="nc" id="L83">                Unpooled.wrappedBuffer(result.getBytes()));</span>
+<span class="nc" id="L84">        HttpHeaders httpHeaders = response.headers();</span>
+<span class="nc" id="L85">        httpHeaders.set(HttpHeaders.Names.CONTENT_TYPE, &quot;text/plain&quot;);</span>
+<span class="nc" id="L86">        httpHeaders.set(HttpHeaders.Names.CONTENT_LENGTH, response.content().readableBytes());</span>
+<span class="nc" id="L87">        return response;</span>
+    }
+
+    private static final FullHttpResponse http404() {
+<span class="nc" id="L91">        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);</span>
+<span class="nc" id="L92">        HttpHeaders httpHeaders = response.headers();</span>
+<span class="nc" id="L93">        httpHeaders.set(HttpHeaders.Names.CONTENT_TYPE, &quot;text/plain&quot;);</span>
+<span class="nc" id="L94">        httpHeaders.set(HttpHeaders.Names.CONTENT_LENGTH, response.content().readableBytes());</span>
+<span class="nc" id="L95">        return response;</span>
+    }
+
+    private static final FullHttpResponse http500(String errorMessage) {
+<span class="nc" id="L99">        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR</span>
+<span class="nc" id="L100">                , Unpooled.wrappedBuffer(errorMessage.getBytes()));</span>
+<span class="nc" id="L101">        HttpHeaders httpHeaders = response.headers();</span>
+<span class="nc" id="L102">        httpHeaders.set(HttpHeaders.Names.CONTENT_TYPE, &quot;text/plain&quot;);</span>
+<span class="nc" id="L103">        httpHeaders.set(HttpHeaders.Names.CONTENT_LENGTH, response.content().readableBytes());</span>
+<span class="nc" id="L104">        return response;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,1012 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">ServiceConfig.java</span></div><h1>ServiceConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.bytecode.Wrapper;
+import org.apache.dubbo.common.config.Environment;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.annotation.Service;
+import org.apache.dubbo.config.context.ConfigManager;
+import org.apache.dubbo.config.invoker.DelegateProviderMetaDataInvoker;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.metadata.integration.MetadataReportService;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.cluster.ConfiguratorFactory;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ProviderModel;
+import org.apache.dubbo.rpc.service.GenericService;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.dubbo.common.Constants.LOCALHOST_VALUE;
+import static org.apache.dubbo.common.utils.NetUtils.getAvailablePort;
+import static org.apache.dubbo.common.utils.NetUtils.getLocalHost;
+import static org.apache.dubbo.common.utils.NetUtils.isInvalidLocalHost;
+import static org.apache.dubbo.common.utils.NetUtils.isInvalidPort;
+
+/**
+ * ServiceConfig
+ *
+ * @export
+ */
+public class ServiceConfig&lt;T&gt; extends AbstractServiceConfig {
+
+    private static final long serialVersionUID = 3033787999037024738L;
+
+    /**
+     * The {@link Protocol} implementation with adaptive functionality,it will be different in different scenarios.
+     * A particular {@link Protocol} implementation is determined by the protocol attribute in the {@link URL}.
+     * For example:
+     *
+     * &lt;li&gt;when the url is registry://224.5.6.7:1234/org.apache.dubbo.registry.RegistryService?application=dubbo-sample,
+     * then the protocol is &lt;b&gt;RegistryProtocol&lt;/b&gt;&lt;/li&gt;
+     *
+     * &lt;li&gt;when the url is dubbo://224.5.6.7:1234/org.apache.dubbo.config.api.DemoService?application=dubbo-sample, then
+     * the protocol is &lt;b&gt;DubboProtocol&lt;/b&gt;&lt;/li&gt;
+     * &lt;p&gt;
+     * Actually，when the {@link ExtensionLoader} init the {@link Protocol} instants,it will automatically wraps two
+     * layers, and eventually will get a &lt;b&gt;ProtocolFilterWrapper&lt;/b&gt; or &lt;b&gt;ProtocolListenerWrapper&lt;/b&gt;
+     */
+<span class="nc" id="L93">    private static final Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();</span>
+
+    /**
+     * A {@link ProxyFactory} implementation that will generate a exported service proxy,the JavassistProxyFactory is its
+     * default implementation
+     */
+<span class="nc" id="L99">    private static final ProxyFactory proxyFactory = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();</span>
+
+    /**
+     * A random port cache, the different protocols who has no port specified have different random port
+     */
+<span class="nc" id="L104">    private static final Map&lt;String, Integer&gt; RANDOM_PORT_MAP = new HashMap&lt;String, Integer&gt;();</span>
+
+    /**
+     * A delayed exposure service timer
+     */
+<span class="nc" id="L109">    private static final ScheduledExecutorService delayExportExecutor = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(&quot;DubboServiceDelayExporter&quot;, true));</span>
+
+    /**
+     * The urls of the services exported
+     */
+<span class="nc" id="L114">    private final List&lt;URL&gt; urls = new ArrayList&lt;URL&gt;();</span>
+
+    /**
+     * The exported services
+     */
+<span class="nc" id="L119">    private final List&lt;Exporter&lt;?&gt;&gt; exporters = new ArrayList&lt;Exporter&lt;?&gt;&gt;();</span>
+
+    /**
+     * The interface name of the exported service
+     */
+    private String interfaceName;
+
+    /**
+     * The interface class of the exported service
+     */
+    private Class&lt;?&gt; interfaceClass;
+
+    /**
+     * The reference of the interface implementation
+     */
+    private T ref;
+
+    /**
+     * The service name
+     */
+    private String path;
+
+    /**
+     * The method configuration
+     */
+    private List&lt;MethodConfig&gt; methods;
+
+    /**
+     * The provider configuration
+     */
+    private ProviderConfig provider;
+
+    /**
+     * The providerIds
+     */
+    private String providerIds;
+
+    /**
+     * Whether the provider has been exported
+     */
+    private transient volatile boolean exported;
+
+    /**
+     * The flag whether a service has unexported ,if the method unexported is invoked, the value is true
+     */
+    private transient volatile boolean unexported;
+
+    /**
+     * whether it is a GenericService
+     */
+    private volatile String generic;
+
+<span class="nc" id="L171">    public ServiceConfig() {</span>
+<span class="nc" id="L172">    }</span>
+
+<span class="nc" id="L174">    public ServiceConfig(Service service) {</span>
+<span class="nc" id="L175">        appendAnnotation(Service.class, service);</span>
+<span class="nc" id="L176">        setMethods(MethodConfig.constructMethodConfig(service.methods()));</span>
+<span class="nc" id="L177">    }</span>
+
+    @Deprecated
+    private static List&lt;ProtocolConfig&gt; convertProviderToProtocol(List&lt;ProviderConfig&gt; providers) {
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(providers)) {</span>
+<span class="nc" id="L182">            return null;</span>
+        }
+<span class="nc" id="L184">        List&lt;ProtocolConfig&gt; protocols = new ArrayList&lt;ProtocolConfig&gt;(providers.size());</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (ProviderConfig provider : providers) {</span>
+<span class="nc" id="L186">            protocols.add(convertProviderToProtocol(provider));</span>
+<span class="nc" id="L187">        }</span>
+<span class="nc" id="L188">        return protocols;</span>
+    }
+
+    @Deprecated
+    private static List&lt;ProviderConfig&gt; convertProtocolToProvider(List&lt;ProtocolConfig&gt; protocols) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(protocols)) {</span>
+<span class="nc" id="L194">            return null;</span>
+        }
+<span class="nc" id="L196">        List&lt;ProviderConfig&gt; providers = new ArrayList&lt;ProviderConfig&gt;(protocols.size());</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        for (ProtocolConfig provider : protocols) {</span>
+<span class="nc" id="L198">            providers.add(convertProtocolToProvider(provider));</span>
+<span class="nc" id="L199">        }</span>
+<span class="nc" id="L200">        return providers;</span>
+    }
+
+    @Deprecated
+    private static ProtocolConfig convertProviderToProtocol(ProviderConfig provider) {
+<span class="nc" id="L205">        ProtocolConfig protocol = new ProtocolConfig();</span>
+<span class="nc" id="L206">        protocol.setName(provider.getProtocol().getName());</span>
+<span class="nc" id="L207">        protocol.setServer(provider.getServer());</span>
+<span class="nc" id="L208">        protocol.setClient(provider.getClient());</span>
+<span class="nc" id="L209">        protocol.setCodec(provider.getCodec());</span>
+<span class="nc" id="L210">        protocol.setHost(provider.getHost());</span>
+<span class="nc" id="L211">        protocol.setPort(provider.getPort());</span>
+<span class="nc" id="L212">        protocol.setPath(provider.getPath());</span>
+<span class="nc" id="L213">        protocol.setPayload(provider.getPayload());</span>
+<span class="nc" id="L214">        protocol.setThreads(provider.getThreads());</span>
+<span class="nc" id="L215">        protocol.setParameters(provider.getParameters());</span>
+<span class="nc" id="L216">        return protocol;</span>
+    }
+
+    @Deprecated
+    private static ProviderConfig convertProtocolToProvider(ProtocolConfig protocol) {
+<span class="nc" id="L221">        ProviderConfig provider = new ProviderConfig();</span>
+<span class="nc" id="L222">        provider.setProtocol(protocol);</span>
+<span class="nc" id="L223">        provider.setServer(protocol.getServer());</span>
+<span class="nc" id="L224">        provider.setClient(protocol.getClient());</span>
+<span class="nc" id="L225">        provider.setCodec(protocol.getCodec());</span>
+<span class="nc" id="L226">        provider.setHost(protocol.getHost());</span>
+<span class="nc" id="L227">        provider.setPort(protocol.getPort());</span>
+<span class="nc" id="L228">        provider.setPath(protocol.getPath());</span>
+<span class="nc" id="L229">        provider.setPayload(protocol.getPayload());</span>
+<span class="nc" id="L230">        provider.setThreads(protocol.getThreads());</span>
+<span class="nc" id="L231">        provider.setParameters(protocol.getParameters());</span>
+<span class="nc" id="L232">        return provider;</span>
+    }
+
+    private static Integer getRandomPort(String protocol) {
+<span class="nc" id="L236">        protocol = protocol.toLowerCase();</span>
+<span class="nc" id="L237">        return RANDOM_PORT_MAP.getOrDefault(protocol, Integer.MIN_VALUE);</span>
+    }
+
+    private static void putRandomPort(String protocol, Integer port) {
+<span class="nc" id="L241">        protocol = protocol.toLowerCase();</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (!RANDOM_PORT_MAP.containsKey(protocol)) {</span>
+<span class="nc" id="L243">            RANDOM_PORT_MAP.put(protocol, port);</span>
+<span class="nc" id="L244">            logger.warn(&quot;Use random available port(&quot; + port + &quot;) for protocol &quot; + protocol);</span>
+        }
+<span class="nc" id="L246">    }</span>
+
+    public URL toUrl() {
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        return urls.isEmpty() ? null : urls.iterator().next();</span>
+    }
+
+    public List&lt;URL&gt; toUrls() {
+<span class="nc" id="L253">        return urls;</span>
+    }
+
+    @Parameter(excluded = true)
+    public boolean isExported() {
+<span class="nc" id="L258">        return exported;</span>
+    }
+
+    @Parameter(excluded = true)
+    public boolean isUnexported() {
+<span class="nc" id="L263">        return unexported;</span>
+    }
+
+    public void checkAndUpdateSubConfigs() {
+        // Use default configs defined explicitly on global configs
+<span class="nc" id="L268">        completeCompoundConfigs();</span>
+        // Config Center should always being started first.
+<span class="nc" id="L270">        startConfigCenter();</span>
+<span class="nc" id="L271">        checkDefault();</span>
+<span class="nc" id="L272">        checkApplication();</span>
+<span class="nc" id="L273">        checkRegistry();</span>
+<span class="nc" id="L274">        checkProtocol();</span>
+<span class="nc" id="L275">        this.refresh();</span>
+<span class="nc" id="L276">        checkMetadataReport();</span>
+
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (StringUtils.isEmpty(interfaceName)) {</span>
+<span class="nc" id="L279">            throw new IllegalStateException(&quot;&lt;dubbo:service interface=\&quot;\&quot; /&gt; interface not allow null!&quot;);</span>
+        }
+
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (ref instanceof GenericService) {</span>
+<span class="nc" id="L283">            interfaceClass = GenericService.class;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            if (StringUtils.isEmpty(generic)) {</span>
+<span class="nc" id="L285">                generic = Boolean.TRUE.toString();</span>
+            }
+        } else {
+            try {
+<span class="nc" id="L289">                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()</span>
+<span class="nc" id="L290">                        .getContextClassLoader());</span>
+<span class="nc" id="L291">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L292">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L293">            }</span>
+<span class="nc" id="L294">            checkInterfaceAndMethods(interfaceClass, methods);</span>
+<span class="nc" id="L295">            checkRef();</span>
+<span class="nc" id="L296">            generic = Boolean.FALSE.toString();</span>
+        }
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (local != null) {</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            if (&quot;true&quot;.equals(local)) {</span>
+<span class="nc" id="L300">                local = interfaceName + &quot;Local&quot;;</span>
+            }
+            Class&lt;?&gt; localClass;
+            try {
+<span class="nc" id="L304">                localClass = ClassUtils.forNameWithThreadContextClassLoader(local);</span>
+<span class="nc" id="L305">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L306">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L307">            }</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (!interfaceClass.isAssignableFrom(localClass)) {</span>
+<span class="nc" id="L309">                throw new IllegalStateException(&quot;The local implementation class &quot; + localClass.getName() + &quot; not implement interface &quot; + interfaceName);</span>
+            }
+        }
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (stub != null) {</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            if (&quot;true&quot;.equals(stub)) {</span>
+<span class="nc" id="L314">                stub = interfaceName + &quot;Stub&quot;;</span>
+            }
+            Class&lt;?&gt; stubClass;
+            try {
+<span class="nc" id="L318">                stubClass = ClassUtils.forNameWithThreadContextClassLoader(stub);</span>
+<span class="nc" id="L319">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L320">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L321">            }</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (!interfaceClass.isAssignableFrom(stubClass)) {</span>
+<span class="nc" id="L323">                throw new IllegalStateException(&quot;The stub implementation class &quot; + stubClass.getName() + &quot; not implement interface &quot; + interfaceName);</span>
+            }
+        }
+<span class="nc" id="L326">        checkStubAndLocal(interfaceClass);</span>
+<span class="nc" id="L327">        checkMock(interfaceClass);</span>
+<span class="nc" id="L328">    }</span>
+
+    public synchronized void export() {
+<span class="nc" id="L331">        checkAndUpdateSubConfigs();</span>
+
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (!shouldExport()) {</span>
+<span class="nc" id="L334">            return;</span>
+        }
+
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (shouldDelay()) {</span>
+<span class="nc" id="L338">            delayExportExecutor.schedule(this::doExport, getDelay(), TimeUnit.MILLISECONDS);</span>
+        } else {
+<span class="nc" id="L340">            doExport();</span>
+        }
+<span class="nc" id="L342">    }</span>
+
+    private boolean shouldExport() {
+<span class="nc" id="L345">        Boolean export = getExport();</span>
+        // default value is true
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        return export == null ? true : export;</span>
+    }
+
+    @Override
+    public Boolean getExport() {
+<span class="nc bnc" id="L352" title="All 4 branches missed.">        return (export == null &amp;&amp; provider != null) ? provider.getExport() : export;</span>
+    }
+
+    private boolean shouldDelay() {
+<span class="nc" id="L356">        Integer delay = getDelay();</span>
+<span class="nc bnc" id="L357" title="All 4 branches missed.">        return delay != null &amp;&amp; delay &gt; 0;</span>
+    }
+
+    @Override
+    public Integer getDelay() {
+<span class="nc bnc" id="L362" title="All 4 branches missed.">        return (delay == null &amp;&amp; provider != null) ? provider.getDelay() : delay;</span>
+    }
+
+    protected synchronized void doExport() {
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (unexported) {</span>
+<span class="nc" id="L367">            throw new IllegalStateException(&quot;The service &quot; + interfaceClass.getName() + &quot; has already unexported!&quot;);</span>
+        }
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (exported) {</span>
+<span class="nc" id="L370">            return;</span>
+        }
+<span class="nc" id="L372">        exported = true;</span>
+
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        if (StringUtils.isEmpty(path)) {</span>
+<span class="nc" id="L375">            path = interfaceName;</span>
+        }
+<span class="nc" id="L377">        doExportUrls();</span>
+<span class="nc" id="L378">    }</span>
+
+    private void checkRef() {
+        // reference should not be null, and is the implementation of the given interface
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if (ref == null) {</span>
+<span class="nc" id="L383">            throw new IllegalStateException(&quot;ref not allow null!&quot;);</span>
+        }
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        if (!interfaceClass.isInstance(ref)) {</span>
+<span class="nc" id="L386">            throw new IllegalStateException(&quot;The class &quot;</span>
+<span class="nc" id="L387">                    + ref.getClass().getName() + &quot; unimplemented interface &quot;</span>
+                    + interfaceClass + &quot;!&quot;);
+        }
+<span class="nc" id="L390">    }</span>
+
+    public synchronized void unexport() {
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (!exported) {</span>
+<span class="nc" id="L394">            return;</span>
+        }
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        if (unexported) {</span>
+<span class="nc" id="L397">            return;</span>
+        }
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (!exporters.isEmpty()) {</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            for (Exporter&lt;?&gt; exporter : exporters) {</span>
+                try {
+<span class="nc" id="L402">                    exporter.unexport();</span>
+<span class="nc" id="L403">                } catch (Throwable t) {</span>
+<span class="nc" id="L404">                    logger.warn(&quot;Unexpected error occured when unexport &quot; + exporter, t);</span>
+<span class="nc" id="L405">                }</span>
+<span class="nc" id="L406">            }</span>
+<span class="nc" id="L407">            exporters.clear();</span>
+        }
+<span class="nc" id="L409">        unexported = true;</span>
+<span class="nc" id="L410">    }</span>
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    private void doExportUrls() {
+<span class="nc" id="L414">        List&lt;URL&gt; registryURLs = loadRegistries(true);</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        for (ProtocolConfig protocolConfig : protocols) {</span>
+<span class="nc" id="L416">            String pathKey = URL.buildKey(getContextPath(protocolConfig).map(p -&gt; p + &quot;/&quot; + path).orElse(path), group, version);</span>
+<span class="nc" id="L417">            ProviderModel providerModel = new ProviderModel(pathKey, ref, interfaceClass);</span>
+<span class="nc" id="L418">            ApplicationModel.initProviderModel(pathKey, providerModel);</span>
+<span class="nc" id="L419">            doExportUrlsFor1Protocol(protocolConfig, registryURLs);</span>
+<span class="nc" id="L420">        }</span>
+<span class="nc" id="L421">    }</span>
+
+    private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List&lt;URL&gt; registryURLs) {
+<span class="nc" id="L424">        String name = protocolConfig.getName();</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (StringUtils.isEmpty(name)) {</span>
+<span class="nc" id="L426">            name = Constants.DUBBO;</span>
+        }
+
+<span class="nc" id="L429">        Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L430">        map.put(Constants.SIDE_KEY, Constants.PROVIDER_SIDE);</span>
+
+<span class="nc" id="L432">        appendRuntimeParameters(map);</span>
+<span class="nc" id="L433">        appendParameters(map, metrics);</span>
+<span class="nc" id="L434">        appendParameters(map, application);</span>
+<span class="nc" id="L435">        appendParameters(map, module);</span>
+        // remove 'default.' prefix for configs from ProviderConfig
+        // appendParameters(map, provider, Constants.DEFAULT_KEY);
+<span class="nc" id="L438">        appendParameters(map, provider);</span>
+<span class="nc" id="L439">        appendParameters(map, protocolConfig);</span>
+<span class="nc" id="L440">        appendParameters(map, this);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(methods)) {</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            for (MethodConfig method : methods) {</span>
+<span class="nc" id="L443">                appendParameters(map, method, method.getName());</span>
+<span class="nc" id="L444">                String retryKey = method.getName() + &quot;.retry&quot;;</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                if (map.containsKey(retryKey)) {</span>
+<span class="nc" id="L446">                    String retryValue = map.remove(retryKey);</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">                    if (&quot;false&quot;.equals(retryValue)) {</span>
+<span class="nc" id="L448">                        map.put(method.getName() + &quot;.retries&quot;, &quot;0&quot;);</span>
+                    }
+                }
+<span class="nc" id="L451">                List&lt;ArgumentConfig&gt; arguments = method.getArguments();</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">                if (CollectionUtils.isNotEmpty(arguments)) {</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                    for (ArgumentConfig argument : arguments) {</span>
+                        // convert argument type
+<span class="nc bnc" id="L455" title="All 4 branches missed.">                        if (argument.getType() != null &amp;&amp; argument.getType().length() &gt; 0) {</span>
+<span class="nc" id="L456">                            Method[] methods = interfaceClass.getMethods();</span>
+                            // visit all methods
+<span class="nc bnc" id="L458" title="All 4 branches missed.">                            if (methods != null &amp;&amp; methods.length &gt; 0) {</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                                for (int i = 0; i &lt; methods.length; i++) {</span>
+<span class="nc" id="L460">                                    String methodName = methods[i].getName();</span>
+                                    // target the method, and get its signature
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                                    if (methodName.equals(method.getName())) {</span>
+<span class="nc" id="L463">                                        Class&lt;?&gt;[] argtypes = methods[i].getParameterTypes();</span>
+                                        // one callback in the method
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                                        if (argument.getIndex() != -1) {</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                                            if (argtypes[argument.getIndex()].getName().equals(argument.getType())) {</span>
+<span class="nc" id="L467">                                                appendParameters(map, argument, method.getName() + &quot;.&quot; + argument.getIndex());</span>
+                                            } else {
+<span class="nc" id="L469">                                                throw new IllegalArgumentException(&quot;Argument config error : the index attribute and type attribute not match :index :&quot; + argument.getIndex() + &quot;, type:&quot; + argument.getType());</span>
+                                            }
+                                        } else {
+                                            // multiple callbacks in the method
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                                            for (int j = 0; j &lt; argtypes.length; j++) {</span>
+<span class="nc" id="L474">                                                Class&lt;?&gt; argclazz = argtypes[j];</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                                                if (argclazz.getName().equals(argument.getType())) {</span>
+<span class="nc" id="L476">                                                    appendParameters(map, argument, method.getName() + &quot;.&quot; + j);</span>
+<span class="nc bnc" id="L477" title="All 4 branches missed.">                                                    if (argument.getIndex() != -1 &amp;&amp; argument.getIndex() != j) {</span>
+<span class="nc" id="L478">                                                        throw new IllegalArgumentException(&quot;Argument config error : the index attribute and type attribute not match :index :&quot; + argument.getIndex() + &quot;, type:&quot; + argument.getType());</span>
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                        } else if (argument.getIndex() != -1) {</span>
+<span class="nc" id="L487">                            appendParameters(map, argument, method.getName() + &quot;.&quot; + argument.getIndex());</span>
+                        } else {
+<span class="nc" id="L489">                            throw new IllegalArgumentException(&quot;Argument config must set index or type attribute.eg: &lt;dubbo:argument index='0' .../&gt; or &lt;dubbo:argument type=xxx .../&gt;&quot;);</span>
+                        }
+
+<span class="nc" id="L492">                    }</span>
+                }
+<span class="nc" id="L494">            } // end of methods for</span>
+        }
+
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        if (ProtocolUtils.isGeneric(generic)) {</span>
+<span class="nc" id="L498">            map.put(Constants.GENERIC_KEY, generic);</span>
+<span class="nc" id="L499">            map.put(Constants.METHODS_KEY, Constants.ANY_VALUE);</span>
+        } else {
+<span class="nc" id="L501">            String revision = Version.getVersion(interfaceClass, version);</span>
+<span class="nc bnc" id="L502" title="All 4 branches missed.">            if (revision != null &amp;&amp; revision.length() &gt; 0) {</span>
+<span class="nc" id="L503">                map.put(Constants.REVISION_KEY, revision);</span>
+            }
+
+<span class="nc" id="L506">            String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">            if (methods.length == 0) {</span>
+<span class="nc" id="L508">                logger.warn(&quot;No method found in service interface &quot; + interfaceClass.getName());</span>
+<span class="nc" id="L509">                map.put(Constants.METHODS_KEY, Constants.ANY_VALUE);</span>
+            } else {
+<span class="nc" id="L511">                map.put(Constants.METHODS_KEY, StringUtils.join(new HashSet&lt;String&gt;(Arrays.asList(methods)), &quot;,&quot;));</span>
+            }
+        }
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (!ConfigUtils.isEmpty(token)) {</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">            if (ConfigUtils.isDefault(token)) {</span>
+<span class="nc" id="L516">                map.put(Constants.TOKEN_KEY, UUID.randomUUID().toString());</span>
+            } else {
+<span class="nc" id="L518">                map.put(Constants.TOKEN_KEY, token);</span>
+            }
+        }
+        // export service
+<span class="nc" id="L522">        String host = this.findConfigedHosts(protocolConfig, registryURLs, map);</span>
+<span class="nc" id="L523">        Integer port = this.findConfigedPorts(protocolConfig, name, map);</span>
+<span class="nc" id="L524">        URL url = new URL(name, host, port, getContextPath(protocolConfig).map(p -&gt; p + &quot;/&quot; + path).orElse(path), map);</span>
+
+<span class="nc" id="L526">        if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                .hasExtension(url.getProtocol())) {</span>
+<span class="nc" id="L528">            url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)</span>
+<span class="nc" id="L529">                    .getExtension(url.getProtocol()).getConfigurator(url).configure(url);</span>
+        }
+
+<span class="nc" id="L532">        String scope = url.getParameter(Constants.SCOPE_KEY);</span>
+        // don't export when none is configured
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (!Constants.SCOPE_NONE.equalsIgnoreCase(scope)) {</span>
+
+            // export to local if the config is not remote (export to remote only when config is remote)
+<span class="nc bnc" id="L537" title="All 2 branches missed.">            if (!Constants.SCOPE_REMOTE.equalsIgnoreCase(scope)) {</span>
+<span class="nc" id="L538">                exportLocal(url);</span>
+            }
+            // export to remote if the config is not local (export to local only when config is local)
+<span class="nc bnc" id="L541" title="All 2 branches missed.">            if (!Constants.SCOPE_LOCAL.equalsIgnoreCase(scope)) {</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L543">                    logger.info(&quot;Export dubbo service &quot; + interfaceClass.getName() + &quot; to url &quot; + url);</span>
+                }
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                if (CollectionUtils.isNotEmpty(registryURLs)) {</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                    for (URL registryURL : registryURLs) {</span>
+<span class="nc" id="L547">                        url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));</span>
+<span class="nc" id="L548">                        URL monitorUrl = loadMonitor(registryURL);</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">                        if (monitorUrl != null) {</span>
+<span class="nc" id="L550">                            url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());</span>
+                        }
+<span class="nc bnc" id="L552" title="All 2 branches missed.">                        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L553">                            logger.info(&quot;Register dubbo service &quot; + interfaceClass.getName() + &quot; url &quot; + url + &quot; to registry &quot; + registryURL);</span>
+                        }
+
+                        // For providers, this is used to enable custom proxy to generate invoker
+<span class="nc" id="L557">                        String proxy = url.getParameter(Constants.PROXY_KEY);</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">                        if (StringUtils.isNotEmpty(proxy)) {</span>
+<span class="nc" id="L559">                            registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);</span>
+                        }
+
+<span class="nc" id="L562">                        Invoker&lt;?&gt; invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));</span>
+<span class="nc" id="L563">                        DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);</span>
+
+<span class="nc" id="L565">                        Exporter&lt;?&gt; exporter = protocol.export(wrapperInvoker);</span>
+<span class="nc" id="L566">                        exporters.add(exporter);</span>
+<span class="nc" id="L567">                    }</span>
+                } else {
+<span class="nc" id="L569">                    Invoker&lt;?&gt; invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);</span>
+<span class="nc" id="L570">                    DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);</span>
+
+<span class="nc" id="L572">                    Exporter&lt;?&gt; exporter = protocol.export(wrapperInvoker);</span>
+<span class="nc" id="L573">                    exporters.add(exporter);</span>
+                }
+                /**
+                 * @since 2.7.0
+                 * ServiceData Store
+                 */
+<span class="nc" id="L579">                MetadataReportService metadataReportService = null;</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">                if ((metadataReportService = getMetadataReportService()) != null) {</span>
+<span class="nc" id="L581">                    metadataReportService.publishProvider(url);</span>
+                }
+            }
+        }
+<span class="nc" id="L585">        this.urls.add(url);</span>
+<span class="nc" id="L586">    }</span>
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    private void exportLocal(URL url) {
+<span class="nc bnc" id="L590" title="All 2 branches missed.">        if (!Constants.LOCAL_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {</span>
+<span class="nc" id="L591">            URL local = URLBuilder.from(url)</span>
+<span class="nc" id="L592">                    .setProtocol(Constants.LOCAL_PROTOCOL)</span>
+<span class="nc" id="L593">                    .setHost(LOCALHOST_VALUE)</span>
+<span class="nc" id="L594">                    .setPort(0)</span>
+<span class="nc" id="L595">                    .build();</span>
+<span class="nc" id="L596">            Exporter&lt;?&gt; exporter = protocol.export(</span>
+<span class="nc" id="L597">                    proxyFactory.getInvoker(ref, (Class) interfaceClass, local));</span>
+<span class="nc" id="L598">            exporters.add(exporter);</span>
+<span class="nc" id="L599">            logger.info(&quot;Export dubbo service &quot; + interfaceClass.getName() + &quot; to local registry&quot;);</span>
+        }
+<span class="nc" id="L601">    }</span>
+
+    private Optional&lt;String&gt; getContextPath(ProtocolConfig protocolConfig) {
+<span class="nc" id="L604">        String contextPath = protocolConfig.getContextpath();</span>
+<span class="nc bnc" id="L605" title="All 4 branches missed.">        if (StringUtils.isEmpty(contextPath) &amp;&amp; provider != null) {</span>
+<span class="nc" id="L606">            contextPath = provider.getContextpath();</span>
+        }
+<span class="nc" id="L608">        return Optional.ofNullable(contextPath);</span>
+    }
+
+    protected Class getServiceClass(T ref) {
+<span class="nc" id="L612">        return ref.getClass();</span>
+    }
+
+    /**
+     * Register &amp; bind IP address for service provider, can be configured separately.
+     * Configuration priority: environment variables -&gt; java system properties -&gt; host property in config file -&gt;
+     * /etc/hosts -&gt; default network address -&gt; first available network address
+     *
+     * @param protocolConfig
+     * @param registryURLs
+     * @param map
+     * @return
+     */
+    private String findConfigedHosts(ProtocolConfig protocolConfig, List&lt;URL&gt; registryURLs, Map&lt;String, String&gt; map) {
+<span class="nc" id="L626">        boolean anyhost = false;</span>
+
+<span class="nc" id="L628">        String hostToBind = getValueFromConfig(protocolConfig, Constants.DUBBO_IP_TO_BIND);</span>
+<span class="nc bnc" id="L629" title="All 6 branches missed.">        if (hostToBind != null &amp;&amp; hostToBind.length() &gt; 0 &amp;&amp; isInvalidLocalHost(hostToBind)) {</span>
+<span class="nc" id="L630">            throw new IllegalArgumentException(&quot;Specified invalid bind ip from property:&quot; + Constants.DUBBO_IP_TO_BIND + &quot;, value:&quot; + hostToBind);</span>
+        }
+
+        // if bind ip is not found in environment, keep looking up
+<span class="nc bnc" id="L634" title="All 2 branches missed.">        if (StringUtils.isEmpty(hostToBind)) {</span>
+<span class="nc" id="L635">            hostToBind = protocolConfig.getHost();</span>
+<span class="nc bnc" id="L636" title="All 4 branches missed.">            if (provider != null &amp;&amp; StringUtils.isEmpty(hostToBind)) {</span>
+<span class="nc" id="L637">                hostToBind = provider.getHost();</span>
+            }
+<span class="nc bnc" id="L639" title="All 2 branches missed.">            if (isInvalidLocalHost(hostToBind)) {</span>
+<span class="nc" id="L640">                anyhost = true;</span>
+                try {
+<span class="nc" id="L642">                    hostToBind = InetAddress.getLocalHost().getHostAddress();</span>
+<span class="nc" id="L643">                } catch (UnknownHostException e) {</span>
+<span class="nc" id="L644">                    logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L645">                }</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">                if (isInvalidLocalHost(hostToBind)) {</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                    if (CollectionUtils.isNotEmpty(registryURLs)) {</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">                        for (URL registryURL : registryURLs) {</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">                            if (Constants.MULTICAST.equalsIgnoreCase(registryURL.getParameter(&quot;registry&quot;))) {</span>
+                                // skip multicast registry since we cannot connect to it via Socket
+<span class="nc" id="L651">                                continue;</span>
+                            }
+<span class="nc" id="L653">                            try (Socket socket = new Socket()) {</span>
+<span class="nc" id="L654">                                SocketAddress addr = new InetSocketAddress(registryURL.getHost(), registryURL.getPort());</span>
+<span class="nc" id="L655">                                socket.connect(addr, 1000);</span>
+<span class="nc" id="L656">                                hostToBind = socket.getLocalAddress().getHostAddress();</span>
+                                break;
+<span class="nc" id="L658">                            } catch (Exception e) {</span>
+<span class="nc" id="L659">                                logger.warn(e.getMessage(), e);</span>
+                            }
+<span class="nc" id="L661">                        }</span>
+                    }
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                    if (isInvalidLocalHost(hostToBind)) {</span>
+<span class="nc" id="L664">                        hostToBind = getLocalHost();</span>
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L670">        map.put(Constants.BIND_IP_KEY, hostToBind);</span>
+
+        // registry ip is not used for bind ip by default
+<span class="nc" id="L673">        String hostToRegistry = getValueFromConfig(protocolConfig, Constants.DUBBO_IP_TO_REGISTRY);</span>
+<span class="nc bnc" id="L674" title="All 6 branches missed.">        if (hostToRegistry != null &amp;&amp; hostToRegistry.length() &gt; 0 &amp;&amp; isInvalidLocalHost(hostToRegistry)) {</span>
+<span class="nc" id="L675">            throw new IllegalArgumentException(&quot;Specified invalid registry ip from property:&quot; + Constants.DUBBO_IP_TO_REGISTRY + &quot;, value:&quot; + hostToRegistry);</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">        } else if (StringUtils.isEmpty(hostToRegistry)) {</span>
+            // bind ip is used as registry ip by default
+<span class="nc" id="L678">            hostToRegistry = hostToBind;</span>
+        }
+
+<span class="nc" id="L681">        map.put(Constants.ANYHOST_KEY, String.valueOf(anyhost));</span>
+
+<span class="nc" id="L683">        return hostToRegistry;</span>
+    }
+
+    /**
+     * Register port and bind port for the provider, can be configured separately
+     * Configuration priority: environment variable -&gt; java system properties -&gt; port property in protocol config file
+     * -&gt; protocol default port
+     *
+     * @param protocolConfig
+     * @param name
+     * @return
+     */
+    private Integer findConfigedPorts(ProtocolConfig protocolConfig, String name, Map&lt;String, String&gt; map) {
+<span class="nc" id="L696">        Integer portToBind = null;</span>
+
+        // parse bind port from environment
+<span class="nc" id="L699">        String port = getValueFromConfig(protocolConfig, Constants.DUBBO_PORT_TO_BIND);</span>
+<span class="nc" id="L700">        portToBind = parsePort(port);</span>
+
+        // if there's no bind port found from environment, keep looking up.
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        if (portToBind == null) {</span>
+<span class="nc" id="L704">            portToBind = protocolConfig.getPort();</span>
+<span class="nc bnc" id="L705" title="All 6 branches missed.">            if (provider != null &amp;&amp; (portToBind == null || portToBind == 0)) {</span>
+<span class="nc" id="L706">                portToBind = provider.getPort();</span>
+            }
+<span class="nc" id="L708">            final int defaultPort = ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(name).getDefaultPort();</span>
+<span class="nc bnc" id="L709" title="All 4 branches missed.">            if (portToBind == null || portToBind == 0) {</span>
+<span class="nc" id="L710">                portToBind = defaultPort;</span>
+            }
+<span class="nc bnc" id="L712" title="All 4 branches missed.">            if (portToBind == null || portToBind &lt;= 0) {</span>
+<span class="nc" id="L713">                portToBind = getRandomPort(name);</span>
+<span class="nc bnc" id="L714" title="All 4 branches missed.">                if (portToBind == null || portToBind &lt; 0) {</span>
+<span class="nc" id="L715">                    portToBind = getAvailablePort(defaultPort);</span>
+<span class="nc" id="L716">                    putRandomPort(name, portToBind);</span>
+                }
+            }
+        }
+
+        // save bind port, used as url's key later
+<span class="nc" id="L722">        map.put(Constants.BIND_PORT_KEY, String.valueOf(portToBind));</span>
+
+        // registry port, not used as bind port by default
+<span class="nc" id="L725">        String portToRegistryStr = getValueFromConfig(protocolConfig, Constants.DUBBO_PORT_TO_REGISTRY);</span>
+<span class="nc" id="L726">        Integer portToRegistry = parsePort(portToRegistryStr);</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">        if (portToRegistry == null) {</span>
+<span class="nc" id="L728">            portToRegistry = portToBind;</span>
+        }
+
+<span class="nc" id="L731">        return portToRegistry;</span>
+    }
+
+    private Integer parsePort(String configPort) {
+<span class="nc" id="L735">        Integer port = null;</span>
+<span class="nc bnc" id="L736" title="All 4 branches missed.">        if (configPort != null &amp;&amp; configPort.length() &gt; 0) {</span>
+            try {
+<span class="nc" id="L738">                Integer intPort = Integer.parseInt(configPort);</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">                if (isInvalidPort(intPort)) {</span>
+<span class="nc" id="L740">                    throw new IllegalArgumentException(&quot;Specified invalid port from env value:&quot; + configPort);</span>
+                }
+<span class="nc" id="L742">                port = intPort;</span>
+<span class="nc" id="L743">            } catch (Exception e) {</span>
+<span class="nc" id="L744">                throw new IllegalArgumentException(&quot;Specified invalid port from env value:&quot; + configPort);</span>
+<span class="nc" id="L745">            }</span>
+        }
+<span class="nc" id="L747">        return port;</span>
+    }
+
+    private String getValueFromConfig(ProtocolConfig protocolConfig, String key) {
+<span class="nc" id="L751">        String protocolPrefix = protocolConfig.getName().toUpperCase() + &quot;_&quot;;</span>
+<span class="nc" id="L752">        String port = ConfigUtils.getSystemProperty(protocolPrefix + key);</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">        if (StringUtils.isEmpty(port)) {</span>
+<span class="nc" id="L754">            port = ConfigUtils.getSystemProperty(key);</span>
+        }
+<span class="nc" id="L756">        return port;</span>
+    }
+
+    private void completeCompoundConfigs() {
+<span class="nc bnc" id="L760" title="All 2 branches missed.">        if (provider != null) {</span>
+<span class="nc bnc" id="L761" title="All 2 branches missed.">            if (application == null) {</span>
+<span class="nc" id="L762">                setApplication(provider.getApplication());</span>
+            }
+<span class="nc bnc" id="L764" title="All 2 branches missed.">            if (module == null) {</span>
+<span class="nc" id="L765">                setModule(provider.getModule());</span>
+            }
+<span class="nc bnc" id="L767" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L768">                setRegistries(provider.getRegistries());</span>
+            }
+<span class="nc bnc" id="L770" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L771">                setMonitor(provider.getMonitor());</span>
+            }
+<span class="nc bnc" id="L773" title="All 2 branches missed.">            if (protocols == null) {</span>
+<span class="nc" id="L774">                setProtocols(provider.getProtocols());</span>
+            }
+<span class="nc bnc" id="L776" title="All 2 branches missed.">            if (configCenter == null) {</span>
+<span class="nc" id="L777">                setConfigCenter(provider.getConfigCenter());</span>
+            }
+        }
+<span class="nc bnc" id="L780" title="All 2 branches missed.">        if (module != null) {</span>
+<span class="nc bnc" id="L781" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L782">                setRegistries(module.getRegistries());</span>
+            }
+<span class="nc bnc" id="L784" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L785">                setMonitor(module.getMonitor());</span>
+            }
+        }
+<span class="nc bnc" id="L788" title="All 2 branches missed.">        if (application != null) {</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L790">                setRegistries(application.getRegistries());</span>
+            }
+<span class="nc bnc" id="L792" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L793">                setMonitor(application.getMonitor());</span>
+            }
+        }
+<span class="nc" id="L796">    }</span>
+
+    private void checkDefault() {
+<span class="nc" id="L799">        createProviderIfAbsent();</span>
+<span class="nc" id="L800">    }</span>
+
+    private void createProviderIfAbsent() {
+<span class="nc bnc" id="L803" title="All 2 branches missed.">        if (provider != null) {</span>
+<span class="nc" id="L804">            return;</span>
+        }
+<span class="nc" id="L806">        setProvider (</span>
+<span class="nc" id="L807">                ConfigManager.getInstance()</span>
+<span class="nc" id="L808">                        .getDefaultProvider()</span>
+<span class="nc" id="L809">                        .orElseGet(() -&gt; {</span>
+<span class="nc" id="L810">                            ProviderConfig providerConfig = new ProviderConfig();</span>
+<span class="nc" id="L811">                            providerConfig.refresh();</span>
+<span class="nc" id="L812">                            return providerConfig;</span>
+                        })
+        );
+<span class="nc" id="L815">    }</span>
+
+    private void checkProtocol() {
+<span class="nc bnc" id="L818" title="All 4 branches missed.">        if (CollectionUtils.isEmpty(protocols) &amp;&amp; provider != null) {</span>
+<span class="nc" id="L819">            setProtocols(provider.getProtocols());</span>
+        }
+<span class="nc" id="L821">        convertProtocolIdsToProtocols();</span>
+<span class="nc" id="L822">    }</span>
+
+    private void convertProtocolIdsToProtocols() {
+<span class="nc bnc" id="L825" title="All 4 branches missed.">        if (StringUtils.isEmpty(protocolIds) &amp;&amp; CollectionUtils.isEmpty(protocols)) {</span>
+<span class="nc" id="L826">            List&lt;String&gt; configedProtocols = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L827">            configedProtocols.addAll(getSubProperties(Environment.getInstance()</span>
+<span class="nc" id="L828">                    .getExternalConfigurationMap(), Constants.PROTOCOLS_SUFFIX));</span>
+<span class="nc" id="L829">            configedProtocols.addAll(getSubProperties(Environment.getInstance()</span>
+<span class="nc" id="L830">                    .getAppExternalConfigurationMap(), Constants.PROTOCOLS_SUFFIX));</span>
+
+<span class="nc" id="L832">            protocolIds = String.join(&quot;,&quot;, configedProtocols);</span>
+        }
+
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        if (StringUtils.isEmpty(protocolIds)) {</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">            if (CollectionUtils.isEmpty(protocols)) {</span>
+<span class="nc" id="L837">               setProtocols(</span>
+<span class="nc" id="L838">                       ConfigManager.getInstance().getDefaultProtocols()</span>
+<span class="nc" id="L839">                        .filter(CollectionUtils::isNotEmpty)</span>
+<span class="nc" id="L840">                        .orElseGet(() -&gt; {</span>
+<span class="nc" id="L841">                            ProtocolConfig protocolConfig = new ProtocolConfig();</span>
+<span class="nc" id="L842">                            protocolConfig.refresh();</span>
+<span class="nc" id="L843">                            return new ArrayList&lt;&gt;(Arrays.asList(protocolConfig));</span>
+                        })
+               );
+            }
+        } else {
+<span class="nc" id="L848">            String[] arr = Constants.COMMA_SPLIT_PATTERN.split(protocolIds);</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">            List&lt;ProtocolConfig&gt; tmpProtocols = CollectionUtils.isNotEmpty(protocols) ? protocols : new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L850">            Arrays.stream(arr).forEach(id -&gt; {</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">                if (tmpProtocols.stream().noneMatch(prot -&gt; prot.getId().equals(id))) {</span>
+<span class="nc" id="L852">                    tmpProtocols.add(ConfigManager.getInstance().getProtocol(id).orElseGet(() -&gt; {</span>
+<span class="nc" id="L853">                        ProtocolConfig protocolConfig = new ProtocolConfig();</span>
+<span class="nc" id="L854">                        protocolConfig.setId(id);</span>
+<span class="nc" id="L855">                        protocolConfig.refresh();</span>
+<span class="nc" id="L856">                        return protocolConfig;</span>
+                    }));
+                }
+<span class="nc" id="L859">            });</span>
+<span class="nc bnc" id="L860" title="All 2 branches missed.">            if (tmpProtocols.size() &gt; arr.length) {</span>
+<span class="nc" id="L861">                throw new IllegalStateException(&quot;Too much protocols found, the protocols comply to this service are :&quot; + protocolIds + &quot; but got &quot; + protocols</span>
+<span class="nc" id="L862">                        .size() + &quot; registries!&quot;);</span>
+            }
+<span class="nc" id="L864">            setProtocols(tmpProtocols);</span>
+        }
+<span class="nc" id="L866">    }</span>
+
+    public Class&lt;?&gt; getInterfaceClass() {
+<span class="nc bnc" id="L869" title="All 2 branches missed.">        if (interfaceClass != null) {</span>
+<span class="nc" id="L870">            return interfaceClass;</span>
+        }
+<span class="nc bnc" id="L872" title="All 2 branches missed.">        if (ref instanceof GenericService) {</span>
+<span class="nc" id="L873">            return GenericService.class;</span>
+        }
+        try {
+<span class="nc bnc" id="L876" title="All 4 branches missed.">            if (interfaceName != null &amp;&amp; interfaceName.length() &gt; 0) {</span>
+<span class="nc" id="L877">                this.interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()</span>
+<span class="nc" id="L878">                        .getContextClassLoader());</span>
+            }
+<span class="nc" id="L880">        } catch (ClassNotFoundException t) {</span>
+<span class="nc" id="L881">            throw new IllegalStateException(t.getMessage(), t);</span>
+<span class="nc" id="L882">        }</span>
+<span class="nc" id="L883">        return interfaceClass;</span>
+    }
+
+    /**
+     * @param interfaceClass
+     * @see #setInterface(Class)
+     * @deprecated
+     */
+    public void setInterfaceClass(Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L892">        setInterface(interfaceClass);</span>
+<span class="nc" id="L893">    }</span>
+
+    public String getInterface() {
+<span class="nc" id="L896">        return interfaceName;</span>
+    }
+
+    public void setInterface(Class&lt;?&gt; interfaceClass) {
+<span class="nc bnc" id="L900" title="All 4 branches missed.">        if (interfaceClass != null &amp;&amp; !interfaceClass.isInterface()) {</span>
+<span class="nc" id="L901">            throw new IllegalStateException(&quot;The interface class &quot; + interfaceClass + &quot; is not a interface!&quot;);</span>
+        }
+<span class="nc" id="L903">        this.interfaceClass = interfaceClass;</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        setInterface(interfaceClass == null ? null : interfaceClass.getName());</span>
+<span class="nc" id="L905">    }</span>
+
+    public void setInterface(String interfaceName) {
+<span class="nc" id="L908">        this.interfaceName = interfaceName;</span>
+<span class="nc bnc" id="L909" title="All 2 branches missed.">        if (StringUtils.isEmpty(id)) {</span>
+<span class="nc" id="L910">            id = interfaceName;</span>
+        }
+<span class="nc" id="L912">    }</span>
+
+    public T getRef() {
+<span class="nc" id="L915">        return ref;</span>
+    }
+
+    public void setRef(T ref) {
+<span class="nc" id="L919">        this.ref = ref;</span>
+<span class="nc" id="L920">    }</span>
+
+    @Parameter(excluded = true)
+    public String getPath() {
+<span class="nc" id="L924">        return path;</span>
+    }
+
+    public void setPath(String path) {
+<span class="nc" id="L928">        checkPathName(Constants.PATH_KEY, path);</span>
+<span class="nc" id="L929">        this.path = path;</span>
+<span class="nc" id="L930">    }</span>
+
+    public List&lt;MethodConfig&gt; getMethods() {
+<span class="nc" id="L933">        return methods;</span>
+    }
+
+    // ======== Deprecated ========
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public void setMethods(List&lt;? extends MethodConfig&gt; methods) {
+<span class="nc" id="L940">        this.methods = (List&lt;MethodConfig&gt;) methods;</span>
+<span class="nc" id="L941">    }</span>
+
+    public ProviderConfig getProvider() {
+<span class="nc" id="L944">        return provider;</span>
+    }
+
+    public void setProvider(ProviderConfig provider) {
+<span class="nc" id="L948">        ConfigManager.getInstance().addProvider(provider);</span>
+<span class="nc" id="L949">        this.provider = provider;</span>
+<span class="nc" id="L950">    }</span>
+
+    @Parameter(excluded = true)
+    public String getProviderIds() {
+<span class="nc" id="L954">        return providerIds;</span>
+    }
+
+    public void setProviderIds(String providerIds) {
+<span class="nc" id="L958">        this.providerIds = providerIds;</span>
+<span class="nc" id="L959">    }</span>
+
+    public String getGeneric() {
+<span class="nc" id="L962">        return generic;</span>
+    }
+
+    public void setGeneric(String generic) {
+<span class="nc bnc" id="L966" title="All 2 branches missed.">        if (StringUtils.isEmpty(generic)) {</span>
+<span class="nc" id="L967">            return;</span>
+        }
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        if (ProtocolUtils.isGeneric(generic)) {</span>
+<span class="nc" id="L970">            this.generic = generic;</span>
+        } else {
+<span class="nc" id="L972">            throw new IllegalArgumentException(&quot;Unsupported generic type &quot; + generic);</span>
+        }
+<span class="nc" id="L974">    }</span>
+
+    @Override
+    public void setMock(Boolean mock) {
+<span class="nc" id="L978">        throw new IllegalArgumentException(&quot;mock doesn't support on provider side&quot;);</span>
+    }
+
+    @Override
+    public void setMock(String mock) {
+<span class="nc" id="L983">        throw new IllegalArgumentException(&quot;mock doesn't support on provider side&quot;);</span>
+    }
+
+    public List&lt;URL&gt; getExportedUrls() {
+<span class="nc" id="L987">        return urls;</span>
+    }
+
+    /**
+     * @deprecated Replace to getProtocols()
+     */
+    @Deprecated
+    public List&lt;ProviderConfig&gt; getProviders() {
+<span class="nc" id="L995">        return convertProtocolToProvider(protocols);</span>
+    }
+
+    /**
+     * @deprecated Replace to setProtocols()
+     */
+    @Deprecated
+    public void setProviders(List&lt;ProviderConfig&gt; providers) {
+<span class="nc" id="L1003">        this.protocols = convertProviderToProtocol(providers);</span>
+<span class="nc" id="L1004">    }</span>
+
+    @Override
+    @Parameter(excluded = true)
+    public String getPrefix() {
+<span class="nc" id="L1009">        return Constants.DUBBO + &quot;.service.&quot; + interfaceName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

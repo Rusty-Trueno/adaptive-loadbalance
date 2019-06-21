@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ListTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo.telnet</a> &gt; <span class="el_source">ListTelnetHandler.java</span></div><h1>ListTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo.telnet;
+
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ConsumerMethodModel;
+import org.apache.dubbo.rpc.model.ConsumerModel;
+import org.apache.dubbo.rpc.model.ProviderMethodModel;
+import org.apache.dubbo.rpc.model.ProviderModel;
+
+import java.lang.reflect.Method;
+
+import static org.apache.dubbo.registry.support.ProviderConsumerRegTable.getConsumerAddressNum;
+import static org.apache.dubbo.registry.support.ProviderConsumerRegTable.isRegistered;
+
+/**
+ * ListTelnetHandler handler list services and its methods details.
+ */
+@Activate
+@Help(parameter = &quot;[-l] [service]&quot;, summary = &quot;List services and methods.&quot;, detail = &quot;List services and methods.&quot;)
+<span class="nc" id="L41">public class ListTelnetHandler implements TelnetHandler {</span>
+
+    @Override
+    public String telnet(Channel channel, String message) {
+<span class="nc" id="L45">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L46">        String service = null;</span>
+<span class="nc" id="L47">        boolean detail = false;</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (message.length() &gt; 0) {</span>
+<span class="nc" id="L49">            String[] parts = message.split(&quot;\\s+&quot;);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            for (String part : parts) {</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">                if (&quot;-l&quot;.equals(part)) {</span>
+<span class="nc" id="L52">                    detail = true;</span>
+                } else {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                    if (!StringUtils.isEmpty(service)) {</span>
+<span class="nc" id="L55">                        return &quot;Invalid parameter &quot; + part;</span>
+                    }
+<span class="nc" id="L57">                    service = part;</span>
+                }
+            }
+<span class="nc" id="L60">        } else {</span>
+<span class="nc" id="L61">            service = (String) channel.getAttribute(ChangeTelnetHandler.SERVICE_KEY);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(service)) {</span>
+<span class="nc" id="L63">                buf.append(&quot;Use default service &quot;).append(service).append(&quot;.\r\n&quot;);</span>
+            }
+        }
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (StringUtils.isEmpty(service)) {</span>
+<span class="nc" id="L68">            printAllServices(buf, detail);</span>
+        } else {
+<span class="nc" id="L70">            printSpecifiedService(service, buf, detail);</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (buf.length() == 0) {</span>
+<span class="nc" id="L73">                buf.append(&quot;No such service: &quot;).append(service);</span>
+            }
+        }
+<span class="nc" id="L76">        return buf.toString();</span>
+    }
+
+    private void printAllServices(StringBuilder buf, boolean detail) {
+<span class="nc" id="L80">        printAllProvidedServices(buf, detail);</span>
+<span class="nc" id="L81">        printAllReferredServices(buf, detail);</span>
+<span class="nc" id="L82">    }</span>
+
+    private void printAllProvidedServices(StringBuilder buf, boolean detail) {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (!ApplicationModel.allProviderModels().isEmpty()) {</span>
+<span class="nc" id="L86">            buf.append(&quot;PROVIDER:\r\n&quot;);</span>
+        }
+
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (ProviderModel provider : ApplicationModel.allProviderModels()) {</span>
+<span class="nc" id="L90">            buf.append(provider.getServiceName());</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (detail) {</span>
+<span class="nc" id="L92">                buf.append(&quot; -&gt; &quot;);</span>
+<span class="nc" id="L93">                buf.append(&quot; published: &quot;);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                buf.append(isRegistered(provider.getServiceName()) ? &quot;Y&quot; : &quot;N&quot;);</span>
+            }
+<span class="nc" id="L96">            buf.append(&quot;\r\n&quot;);</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">    }</span>
+
+    private void printAllReferredServices(StringBuilder buf, boolean detail) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (!ApplicationModel.allConsumerModels().isEmpty()) {</span>
+<span class="nc" id="L102">            buf.append(&quot;CONSUMER:\r\n&quot;);</span>
+        }
+
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        for (ConsumerModel consumer : ApplicationModel.allConsumerModels()) {</span>
+<span class="nc" id="L106">            buf.append(consumer.getServiceName());</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (detail) {</span>
+<span class="nc" id="L108">                buf.append(&quot; -&gt; &quot;);</span>
+<span class="nc" id="L109">                buf.append(&quot; addresses: &quot;);</span>
+<span class="nc" id="L110">                buf.append(getConsumerAddressNum(consumer.getServiceName()));</span>
+            }
+<span class="nc" id="L112">        }</span>
+<span class="nc" id="L113">    }</span>
+
+    private void printSpecifiedService(String service, StringBuilder buf, boolean detail) {
+<span class="nc" id="L116">        printSpecifiedProvidedService(service, buf, detail);</span>
+<span class="nc" id="L117">        printSpecifiedReferredService(service, buf, detail);</span>
+<span class="nc" id="L118">    }</span>
+
+    private void printSpecifiedProvidedService(String service, StringBuilder buf, boolean detail) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (ProviderModel provider : ApplicationModel.allProviderModels()) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (isProviderMatched(service,provider)) {</span>
+<span class="nc" id="L123">                buf.append(provider.getServiceName()).append(&quot; (as provider):\r\n&quot;);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                for (ProviderMethodModel method : provider.getAllMethods()) {</span>
+<span class="nc" id="L125">                    printMethod(method.getMethod(), buf, detail);</span>
+<span class="nc" id="L126">                }</span>
+            }
+<span class="nc" id="L128">        }</span>
+<span class="nc" id="L129">    }</span>
+
+    private void printSpecifiedReferredService(String service, StringBuilder buf, boolean detail) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        for (ConsumerModel consumer : ApplicationModel.allConsumerModels()) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (isConsumerMatcher(service,consumer)) {</span>
+<span class="nc" id="L134">                buf.append(consumer.getServiceName()).append(&quot; (as consumer):\r\n&quot;);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                for (ConsumerMethodModel method : consumer.getAllMethods()) {</span>
+<span class="nc" id="L136">                    printMethod(method.getMethod(), buf, detail);</span>
+<span class="nc" id="L137">                }</span>
+            }
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">    }</span>
+
+    private void printMethod(Method method, StringBuilder buf, boolean detail) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (detail) {</span>
+<span class="nc" id="L144">            buf.append('\t').append(ReflectUtils.getName(method));</span>
+        } else {
+<span class="nc" id="L146">            buf.append('\t').append(method.getName());</span>
+        }
+<span class="nc" id="L148">        buf.append(&quot;\r\n&quot;);</span>
+<span class="nc" id="L149">    }</span>
+
+    private boolean isProviderMatched(String service, ProviderModel provider) {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        return service.equalsIgnoreCase(provider.getServiceName())</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                || service.equalsIgnoreCase(provider.getServiceInterfaceClass().getName())</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                || service.equalsIgnoreCase(provider.getServiceInterfaceClass().getSimpleName());</span>
+    }
+
+    private boolean isConsumerMatcher(String service,ConsumerModel consumer) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        return service.equalsIgnoreCase(consumer.getServiceName())</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                || service.equalsIgnoreCase(consumer.getServiceInterfaceClass().getName())</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                || service.equalsIgnoreCase(consumer.getServiceInterfaceClass().getSimpleName());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

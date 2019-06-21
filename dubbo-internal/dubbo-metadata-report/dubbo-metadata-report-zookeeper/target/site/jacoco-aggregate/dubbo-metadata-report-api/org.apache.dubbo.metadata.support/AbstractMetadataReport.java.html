@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMetadataReport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-zookeeper</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-report-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.support</a> &gt; <span class="el_source">AbstractMetadataReport.java</span></div><h1>AbstractMetadataReport.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.metadata.definition.model.FullServiceDefinition;
+import org.apache.dubbo.metadata.identifier.MetadataIdentifier;
+import org.apache.dubbo.metadata.store.MetadataReport;
+
+import com.google.gson.Gson;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.util.Calendar;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ *
+ */
+public abstract class AbstractMetadataReport implements MetadataReport {
+
+    protected final static String DEFAULT_ROOT = &quot;dubbo&quot;;
+
+    private static final int ONE_DAY_IN_MIll = 60 * 24 * 60 * 1000;
+    private static final int FOUR_HOURS_IN_MIll = 60 * 4 * 60 * 1000;
+    // Log output
+<span class="nc" id="L64">    protected final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+    // Local disk cache, where the special key value.registries records the list of metadata centers, and the others are the list of notified service providers
+<span class="nc" id="L67">    final Properties properties = new Properties();</span>
+<span class="nc" id="L68">    private final ExecutorService reportCacheExecutor = Executors.newFixedThreadPool(1, new NamedThreadFactory(&quot;DubboSaveMetadataReport&quot;, true));</span>
+<span class="nc" id="L69">    final Map&lt;MetadataIdentifier, Object&gt; allMetadataReports = new ConcurrentHashMap&lt;&gt;(4);</span>
+
+<span class="nc" id="L71">    private final AtomicLong lastCacheChanged = new AtomicLong();</span>
+<span class="nc" id="L72">    final Map&lt;MetadataIdentifier, Object&gt; failedReports = new ConcurrentHashMap&lt;&gt;(4);</span>
+    private URL reportURL;
+    boolean syncReport;
+    // Local disk cache file
+    File file;
+<span class="nc" id="L77">    private AtomicBoolean INIT = new AtomicBoolean(false);</span>
+    public MetadataReportRetry metadataReportRetry;
+
+<span class="nc" id="L80">    public AbstractMetadataReport(URL reportServerURL) {</span>
+<span class="nc" id="L81">        setUrl(reportServerURL);</span>
+        // Start file save timer
+<span class="nc" id="L83">        String filename = reportServerURL.getParameter(Constants.FILE_KEY, System.getProperty(&quot;user.home&quot;) + &quot;/.dubbo/dubbo-metadata-&quot; + reportServerURL.getParameter(Constants.APPLICATION_KEY) + &quot;-&quot; + reportServerURL.getAddress() + &quot;.cache&quot;);</span>
+<span class="nc" id="L84">        File file = null;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (ConfigUtils.isNotEmpty(filename)) {</span>
+<span class="nc" id="L86">            file = new File(filename);</span>
+<span class="nc bnc" id="L87" title="All 6 branches missed.">            if (!file.exists() &amp;&amp; file.getParentFile() != null &amp;&amp; !file.getParentFile().exists()) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                if (!file.getParentFile().mkdirs()) {</span>
+<span class="nc" id="L89">                    throw new IllegalArgumentException(&quot;Invalid service store file &quot; + file + &quot;, cause: Failed to create directory &quot; + file.getParentFile() + &quot;!&quot;);</span>
+                }
+            }
+            // if this file exist, firstly delete it.
+<span class="nc bnc" id="L93" title="All 4 branches missed.">            if (!INIT.getAndSet(true) &amp;&amp; file.exists()) {</span>
+<span class="nc" id="L94">                file.delete();</span>
+            }
+        }
+<span class="nc" id="L97">        this.file = file;</span>
+<span class="nc" id="L98">        loadProperties();</span>
+<span class="nc" id="L99">        syncReport = reportServerURL.getParameter(Constants.SYNC_REPORT_KEY, false);</span>
+<span class="nc" id="L100">        metadataReportRetry = new MetadataReportRetry(reportServerURL.getParameter(Constants.RETRY_TIMES_KEY, Constants.DEFAULT_METADATA_REPORT_RETRY_TIMES),</span>
+<span class="nc" id="L101">                reportServerURL.getParameter(Constants.RETRY_PERIOD_KEY, Constants.DEFAULT_METADATA_REPORT_RETRY_PERIOD));</span>
+        // cycle report the data switch
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (reportServerURL.getParameter(Constants.CYCLE_REPORT_KEY, Constants.DEFAULT_METADATA_REPORT_CYCLE_REPORT)) {</span>
+<span class="nc" id="L104">            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(&quot;DubboMetadataReportTimer&quot;, true));</span>
+<span class="nc" id="L105">            scheduler.scheduleAtFixedRate(this::publishAll, calculateStartTime(), ONE_DAY_IN_MIll, TimeUnit.MILLISECONDS);</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+    public URL getUrl() {
+<span class="nc" id="L110">        return reportURL;</span>
+    }
+
+    protected void setUrl(URL url) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(&quot;metadataReport url == null&quot;);</span>
+        }
+<span class="nc" id="L117">        this.reportURL = url;</span>
+<span class="nc" id="L118">    }</span>
+
+    private void doSaveProperties(long version) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (version &lt; lastCacheChanged.get()) {</span>
+<span class="nc" id="L122">            return;</span>
+        }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (file == null) {</span>
+<span class="nc" id="L125">            return;</span>
+        }
+        // Save
+        try {
+<span class="nc" id="L129">            File lockfile = new File(file.getAbsolutePath() + &quot;.lock&quot;);</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (!lockfile.exists()) {</span>
+<span class="nc" id="L131">                lockfile.createNewFile();</span>
+            }
+<span class="nc" id="L133">            try (RandomAccessFile raf = new RandomAccessFile(lockfile, &quot;rw&quot;);</span>
+<span class="nc" id="L134">                 FileChannel channel = raf.getChannel()) {</span>
+<span class="nc" id="L135">                FileLock lock = channel.tryLock();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                if (lock == null) {</span>
+<span class="nc" id="L137">                    throw new IOException(&quot;Can not lock the metadataReport cache file &quot; + file.getAbsolutePath() + &quot;, ignore and retry later, maybe multi java process use the file, please config: dubbo.metadata.file=xxx.properties&quot;);</span>
+                }
+                // Save
+                try {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                    if (!file.exists()) {</span>
+<span class="nc" id="L142">                        file.createNewFile();</span>
+                    }
+<span class="nc" id="L144">                    try (FileOutputStream outputFile = new FileOutputStream(file)) {</span>
+<span class="nc" id="L145">                        properties.store(outputFile, &quot;Dubbo metadataReport Cache&quot;);</span>
+                    }
+                } finally {
+<span class="nc" id="L148">                    lock.release();</span>
+                }
+            }
+<span class="nc" id="L151">        } catch (Throwable e) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (version &lt; lastCacheChanged.get()) {</span>
+<span class="nc" id="L153">                return;</span>
+            } else {
+<span class="nc" id="L155">                reportCacheExecutor.execute(new SaveProperties(lastCacheChanged.incrementAndGet()));</span>
+            }
+<span class="nc" id="L157">            logger.warn(&quot;Failed to save service store file, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L158">        }</span>
+<span class="nc" id="L159">    }</span>
+
+    void loadProperties() {
+<span class="nc bnc" id="L162" title="All 4 branches missed.">        if (file != null &amp;&amp; file.exists()) {</span>
+<span class="nc" id="L163">            try (InputStream in = new FileInputStream(file)) {</span>
+<span class="nc" id="L164">                properties.load(in);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L166">                    logger.info(&quot;Load service store file &quot; + file + &quot;, data: &quot; + properties);</span>
+                }
+<span class="nc" id="L168">            } catch (Throwable e) {</span>
+<span class="nc" id="L169">                logger.warn(&quot;Failed to load service store file &quot; + file, e);</span>
+<span class="nc" id="L170">            }</span>
+        }
+<span class="nc" id="L172">    }</span>
+
+    private void saveProperties(MetadataIdentifier metadataIdentifier, String value, boolean add, boolean sync) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (file == null) {</span>
+<span class="nc" id="L176">            return;</span>
+        }
+
+        try {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (add) {</span>
+<span class="nc" id="L181">                properties.setProperty(metadataIdentifier.getUniqueKey(MetadataIdentifier.KeyTypeEnum.UNIQUE_KEY), value);</span>
+            } else {
+<span class="nc" id="L183">                properties.remove(metadataIdentifier.getUniqueKey(MetadataIdentifier.KeyTypeEnum.UNIQUE_KEY));</span>
+            }
+<span class="nc" id="L185">            long version = lastCacheChanged.incrementAndGet();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (sync) {</span>
+<span class="nc" id="L187">                new SaveProperties(version).run();</span>
+            } else {
+<span class="nc" id="L189">                reportCacheExecutor.execute(new SaveProperties(version));</span>
+            }
+
+<span class="nc" id="L192">        } catch (Throwable t) {</span>
+<span class="nc" id="L193">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L194">        }</span>
+<span class="nc" id="L195">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L199">        return getUrl().toString();</span>
+    }
+
+    private class SaveProperties implements Runnable {
+        private long version;
+
+<span class="nc" id="L205">        private SaveProperties(long version) {</span>
+<span class="nc" id="L206">            this.version = version;</span>
+<span class="nc" id="L207">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L211">            doSaveProperties(version);</span>
+<span class="nc" id="L212">        }</span>
+    }
+
+    @Override
+    public void storeProviderMetadata(MetadataIdentifier providerMetadataIdentifier, FullServiceDefinition serviceDefinition) {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (syncReport) {</span>
+<span class="nc" id="L218">            storeProviderMetadataTask(providerMetadataIdentifier, serviceDefinition);</span>
+        } else {
+<span class="nc" id="L220">            reportCacheExecutor.execute(() -&gt; storeProviderMetadataTask(providerMetadataIdentifier, serviceDefinition));</span>
+        }
+<span class="nc" id="L222">    }</span>
+
+    private void storeProviderMetadataTask(MetadataIdentifier providerMetadataIdentifier, FullServiceDefinition serviceDefinition) {
+        try {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L227">                logger.info(&quot;store provider metadata. Identifier : &quot; + providerMetadataIdentifier + &quot;; definition: &quot; + serviceDefinition);</span>
+            }
+<span class="nc" id="L229">            allMetadataReports.put(providerMetadataIdentifier, serviceDefinition);</span>
+<span class="nc" id="L230">            failedReports.remove(providerMetadataIdentifier);</span>
+<span class="nc" id="L231">            Gson gson = new Gson();</span>
+<span class="nc" id="L232">            String data = gson.toJson(serviceDefinition);</span>
+<span class="nc" id="L233">            doStoreProviderMetadata(providerMetadataIdentifier, data);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            saveProperties(providerMetadataIdentifier, data, true, !syncReport);</span>
+<span class="nc" id="L235">        } catch (Exception e) {</span>
+            // retry again. If failed again, throw exception.
+<span class="nc" id="L237">            failedReports.put(providerMetadataIdentifier, serviceDefinition);</span>
+<span class="nc" id="L238">            metadataReportRetry.startRetryTask();</span>
+<span class="nc" id="L239">            logger.error(&quot;Failed to put provider metadata &quot; + providerMetadataIdentifier + &quot; in  &quot; + serviceDefinition + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L240">        }</span>
+<span class="nc" id="L241">    }</span>
+
+    @Override
+    public void storeConsumerMetadata(MetadataIdentifier consumerMetadataIdentifier, Map&lt;String, String&gt; serviceParameterMap) {
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (syncReport) {</span>
+<span class="nc" id="L246">            storeConsumerMetadataTask(consumerMetadataIdentifier, serviceParameterMap);</span>
+        } else {
+<span class="nc" id="L248">            reportCacheExecutor.execute(() -&gt; storeConsumerMetadataTask(consumerMetadataIdentifier, serviceParameterMap));</span>
+        }
+<span class="nc" id="L250">    }</span>
+
+    public void storeConsumerMetadataTask(MetadataIdentifier consumerMetadataIdentifier, Map&lt;String, String&gt; serviceParameterMap) {
+        try {
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L255">                logger.info(&quot;store consumer metadata. Identifier : &quot; + consumerMetadataIdentifier + &quot;; definition: &quot; + serviceParameterMap);</span>
+            }
+<span class="nc" id="L257">            allMetadataReports.put(consumerMetadataIdentifier, serviceParameterMap);</span>
+<span class="nc" id="L258">            failedReports.remove(consumerMetadataIdentifier);</span>
+
+<span class="nc" id="L260">            Gson gson = new Gson();</span>
+<span class="nc" id="L261">            String data = gson.toJson(serviceParameterMap);</span>
+<span class="nc" id="L262">            doStoreConsumerMetadata(consumerMetadataIdentifier, data);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            saveProperties(consumerMetadataIdentifier, data, true, !syncReport);</span>
+<span class="nc" id="L264">        } catch (Exception e) {</span>
+            // retry again. If failed again, throw exception.
+<span class="nc" id="L266">            failedReports.put(consumerMetadataIdentifier, serviceParameterMap);</span>
+<span class="nc" id="L267">            metadataReportRetry.startRetryTask();</span>
+<span class="nc" id="L268">            logger.error(&quot;Failed to put consumer metadata &quot; + consumerMetadataIdentifier + &quot;;  &quot; + serviceParameterMap + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L269">        }</span>
+<span class="nc" id="L270">    }</span>
+
+
+    String getProtocol(URL url) {
+<span class="nc" id="L274">        String protocol = url.getParameter(Constants.SIDE_KEY);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        protocol = protocol == null ? url.getProtocol() : protocol;</span>
+<span class="nc" id="L276">        return protocol;</span>
+    }
+
+    /**
+     * @return if need to continue
+     */
+    public boolean retry() {
+<span class="nc" id="L283">        return doHandleMetadataCollection(failedReports);</span>
+    }
+
+    private boolean doHandleMetadataCollection(Map&lt;MetadataIdentifier, Object&gt; metadataMap) {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (metadataMap.isEmpty()) {</span>
+<span class="nc" id="L288">            return true;</span>
+        }
+<span class="nc" id="L290">        Iterator&lt;Map.Entry&lt;MetadataIdentifier, Object&gt;&gt; iterable = metadataMap.entrySet().iterator();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        while (iterable.hasNext()) {</span>
+<span class="nc" id="L292">            Map.Entry&lt;MetadataIdentifier, Object&gt; item = iterable.next();</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            if (Constants.PROVIDER_SIDE.equals(item.getKey().getSide())) {</span>
+<span class="nc" id="L294">                this.storeProviderMetadata(item.getKey(), (FullServiceDefinition) item.getValue());</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            } else if (Constants.CONSUMER_SIDE.equals(item.getKey().getSide())) {</span>
+<span class="nc" id="L296">                this.storeConsumerMetadata(item.getKey(), (Map) item.getValue());</span>
+            }
+
+<span class="nc" id="L299">        }</span>
+<span class="nc" id="L300">        return false;</span>
+    }
+
+    /**
+     * not private. just for unittest.
+     */
+    void publishAll() {
+<span class="nc" id="L307">        logger.info(&quot;start to publish all metadata.&quot;);</span>
+<span class="nc" id="L308">        this.doHandleMetadataCollection(allMetadataReports);</span>
+<span class="nc" id="L309">    }</span>
+
+    /**
+     * between 2:00 am to 6:00 am, the time is random.
+     *
+     * @return
+     */
+    long calculateStartTime() {
+<span class="nc" id="L317">        Calendar calendar = Calendar.getInstance();</span>
+<span class="nc" id="L318">        long nowMill = calendar.getTimeInMillis();</span>
+<span class="nc" id="L319">        calendar.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L320">        calendar.set(Calendar.MINUTE, 0);</span>
+<span class="nc" id="L321">        calendar.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L322">        calendar.set(Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L323">        long subtract = calendar.getTimeInMillis() + ONE_DAY_IN_MIll - nowMill;</span>
+<span class="nc" id="L324">        return subtract + (FOUR_HOURS_IN_MIll / 2) + ThreadLocalRandom.current().nextInt(FOUR_HOURS_IN_MIll);</span>
+    }
+
+    class MetadataReportRetry {
+<span class="nc" id="L328">        protected final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+<span class="nc" id="L330">        final ScheduledExecutorService retryExecutor = Executors.newScheduledThreadPool(0, new NamedThreadFactory(&quot;DubboMetadataReportRetryTimer&quot;, true));</span>
+        volatile ScheduledFuture retryScheduledFuture;
+<span class="nc" id="L332">        AtomicInteger retryCounter = new AtomicInteger(0);</span>
+        // retry task schedule period
+        long retryPeriod;
+        // if no failed report, wait how many times to run retry task.
+<span class="nc" id="L336">        int retryTimesIfNonFail = 600;</span>
+
+        int retryLimit;
+
+<span class="nc" id="L340">        public MetadataReportRetry(int retryTimes, int retryPeriod) {</span>
+<span class="nc" id="L341">            this.retryPeriod = retryPeriod;</span>
+<span class="nc" id="L342">            this.retryLimit = retryTimes;</span>
+<span class="nc" id="L343">        }</span>
+
+        void startRetryTask() {
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            if (retryScheduledFuture == null) {</span>
+<span class="nc" id="L347">                synchronized (retryCounter) {</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                    if (retryScheduledFuture == null) {</span>
+<span class="nc" id="L349">                        retryScheduledFuture = retryExecutor.scheduleWithFixedDelay(new Runnable() {</span>
+                            @Override
+                            public void run() {
+                                // Check and connect to the metadata
+                                try {
+<span class="nc" id="L354">                                    int times = retryCounter.incrementAndGet();</span>
+<span class="nc" id="L355">                                    logger.info(&quot;start to retry task for metadata report. retry times:&quot; + times);</span>
+<span class="nc bnc" id="L356" title="All 4 branches missed.">                                    if (retry() &amp;&amp; times &gt; retryTimesIfNonFail) {</span>
+<span class="nc" id="L357">                                        cancelRetryTask();</span>
+                                    }
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                                    if (times &gt; retryLimit) {</span>
+<span class="nc" id="L360">                                        cancelRetryTask();</span>
+                                    }
+<span class="nc" id="L362">                                } catch (Throwable t) { // Defensive fault tolerance</span>
+<span class="nc" id="L363">                                    logger.error(&quot;Unexpected error occur at failed retry, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L364">                                }</span>
+<span class="nc" id="L365">                            }</span>
+                        }, 500, retryPeriod, TimeUnit.MILLISECONDS);
+                    }
+<span class="nc" id="L368">                }</span>
+            }
+<span class="nc" id="L370">        }</span>
+
+        void cancelRetryTask() {
+<span class="nc" id="L373">            retryScheduledFuture.cancel(false);</span>
+<span class="nc" id="L374">            retryExecutor.shutdown();</span>
+<span class="nc" id="L375">        }</span>
+    }
+
+    protected abstract void doStoreProviderMetadata(MetadataIdentifier providerMetadataIdentifier, String serviceDefinitions);
+
+    protected abstract void doStoreConsumerMetadata(MetadataIdentifier consumerMetadataIdentifier, String serviceParameterString);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

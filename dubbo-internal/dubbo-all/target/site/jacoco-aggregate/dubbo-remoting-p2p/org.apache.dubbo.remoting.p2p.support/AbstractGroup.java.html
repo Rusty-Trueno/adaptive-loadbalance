@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractGroup.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-p2p</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.p2p.support</a> &gt; <span class="el_source">AbstractGroup.java</span></div><h1>AbstractGroup.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.p2p.support;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Client;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Server;
+import org.apache.dubbo.remoting.Transporters;
+import org.apache.dubbo.remoting.p2p.Group;
+import org.apache.dubbo.remoting.p2p.Peer;
+import org.apache.dubbo.remoting.transport.ChannelHandlerDispatcher;
+
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * AbstractGroup
+ */
+public abstract class AbstractGroup implements Group {
+
+    // log output
+<span class="nc" id="L41">    protected static final Logger logger = LoggerFactory.getLogger(AbstractGroup.class);</span>
+
+    protected final URL url;
+
+<span class="nc" id="L45">    protected final Map&lt;URL, Server&gt; servers = new ConcurrentHashMap&lt;URL, Server&gt;();</span>
+
+<span class="nc" id="L47">    protected final Map&lt;URL, Client&gt; clients = new ConcurrentHashMap&lt;URL, Client&gt;();</span>
+
+<span class="nc" id="L49">    protected final ChannelHandlerDispatcher dispatcher = new ChannelHandlerDispatcher();</span>
+
+<span class="nc" id="L51">    public AbstractGroup(URL url) {</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc" id="L55">        this.url = url;</span>
+<span class="nc" id="L56">    }</span>
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L60">        return url;</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (URL url : new ArrayList&lt;URL&gt;(servers.keySet())) {</span>
+            try {
+<span class="nc" id="L67">                leave(url);</span>
+<span class="nc" id="L68">            } catch (Throwable t) {</span>
+<span class="nc" id="L69">                logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L70">            }</span>
+<span class="nc" id="L71">        }</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        for (URL url : new ArrayList&lt;URL&gt;(clients.keySet())) {</span>
+            try {
+<span class="nc" id="L74">                disconnect(url);</span>
+<span class="nc" id="L75">            } catch (Throwable t) {</span>
+<span class="nc" id="L76">                logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L77">            }</span>
+<span class="nc" id="L78">        }</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public Peer join(URL url, ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L83">        Server server = servers.get(url);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (server == null) { // TODO exist concurrent gap</span>
+<span class="nc" id="L85">            server = Transporters.bind(url, handler);</span>
+<span class="nc" id="L86">            servers.put(url, server);</span>
+<span class="nc" id="L87">            dispatcher.addChannelHandler(handler);</span>
+        }
+<span class="nc" id="L89">        return new ServerPeer(server, clients, this);</span>
+    }
+
+    @Override
+    public void leave(URL url) throws RemotingException {
+<span class="nc" id="L94">        Server server = servers.remove(url);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (server != null) {</span>
+<span class="nc" id="L96">            server.close();</span>
+        }
+<span class="nc" id="L98">    }</span>
+
+    protected Client connect(URL url) throws RemotingException {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (servers.containsKey(url)) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="nc" id="L104">        Client client = clients.get(url);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (client == null) { // TODO exist concurrent gap</span>
+<span class="nc" id="L106">            client = Transporters.connect(url, dispatcher);</span>
+<span class="nc" id="L107">            clients.put(url, client);</span>
+        }
+<span class="nc" id="L109">        return client;</span>
+    }
+
+    protected void disconnect(URL url) throws RemotingException {
+<span class="nc" id="L113">        Client client = clients.remove(url);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L115">            client.close();</span>
+        }
+<span class="nc" id="L117">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

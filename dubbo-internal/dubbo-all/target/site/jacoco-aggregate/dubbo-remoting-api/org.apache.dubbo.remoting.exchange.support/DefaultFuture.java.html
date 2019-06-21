@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DefaultFuture.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support</a> &gt; <span class="el_source">DefaultFuture.java</span></div><h1>DefaultFuture.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.timer.HashedWheelTimer;
+import org.apache.dubbo.common.timer.Timeout;
+import org.apache.dubbo.common.timer.Timer;
+import org.apache.dubbo.common.timer.TimerTask;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.TimeoutException;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.exchange.ResponseCallback;
+import org.apache.dubbo.remoting.exchange.ResponseFuture;
+import org.apache.dubbo.remoting.transport.RequestLimitException;
+import org.apache.dubbo.remoting.transport.ThreadPollExhaustedException;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * DefaultFuture.
+ */
+public class DefaultFuture implements ResponseFuture {
+
+<span class="nc" id="L51">    private static final Logger logger = LoggerFactory.getLogger(DefaultFuture.class);</span>
+
+<span class="nc" id="L53">    private static final Map&lt;Long, Channel&gt; CHANNELS = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L55">    private static final Map&lt;Long, DefaultFuture&gt; FUTURES = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L57">    public static final Timer TIME_OUT_TIMER = new HashedWheelTimer(</span>
+            new NamedThreadFactory(&quot;dubbo-future-timeout&quot;, true),
+            30,
+            TimeUnit.MILLISECONDS);
+
+    // invoke id.
+    private final long id;
+    private final Channel channel;
+    private final Request request;
+    private final int timeout;
+<span class="nc" id="L67">    private final Lock lock = new ReentrantLock();</span>
+<span class="nc" id="L68">    private final Condition done = lock.newCondition();</span>
+<span class="nc" id="L69">    private final long start = System.currentTimeMillis();</span>
+    private volatile long sent;
+    private volatile Response response;
+    private volatile ResponseCallback callback;
+
+<span class="nc" id="L74">    private DefaultFuture(Channel channel, Request request, int timeout) {</span>
+<span class="nc" id="L75">        this.channel = channel;</span>
+<span class="nc" id="L76">        this.request = request;</span>
+<span class="nc" id="L77">        this.id = request.getId();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        this.timeout = timeout &gt; 0 ? timeout : channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+        // put into waiting map.
+<span class="nc" id="L80">        FUTURES.put(id, this);</span>
+<span class="nc" id="L81">        CHANNELS.put(id, channel);</span>
+<span class="nc" id="L82">    }</span>
+
+    /**
+     * check time out of the future
+     */
+    private static void timeoutCheck(DefaultFuture future) {
+<span class="nc" id="L88">        TimeoutCheckTask task = new TimeoutCheckTask(future);</span>
+<span class="nc" id="L89">        TIME_OUT_TIMER.newTimeout(task, future.getTimeout(), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * init a DefaultFuture
+     * 1.init a DefaultFuture
+     * 2.timeout check
+     *
+     * @param channel channel
+     * @param request the request
+     * @param timeout timeout
+     * @return a new DefaultFuture
+     */
+    public static DefaultFuture newFuture(Channel channel, Request request, int timeout) {
+<span class="nc" id="L103">        final DefaultFuture future = new DefaultFuture(channel, request, timeout);</span>
+        // timeout check
+<span class="nc" id="L105">        timeoutCheck(future);</span>
+<span class="nc" id="L106">        return future;</span>
+    }
+
+    public static DefaultFuture getFuture(long id) {
+<span class="nc" id="L110">        return FUTURES.get(id);</span>
+    }
+
+    public static boolean hasFuture(Channel channel) {
+<span class="nc" id="L114">        return CHANNELS.containsValue(channel);</span>
+    }
+
+    public static void sent(Channel channel, Request request) {
+<span class="nc" id="L118">        DefaultFuture future = FUTURES.get(request.getId());</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (future != null) {</span>
+<span class="nc" id="L120">            future.doSent();</span>
+        }
+<span class="nc" id="L122">    }</span>
+
+    /**
+     * close a channel when a channel is inactive
+     * directly return the unfinished requests.
+     *
+     * @param channel channel to close
+     */
+    public static void closeChannel(Channel channel) {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        for (Map.Entry&lt;Long, Channel&gt; entry : CHANNELS.entrySet()) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (channel.equals(entry.getValue())) {</span>
+<span class="nc" id="L133">                DefaultFuture future = getFuture(entry.getKey());</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">                if (future != null &amp;&amp; !future.isDone()) {</span>
+<span class="nc" id="L135">                    Response disconnectResponse = new Response(future.getId());</span>
+<span class="nc" id="L136">                    disconnectResponse.setStatus(Response.CHANNEL_INACTIVE);</span>
+<span class="nc" id="L137">                    disconnectResponse.setErrorMessage(&quot;Channel &quot; +</span>
+                            channel +
+                            &quot; is inactive. Directly return the unFinished request : &quot; +
+<span class="nc" id="L140">                            future.getRequest());</span>
+<span class="nc" id="L141">                    DefaultFuture.received(channel, disconnectResponse);</span>
+                }
+            }
+<span class="nc" id="L144">        }</span>
+<span class="nc" id="L145">    }</span>
+
+    public static void received(Channel channel, Response response) {
+        try {
+<span class="nc" id="L149">            DefaultFuture future = FUTURES.remove(response.getId());</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (future != null) {</span>
+<span class="nc" id="L151">                future.doReceived(response);</span>
+            } else {
+<span class="nc" id="L153">                logger.warn(&quot;The timeout response finally returned at &quot;</span>
+<span class="nc" id="L154">                        + (new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss.SSS&quot;).format(new Date()))</span>
+                        + &quot;, response &quot; + response
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                        + (channel == null ? &quot;&quot; : &quot;, channel: &quot; + channel.getLocalAddress()</span>
+<span class="nc" id="L157">                        + &quot; -&gt; &quot; + channel.getRemoteAddress()));</span>
+            }
+        } finally {
+<span class="nc" id="L160">            CHANNELS.remove(response.getId());</span>
+        }
+<span class="nc" id="L162">    }</span>
+
+    @Override
+    public Object get() throws RemotingException {
+<span class="nc" id="L166">        return get(timeout);</span>
+    }
+
+    @Override
+    public Object get(int timeout) throws RemotingException {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (timeout &lt;= 0) {</span>
+<span class="nc" id="L172">            timeout = Constants.DEFAULT_TIMEOUT;</span>
+        }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (!isDone()) {</span>
+<span class="nc" id="L175">            long start = System.currentTimeMillis();</span>
+<span class="nc" id="L176">            lock.lock();</span>
+            try {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                while (!isDone()) {</span>
+<span class="nc" id="L179">                    done.await(timeout, TimeUnit.MILLISECONDS);</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">                    if (isDone() || System.currentTimeMillis() - start &gt; timeout) {</span>
+<span class="nc" id="L181">                        break;</span>
+                    }
+                }
+<span class="nc" id="L184">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L185">                throw new RuntimeException(e);</span>
+            } finally {
+<span class="nc" id="L187">                lock.unlock();</span>
+            }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (!isDone()) {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                throw new TimeoutException(sent &gt; 0, channel, getTimeoutMessage(false));</span>
+            }
+        }
+<span class="nc" id="L193">        return returnFromResponse();</span>
+    }
+
+    public void cancel() {
+<span class="nc" id="L197">        Response errorResult = new Response(id);</span>
+<span class="nc" id="L198">        errorResult.setErrorMessage(&quot;request future has been canceled.&quot;);</span>
+<span class="nc" id="L199">        response = errorResult;</span>
+<span class="nc" id="L200">        FUTURES.remove(id);</span>
+<span class="nc" id="L201">        CHANNELS.remove(id);</span>
+<span class="nc" id="L202">    }</span>
+
+    @Override
+    public boolean isDone() {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        return response != null;</span>
+    }
+
+    @Override
+    public void setCallback(ResponseCallback callback) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (isDone()) {</span>
+<span class="nc" id="L212">            invokeCallback(callback);</span>
+        } else {
+<span class="nc" id="L214">            boolean isdone = false;</span>
+<span class="nc" id="L215">            lock.lock();</span>
+            try {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (!isDone()) {</span>
+<span class="nc" id="L218">                    this.callback = callback;</span>
+                } else {
+<span class="nc" id="L220">                    isdone = true;</span>
+                }
+            } finally {
+<span class="nc" id="L223">                lock.unlock();</span>
+            }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            if (isdone) {</span>
+<span class="nc" id="L226">                invokeCallback(callback);</span>
+            }
+        }
+<span class="nc" id="L229">    }</span>
+
+    private static class TimeoutCheckTask implements TimerTask {
+
+        private DefaultFuture future;
+
+<span class="nc" id="L235">        TimeoutCheckTask(DefaultFuture future) {</span>
+<span class="nc" id="L236">            this.future = future;</span>
+<span class="nc" id="L237">        }</span>
+
+        @Override
+        public void run(Timeout timeout) {
+<span class="nc bnc" id="L241" title="All 4 branches missed.">            if (future == null || future.isDone()) {</span>
+<span class="nc" id="L242">                return;</span>
+            }
+            // create exception response.
+<span class="nc" id="L245">            Response timeoutResponse = new Response(future.getId());</span>
+            // set timeout status.
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            timeoutResponse.setStatus(future.isSent() ? Response.SERVER_TIMEOUT : Response.CLIENT_TIMEOUT);</span>
+<span class="nc" id="L248">            timeoutResponse.setErrorMessage(future.getTimeoutMessage(true));</span>
+            // handle response.
+<span class="nc" id="L250">            DefaultFuture.received(future.getChannel(), timeoutResponse);</span>
+
+<span class="nc" id="L252">        }</span>
+    }
+
+    private void invokeCallback(ResponseCallback c) {
+<span class="nc" id="L256">        ResponseCallback callbackCopy = c;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (callbackCopy == null) {</span>
+<span class="nc" id="L258">            throw new NullPointerException(&quot;callback cannot be null.&quot;);</span>
+        }
+<span class="nc" id="L260">        Response res = response;</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (res == null) {</span>
+<span class="nc" id="L262">            throw new IllegalStateException(&quot;response cannot be null. url:&quot; + channel.getUrl());</span>
+        }
+
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (res.getStatus() == Response.OK) {</span>
+            try {
+<span class="nc" id="L267">                callbackCopy.done(res.getResult());</span>
+<span class="nc" id="L268">            } catch (Exception e) {</span>
+<span class="nc" id="L269">                logger.error(&quot;callback invoke error .result:&quot; + res.getResult() + &quot;,url:&quot; + channel.getUrl(), e);</span>
+<span class="nc" id="L270">            }</span>
+        }
+<span class="nc bnc" id="L272" title="All 4 branches missed.">        else if (res.getStatus() == Response.CLIENT_TIMEOUT || res.getStatus() == Response.SERVER_TIMEOUT) {</span>
+            try {
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                TimeoutException te = new TimeoutException(res.getStatus() == Response.SERVER_TIMEOUT, channel, res.getErrorMessage());</span>
+<span class="nc" id="L275">                callbackCopy.caught(te);</span>
+<span class="nc" id="L276">            } catch (Exception e) {</span>
+<span class="nc" id="L277">                logger.error(&quot;callback invoke error ,url:&quot; + channel.getUrl(), e);</span>
+<span class="nc" id="L278">            }</span>
+        } else {
+            try {
+<span class="nc" id="L281">                RuntimeException re = new RuntimeException(res.getErrorMessage());</span>
+<span class="nc" id="L282">                callbackCopy.caught(re);</span>
+<span class="nc" id="L283">            } catch (Exception e) {</span>
+<span class="nc" id="L284">                logger.error(&quot;callback invoke error ,url:&quot; + channel.getUrl(), e);</span>
+<span class="nc" id="L285">            }</span>
+        }
+<span class="nc" id="L287">    }</span>
+
+    private Object returnFromResponse() throws RemotingException {
+<span class="nc" id="L290">        Response res = response;</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (res == null) {</span>
+<span class="nc" id="L292">            throw new IllegalStateException(&quot;response cannot be null&quot;);</span>
+        }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (res.getStatus() == Response.OK) {</span>
+<span class="nc" id="L295">            return res.getResult();</span>
+        }
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        if (res.getStatus() == Response.CLIENT_TIMEOUT || res.getStatus() == Response.SERVER_TIMEOUT) {</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            throw new TimeoutException(res.getStatus() == Response.SERVER_TIMEOUT, channel, res.getErrorMessage());</span>
+        }
+<span class="nc" id="L300">        throw new RemotingException(channel, res.getErrorMessage());</span>
+    }
+
+    private long getId() {
+<span class="nc" id="L304">        return id;</span>
+    }
+
+    private Channel getChannel() {
+<span class="nc" id="L308">        return channel;</span>
+    }
+
+    private boolean isSent() {
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        return sent &gt; 0;</span>
+    }
+
+    public Request getRequest() {
+<span class="nc" id="L316">        return request;</span>
+    }
+
+    private int getTimeout() {
+<span class="nc" id="L320">        return timeout;</span>
+    }
+
+    private long getStartTimestamp() {
+<span class="nc" id="L324">        return start;</span>
+    }
+
+    private void doSent() {
+<span class="nc" id="L328">        sent = System.currentTimeMillis();</span>
+<span class="nc" id="L329">    }</span>
+
+    private void doReceived(Response res) {
+<span class="nc" id="L332">        lock.lock();</span>
+        try {
+<span class="nc" id="L334">            response = res;</span>
+<span class="nc" id="L335">            done.signalAll();</span>
+        } finally {
+<span class="nc" id="L337">            lock.unlock();</span>
+        }
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (callback != null) {</span>
+<span class="nc" id="L340">            invokeCallback(callback);</span>
+        }
+<span class="nc" id="L342">    }</span>
+
+    private String getTimeoutMessage(boolean scan) {
+<span class="nc" id="L345">        long nowTimestamp = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        return (sent &gt; 0 ? &quot;Waiting server-side response timeout&quot; : &quot;Sending request timeout in client-side&quot;)</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                + (scan ? &quot; by scan timer&quot; : &quot;&quot;) + &quot;. start time: &quot;</span>
+<span class="nc" id="L348">                + (new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss.SSS&quot;).format(new Date(start))) + &quot;, end time: &quot;</span>
+<span class="nc" id="L349">                + (new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss.SSS&quot;).format(new Date())) + &quot;,&quot;</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                + (sent &gt; 0 ? &quot; client elapsed: &quot; + (sent - start)</span>
+<span class="nc" id="L351">                + &quot; ms, server elapsed: &quot; + (nowTimestamp - sent)</span>
+<span class="nc" id="L352">                : &quot; elapsed: &quot; + (nowTimestamp - start)) + &quot; ms, timeout: &quot;</span>
+<span class="nc" id="L353">                + timeout + &quot; ms, request: &quot; + request + &quot;, channel: &quot; + channel.getLocalAddress()</span>
+<span class="nc" id="L354">                + &quot; -&gt; &quot; + channel.getRemoteAddress();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CallbackServiceCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">CallbackServiceCodec.java</span></div><h1>CallbackServiceCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.bytecode.Wrapper;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.RpcInvocation;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * callback service helper
+ */
+<span class="nc" id="L43">class CallbackServiceCodec {</span>
+<span class="nc" id="L44">    private static final Logger logger = LoggerFactory.getLogger(CallbackServiceCodec.class);</span>
+
+<span class="nc" id="L46">    private static final ProxyFactory PROXY_FACTORY = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();</span>
+<span class="nc" id="L47">    private static final DubboProtocol protocol = DubboProtocol.getDubboProtocol();</span>
+    private static final byte CALLBACK_NONE = 0x0;
+    private static final byte CALLBACK_CREATE = 0x1;
+    private static final byte CALLBACK_DESTROY = 0x2;
+    private static final String INV_ATT_CALLBACK_KEY = &quot;sys_callback_arg-&quot;;
+
+    private static byte isCallBack(URL url, String methodName, int argIndex) {
+        // parameter callback rule: method-name.parameter-index(starting from 0).callback
+<span class="nc" id="L55">        byte isCallback = CALLBACK_NONE;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (url != null) {</span>
+<span class="nc" id="L57">            String callback = url.getParameter(methodName + &quot;.&quot; + argIndex + &quot;.callback&quot;);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            if (callback != null) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                if (callback.equalsIgnoreCase(&quot;true&quot;)) {</span>
+<span class="nc" id="L60">                    isCallback = CALLBACK_CREATE;</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                } else if (callback.equalsIgnoreCase(&quot;false&quot;)) {</span>
+<span class="nc" id="L62">                    isCallback = CALLBACK_DESTROY;</span>
+                }
+            }
+        }
+<span class="nc" id="L66">        return isCallback;</span>
+    }
+
+    /**
+     * export or unexport callback service on client side
+     *
+     * @param channel
+     * @param url
+     * @param clazz
+     * @param inst
+     * @param export
+     * @throws IOException
+     */
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    private static String exportOrUnexportCallbackService(Channel channel, URL url, Class clazz, Object inst, Boolean export) throws IOException {
+<span class="nc" id="L81">        int instid = System.identityHashCode(inst);</span>
+
+<span class="nc" id="L83">        Map&lt;String, String&gt; params = new HashMap&lt;&gt;(3);</span>
+        // no need to new client again
+<span class="nc" id="L85">        params.put(Constants.IS_SERVER_KEY, Boolean.FALSE.toString());</span>
+        // mark it's a callback, for troubleshooting
+<span class="nc" id="L87">        params.put(Constants.IS_CALLBACK_SERVICE, Boolean.TRUE.toString());</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        String group = (url == null ? null : url.getParameter(Constants.GROUP_KEY));</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (group != null &amp;&amp; group.length() &gt; 0) {</span>
+<span class="nc" id="L90">            params.put(Constants.GROUP_KEY, group);</span>
+        }
+        // add method, for verifying against method, automatic fallback (see dubbo protocol)
+<span class="nc" id="L93">        params.put(Constants.METHODS_KEY, StringUtils.join(Wrapper.getWrapper(clazz).getDeclaredMethodNames(), &quot;,&quot;));</span>
+
+<span class="nc" id="L95">        Map&lt;String, String&gt; tmpMap = new HashMap&lt;&gt;(url.getParameters());</span>
+<span class="nc" id="L96">        tmpMap.putAll(params);</span>
+<span class="nc" id="L97">        tmpMap.remove(Constants.VERSION_KEY);// doesn't need to distinguish version for callback</span>
+<span class="nc" id="L98">        tmpMap.put(Constants.INTERFACE_KEY, clazz.getName());</span>
+<span class="nc" id="L99">        URL exportUrl = new URL(DubboProtocol.NAME, channel.getLocalAddress().getAddress().getHostAddress(), channel.getLocalAddress().getPort(), clazz.getName() + &quot;.&quot; + instid, tmpMap);</span>
+
+        // no need to generate multiple exporters for different channel in the same JVM, cache key cannot collide.
+<span class="nc" id="L102">        String cacheKey = getClientSideCallbackServiceCacheKey(instid);</span>
+<span class="nc" id="L103">        String countKey = getClientSideCountKey(clazz.getName());</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (export) {</span>
+            // one channel can have multiple callback instances, no need to re-export for different instance.
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (!channel.hasAttribute(cacheKey)) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                if (!isInstancesOverLimit(channel, url, clazz.getName(), instid, false)) {</span>
+<span class="nc" id="L108">                    Invoker&lt;?&gt; invoker = PROXY_FACTORY.getInvoker(inst, clazz, exportUrl);</span>
+                    // should destroy resource?
+<span class="nc" id="L110">                    Exporter&lt;?&gt; exporter = protocol.export(invoker);</span>
+                    // this is used for tracing if instid has published service or not.
+<span class="nc" id="L112">                    channel.setAttribute(cacheKey, exporter);</span>
+<span class="nc" id="L113">                    logger.info(&quot;Export a callback service :&quot; + exportUrl + &quot;, on &quot; + channel + &quot;, url is: &quot; + url);</span>
+<span class="nc" id="L114">                    increaseInstanceCount(channel, countKey);</span>
+<span class="nc" id="L115">                }</span>
+            }
+        } else {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (channel.hasAttribute(cacheKey)) {</span>
+<span class="nc" id="L119">                Exporter&lt;?&gt; exporter = (Exporter&lt;?&gt;) channel.getAttribute(cacheKey);</span>
+<span class="nc" id="L120">                exporter.unexport();</span>
+<span class="nc" id="L121">                channel.removeAttribute(cacheKey);</span>
+<span class="nc" id="L122">                decreaseInstanceCount(channel, countKey);</span>
+            }
+        }
+<span class="nc" id="L125">        return String.valueOf(instid);</span>
+    }
+
+    /**
+     * refer or destroy callback service on server side
+     *
+     * @param url
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Object referOrDestroyCallbackService(Channel channel, URL url, Class&lt;?&gt; clazz, Invocation inv, int instid, boolean isRefer) {
+<span class="nc" id="L135">        Object proxy = null;</span>
+<span class="nc" id="L136">        String invokerCacheKey = getServerSideCallbackInvokerCacheKey(channel, clazz.getName(), instid);</span>
+<span class="nc" id="L137">        String proxyCacheKey = getServerSideCallbackServiceCacheKey(channel, clazz.getName(), instid);</span>
+<span class="nc" id="L138">        proxy = channel.getAttribute(proxyCacheKey);</span>
+<span class="nc" id="L139">        String countkey = getServerSideCountKey(channel, clazz.getName());</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (isRefer) {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (proxy == null) {</span>
+<span class="nc" id="L142">                URL referurl = URL.valueOf(&quot;callback://&quot; + url.getAddress() + &quot;/&quot; + clazz.getName() + &quot;?&quot; + Constants.INTERFACE_KEY + &quot;=&quot; + clazz.getName());</span>
+<span class="nc" id="L143">                referurl = referurl.addParametersIfAbsent(url.getParameters()).removeParameter(Constants.METHODS_KEY);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                if (!isInstancesOverLimit(channel, referurl, clazz.getName(), instid, true)) {</span>
+                    @SuppressWarnings(&quot;rawtypes&quot;)
+<span class="nc" id="L146">                    Invoker&lt;?&gt; invoker = new ChannelWrappedInvoker(clazz, channel, referurl, String.valueOf(instid));</span>
+<span class="nc" id="L147">                    proxy = PROXY_FACTORY.getProxy(invoker);</span>
+<span class="nc" id="L148">                    channel.setAttribute(proxyCacheKey, proxy);</span>
+<span class="nc" id="L149">                    channel.setAttribute(invokerCacheKey, invoker);</span>
+<span class="nc" id="L150">                    increaseInstanceCount(channel, countkey);</span>
+
+                    //convert error fail fast .
+                    //ignore concurrent problem.
+<span class="nc" id="L154">                    Set&lt;Invoker&lt;?&gt;&gt; callbackInvokers = (Set&lt;Invoker&lt;?&gt;&gt;) channel.getAttribute(Constants.CHANNEL_CALLBACK_KEY);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    if (callbackInvokers == null) {</span>
+<span class="nc" id="L156">                        callbackInvokers = new ConcurrentHashSet&lt;Invoker&lt;?&gt;&gt;(1);</span>
+<span class="nc" id="L157">                        callbackInvokers.add(invoker);</span>
+<span class="nc" id="L158">                        channel.setAttribute(Constants.CHANNEL_CALLBACK_KEY, callbackInvokers);</span>
+                    }
+<span class="nc" id="L160">                    logger.info(&quot;method &quot; + inv.getMethodName() + &quot; include a callback service :&quot; + invoker.getUrl() + &quot;, a proxy :&quot; + invoker + &quot; has been created.&quot;);</span>
+                }
+<span class="nc" id="L162">            }</span>
+        } else {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (proxy != null) {</span>
+<span class="nc" id="L165">                Invoker&lt;?&gt; invoker = (Invoker&lt;?&gt;) channel.getAttribute(invokerCacheKey);</span>
+                try {
+<span class="nc" id="L167">                    Set&lt;Invoker&lt;?&gt;&gt; callbackInvokers = (Set&lt;Invoker&lt;?&gt;&gt;) channel.getAttribute(Constants.CHANNEL_CALLBACK_KEY);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                    if (callbackInvokers != null) {</span>
+<span class="nc" id="L169">                        callbackInvokers.remove(invoker);</span>
+                    }
+<span class="nc" id="L171">                    invoker.destroy();</span>
+<span class="nc" id="L172">                } catch (Exception e) {</span>
+<span class="nc" id="L173">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L174">                }</span>
+                // cancel refer, directly remove from the map
+<span class="nc" id="L176">                channel.removeAttribute(proxyCacheKey);</span>
+<span class="nc" id="L177">                channel.removeAttribute(invokerCacheKey);</span>
+<span class="nc" id="L178">                decreaseInstanceCount(channel, countkey);</span>
+            }
+        }
+<span class="nc" id="L181">        return proxy;</span>
+    }
+
+    private static String getClientSideCallbackServiceCacheKey(int instid) {
+<span class="nc" id="L185">        return Constants.CALLBACK_SERVICE_KEY + &quot;.&quot; + instid;</span>
+    }
+
+    private static String getServerSideCallbackServiceCacheKey(Channel channel, String interfaceClass, int instid) {
+<span class="nc" id="L189">        return Constants.CALLBACK_SERVICE_PROXY_KEY + &quot;.&quot; + System.identityHashCode(channel) + &quot;.&quot; + interfaceClass + &quot;.&quot; + instid;</span>
+    }
+
+    private static String getServerSideCallbackInvokerCacheKey(Channel channel, String interfaceClass, int instid) {
+<span class="nc" id="L193">        return getServerSideCallbackServiceCacheKey(channel, interfaceClass, instid) + &quot;.&quot; + &quot;invoker&quot;;</span>
+    }
+
+    private static String getClientSideCountKey(String interfaceClass) {
+<span class="nc" id="L197">        return Constants.CALLBACK_SERVICE_KEY + &quot;.&quot; + interfaceClass + &quot;.COUNT&quot;;</span>
+    }
+
+    private static String getServerSideCountKey(Channel channel, String interfaceClass) {
+<span class="nc" id="L201">        return Constants.CALLBACK_SERVICE_PROXY_KEY + &quot;.&quot; + System.identityHashCode(channel) + &quot;.&quot; + interfaceClass + &quot;.COUNT&quot;;</span>
+    }
+
+    private static boolean isInstancesOverLimit(Channel channel, URL url, String interfaceClass, int instid, boolean isServer) {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        Integer count = (Integer) channel.getAttribute(isServer ? getServerSideCountKey(channel, interfaceClass) : getClientSideCountKey(interfaceClass));</span>
+<span class="nc" id="L206">        int limit = url.getParameter(Constants.CALLBACK_INSTANCES_LIMIT_KEY, Constants.DEFAULT_CALLBACK_INSTANCES);</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">        if (count != null &amp;&amp; count &gt;= limit) {</span>
+            //client side error
+<span class="nc" id="L209">            throw new IllegalStateException(&quot;interface &quot; + interfaceClass + &quot; `s callback instances num exceed providers limit :&quot; + limit</span>
+<span class="nc" id="L210">                    + &quot; ,current num: &quot; + (count + 1) + &quot;. The new callback service will not work !!! you can cancle the callback service which exported before. channel :&quot; + channel);</span>
+        } else {
+<span class="nc" id="L212">            return false;</span>
+        }
+    }
+
+    private static void increaseInstanceCount(Channel channel, String countkey) {
+        try {
+            //ignore concurrent problem?
+<span class="nc" id="L219">            Integer count = (Integer) channel.getAttribute(countkey);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (count == null) {</span>
+<span class="nc" id="L221">                count = 1;</span>
+            } else {
+<span class="nc" id="L223">                count++;</span>
+            }
+<span class="nc" id="L225">            channel.setAttribute(countkey, count);</span>
+<span class="nc" id="L226">        } catch (Exception e) {</span>
+<span class="nc" id="L227">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L228">        }</span>
+<span class="nc" id="L229">    }</span>
+
+    private static void decreaseInstanceCount(Channel channel, String countkey) {
+        try {
+<span class="nc" id="L233">            Integer count = (Integer) channel.getAttribute(countkey);</span>
+<span class="nc bnc" id="L234" title="All 4 branches missed.">            if (count == null || count &lt;= 0) {</span>
+<span class="nc" id="L235">                return;</span>
+            } else {
+<span class="nc" id="L237">                count--;</span>
+            }
+<span class="nc" id="L239">            channel.setAttribute(countkey, count);</span>
+<span class="nc" id="L240">        } catch (Exception e) {</span>
+<span class="nc" id="L241">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L242">        }</span>
+<span class="nc" id="L243">    }</span>
+
+    public static Object encodeInvocationArgument(Channel channel, RpcInvocation inv, int paraIndex) throws IOException {
+        // get URL directly
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        URL url = inv.getInvoker() == null ? null : inv.getInvoker().getUrl();</span>
+<span class="nc" id="L248">        byte callbackStatus = isCallBack(url, inv.getMethodName(), paraIndex);</span>
+<span class="nc" id="L249">        Object[] args = inv.getArguments();</span>
+<span class="nc" id="L250">        Class&lt;?&gt;[] pts = inv.getParameterTypes();</span>
+<span class="nc bnc" id="L251" title="All 4 branches missed.">        switch (callbackStatus) {</span>
+            case CallbackServiceCodec.CALLBACK_NONE:
+<span class="nc" id="L253">                return args[paraIndex];</span>
+            case CallbackServiceCodec.CALLBACK_CREATE:
+<span class="nc" id="L255">                inv.setAttachment(INV_ATT_CALLBACK_KEY + paraIndex, exportOrUnexportCallbackService(channel, url, pts[paraIndex], args[paraIndex], true));</span>
+<span class="nc" id="L256">                return null;</span>
+            case CallbackServiceCodec.CALLBACK_DESTROY:
+<span class="nc" id="L258">                inv.setAttachment(INV_ATT_CALLBACK_KEY + paraIndex, exportOrUnexportCallbackService(channel, url, pts[paraIndex], args[paraIndex], false));</span>
+<span class="nc" id="L259">                return null;</span>
+            default:
+<span class="nc" id="L261">                return args[paraIndex];</span>
+        }
+    }
+
+    public static Object decodeInvocationArgument(Channel channel, RpcInvocation inv, Class&lt;?&gt;[] pts, int paraIndex, Object inObject) throws IOException {
+        // if it's a callback, create proxy on client side, callback interface on client side can be invoked through channel
+        // need get URL from channel and env when decode
+<span class="nc" id="L268">        URL url = null;</span>
+        try {
+<span class="nc" id="L270">            url = DubboProtocol.getDubboProtocol().getInvoker(channel, inv).getUrl();</span>
+<span class="nc" id="L271">        } catch (RemotingException e) {</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L273">                logger.info(e.getMessage(), e);</span>
+            }
+<span class="nc" id="L275">            return inObject;</span>
+<span class="nc" id="L276">        }</span>
+<span class="nc" id="L277">        byte callbackstatus = isCallBack(url, inv.getMethodName(), paraIndex);</span>
+<span class="nc bnc" id="L278" title="All 4 branches missed.">        switch (callbackstatus) {</span>
+            case CallbackServiceCodec.CALLBACK_NONE:
+<span class="nc" id="L280">                return inObject;</span>
+            case CallbackServiceCodec.CALLBACK_CREATE:
+                try {
+<span class="nc" id="L283">                    return referOrDestroyCallbackService(channel, url, pts[paraIndex], inv, Integer.parseInt(inv.getAttachment(INV_ATT_CALLBACK_KEY + paraIndex)), true);</span>
+<span class="nc" id="L284">                } catch (Exception e) {</span>
+<span class="nc" id="L285">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L286">                    throw new IOException(StringUtils.toString(e));</span>
+                }
+            case CallbackServiceCodec.CALLBACK_DESTROY:
+                try {
+<span class="nc" id="L290">                    return referOrDestroyCallbackService(channel, url, pts[paraIndex], inv, Integer.parseInt(inv.getAttachment(INV_ATT_CALLBACK_KEY + paraIndex)), false);</span>
+<span class="nc" id="L291">                } catch (Exception e) {</span>
+<span class="nc" id="L292">                    throw new IOException(StringUtils.toString(e));</span>
+                }
+            default:
+<span class="nc" id="L295">                return inObject;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

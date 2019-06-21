@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractEtcdClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.etcd.support</a> &gt; <span class="el_source">AbstractEtcdClient.java</span></div><h1>AbstractEtcdClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.etcd.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.etcd.ChildListener;
+import org.apache.dubbo.remoting.etcd.EtcdClient;
+import org.apache.dubbo.remoting.etcd.StateListener;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+public abstract class AbstractEtcdClient&lt;WatcherListener&gt; implements EtcdClient {
+
+<span class="nc" id="L54">    protected static final Logger logger = LoggerFactory.getLogger(AbstractEtcdClient.class);</span>
+
+    private final URL url;
+
+<span class="nc" id="L58">    private final Set&lt;StateListener&gt; stateListeners = new ConcurrentHashSet&lt;&gt;();</span>
+
+<span class="nc" id="L60">    private final ConcurrentMap&lt;String, ConcurrentMap&lt;ChildListener, WatcherListener&gt;&gt; childListeners = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L61">    private final List&lt;String&gt; categories = Arrays.asList(Constants.PROVIDERS_CATEGORY</span>
+            , Constants.CONSUMERS_CATEGORY
+            , Constants.ROUTERS_CATEGORY
+            , Constants.CONFIGURATORS_CATEGORY);
+<span class="nc" id="L65">    private volatile boolean closed = false;</span>
+
+<span class="nc" id="L67">    public AbstractEtcdClient(URL url) {</span>
+<span class="nc" id="L68">        this.url = url;</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L73">        return url;</span>
+    }
+
+    @Override
+    public void create(String path) {
+<span class="nc" id="L78">        String fixedPath = fixNamespace(path);</span>
+<span class="nc" id="L79">        createParentIfAbsent(fixedPath);</span>
+<span class="nc" id="L80">        doCreatePersistent(fixedPath);</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public long createEphemeral(String path) {
+<span class="nc" id="L85">        String fixedPath = fixNamespace(path);</span>
+<span class="nc" id="L86">        createParentIfAbsent(fixedPath);</span>
+<span class="nc" id="L87">        return doCreateEphemeral(path);</span>
+    }
+
+    @Override
+    public void addStateListener(StateListener listener) {
+<span class="nc" id="L92">        stateListeners.add(listener);</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public void removeStateListener(StateListener listener) {
+<span class="nc" id="L97">        stateListeners.remove(listener);</span>
+<span class="nc" id="L98">    }</span>
+
+    public Set&lt;StateListener&gt; getSessionListeners() {
+<span class="nc" id="L101">        return stateListeners;</span>
+    }
+
+    @Override
+    public List&lt;String&gt; addChildListener(String path, final ChildListener listener) {
+<span class="nc" id="L106">        ConcurrentMap&lt;ChildListener, WatcherListener&gt; listeners = childListeners.get(path);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L108">            childListeners.putIfAbsent(path, new ConcurrentHashMap&lt;&gt;());</span>
+<span class="nc" id="L109">            listeners = childListeners.get(path);</span>
+        }
+<span class="nc" id="L111">        WatcherListener targetListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (targetListener == null) {</span>
+<span class="nc" id="L113">            listeners.putIfAbsent(listener, createChildWatcherListener(path, listener));</span>
+<span class="nc" id="L114">            targetListener = listeners.get(listener);</span>
+        }
+<span class="nc" id="L116">        return addChildWatcherListener(path, targetListener);</span>
+    }
+
+    @Override
+    public WatcherListener getChildListener(String path, ChildListener listener) {
+<span class="nc" id="L121">        ConcurrentMap&lt;ChildListener, WatcherListener&gt; listeners = childListeners.get(path);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+<span class="nc" id="L125">        WatcherListener targetListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (targetListener == null) {</span>
+<span class="nc" id="L127">            listeners.putIfAbsent(listener, createChildWatcherListener(path, listener));</span>
+<span class="nc" id="L128">            targetListener = listeners.get(listener);</span>
+        }
+<span class="nc" id="L130">        return targetListener;</span>
+    }
+
+    @Override
+    public void removeChildListener(String path, ChildListener listener) {
+<span class="nc" id="L135">        ConcurrentMap&lt;ChildListener, WatcherListener&gt; listeners = childListeners.get(path);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (listeners != null) {</span>
+<span class="nc" id="L137">            WatcherListener targetListener = listeners.remove(listener);</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (targetListener != null) {</span>
+<span class="nc" id="L139">                removeChildWatcherListener(path, targetListener);</span>
+            }
+        }
+<span class="nc" id="L142">    }</span>
+
+    protected void stateChanged(int state) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (StateListener sessionListener : getSessionListeners()) {</span>
+<span class="nc" id="L146">            sessionListener.stateChanged(state);</span>
+<span class="nc" id="L147">        }</span>
+<span class="nc" id="L148">    }</span>
+
+    protected String fixNamespace(String path) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (StringUtils.isEmpty(path)) {</span>
+<span class="nc" id="L152">            throw new IllegalArgumentException(&quot;path is required, actual null or ''&quot;);</span>
+        }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        return (path.charAt(0) != '/') ? (Constants.PATH_SEPARATOR + path) : path;</span>
+    }
+
+    protected void createParentIfAbsent(String fixedPath) {
+<span class="nc" id="L158">        int i = fixedPath.lastIndexOf('/');</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (i &gt; 0) {</span>
+<span class="nc" id="L160">            String parentPath = fixedPath.substring(0, i);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (categories.stream().anyMatch(c -&gt; fixedPath.endsWith(c))) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                if (!checkExists(parentPath)) {</span>
+<span class="nc" id="L163">                    this.doCreatePersistent(parentPath);</span>
+                }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            } else if (categories.stream().anyMatch(c -&gt; parentPath.endsWith(c))) {</span>
+<span class="nc" id="L166">                String grandfather = parentPath.substring(0, parentPath.lastIndexOf('/'));</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                if (!checkExists(grandfather)) {</span>
+<span class="nc" id="L168">                    this.doCreatePersistent(grandfather);</span>
+                }
+            }
+        }
+<span class="nc" id="L172">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L177">            return;</span>
+        }
+<span class="nc" id="L179">        closed = true;</span>
+        try {
+<span class="nc" id="L181">            doClose();</span>
+<span class="nc" id="L182">        } catch (Throwable t) {</span>
+<span class="nc" id="L183">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L184">        }</span>
+<span class="nc" id="L185">    }</span>
+
+    public abstract void doClose();
+
+    public abstract void doCreatePersistent(String path);
+
+    public abstract long doCreateEphemeral(String path);
+
+    @Override
+    public abstract void delete(String path);
+
+    public abstract boolean checkExists(String path);
+
+    public abstract WatcherListener createChildWatcherListener(String path, ChildListener listener);
+
+    public abstract List&lt;String&gt; addChildWatcherListener(String path, WatcherListener listener);
+
+    public abstract void removeChildWatcherListener(String path, WatcherListener listener);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

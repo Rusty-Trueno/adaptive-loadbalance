@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RpcResult.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc</a> &gt; <span class="el_source">RpcResult.java</span></div><h1>RpcResult.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc;
+
+import java.lang.reflect.Field;
+
+/**
+ * RPC Result.
+ *
+ * @serial Don't change the class name and properties.
+ */
+public class RpcResult extends AbstractResult {
+
+    private static final long serialVersionUID = -6925924956850004727L;
+
+<span class="nc" id="L30">    public RpcResult() {</span>
+<span class="nc" id="L31">    }</span>
+
+<span class="nc" id="L33">    public RpcResult(Object result) {</span>
+<span class="nc" id="L34">        this.result = result;</span>
+<span class="nc" id="L35">    }</span>
+
+<span class="nc" id="L37">    public RpcResult(Throwable exception) {</span>
+<span class="nc" id="L38">        this.exception = handleStackTraceNull(exception);</span>
+<span class="nc" id="L39">    }</span>
+
+    @Override
+    public Object recreate() throws Throwable {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (exception != null) {</span>
+<span class="nc" id="L44">            throw exception;</span>
+        }
+<span class="nc" id="L46">        return result;</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.rpc.RpcResult#getValue()
+     * @deprecated Replace to getValue()
+     */
+    @Override
+    @Deprecated
+    public Object getResult() {
+<span class="nc" id="L56">        return getValue();</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.rpc.RpcResult#setValue(Object)
+     * @deprecated Replace to setValue()
+     */
+    @Deprecated
+    public void setResult(Object result) {
+<span class="nc" id="L65">        setValue(result);</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public Object getValue() {
+<span class="nc" id="L70">        return result;</span>
+    }
+
+    public void setValue(Object value) {
+<span class="nc" id="L74">        this.result = value;</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public Throwable getException() {
+<span class="nc" id="L79">        return exception;</span>
+    }
+
+    public void setException(Throwable e) {
+<span class="nc" id="L83">        this.exception = handleStackTraceNull(e);</span>
+<span class="nc" id="L84">    }</span>
+
+    @Override
+    public boolean hasException() {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        return exception != null;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L93">        return &quot;RpcResult [result=&quot; + result + &quot;, exception=&quot; + exception + &quot;]&quot;;</span>
+    }
+
+    /**
+     * we need to deal the exception whose stack trace is null.
+     * &lt;p&gt;
+     * see https://github.com/apache/incubator-dubbo/pull/2956
+     * and https://github.com/apache/incubator-dubbo/pull/3634
+     * and https://github.com/apache/incubator-dubbo/issues/619
+     *
+     * @param e exception
+     * @return exception after deal with stack trace
+     */
+    private Throwable handleStackTraceNull(Throwable e) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (e != null) {</span>
+            try {
+                // get Throwable class
+<span class="nc" id="L110">                Class clazz = e.getClass();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                while (!clazz.getName().equals(Throwable.class.getName())) {</span>
+<span class="nc" id="L112">                    clazz = clazz.getSuperclass();</span>
+                }
+                // get stackTrace value
+<span class="nc" id="L115">                Field stackTraceField = clazz.getDeclaredField(&quot;stackTrace&quot;);</span>
+<span class="nc" id="L116">                stackTraceField.setAccessible(true);</span>
+<span class="nc" id="L117">                Object stackTrace = stackTraceField.get(e);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (stackTrace == null) {</span>
+<span class="nc" id="L119">                    e.setStackTrace(new StackTraceElement[0]);</span>
+                }
+<span class="nc" id="L121">            } catch (Throwable t) {</span>
+                // ignore
+<span class="nc" id="L123">            }</span>
+        }
+
+<span class="nc" id="L126">        return e;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

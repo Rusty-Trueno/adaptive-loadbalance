@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReconnectTimerTask.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support.header</a> &gt; <span class="el_source">ReconnectTimerTask.java</span></div><h1>ReconnectTimerTask.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.exchange.support.header;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Client;
+
+/**
+ * ReconnectTimerTask
+ */
+public class ReconnectTimerTask extends AbstractTimerTask {
+
+<span class="nc" id="L30">    private static final Logger logger = LoggerFactory.getLogger(ReconnectTimerTask.class);</span>
+
+    private final int idleTimeout;
+
+    public ReconnectTimerTask(ChannelProvider channelProvider, Long heartbeatTimeoutTick, int idleTimeout) {
+<span class="nc" id="L35">        super(channelProvider, heartbeatTimeoutTick);</span>
+<span class="nc" id="L36">        this.idleTimeout = idleTimeout;</span>
+<span class="nc" id="L37">    }</span>
+
+    @Override
+    protected void doTask(Channel channel) {
+        try {
+<span class="nc" id="L42">            Long lastRead = lastRead(channel);</span>
+<span class="nc" id="L43">            Long now = now();</span>
+
+            // Rely on reconnect timer to reconnect when AbstractClient.doConnect fails to init the connection
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (!channel.isConnected()) {</span>
+                try {
+<span class="nc" id="L48">                    logger.info(&quot;Initial connection to &quot; + channel);</span>
+<span class="nc" id="L49">                    ((Client) channel).reconnect();</span>
+<span class="nc" id="L50">                } catch (Exception e) {</span>
+<span class="nc" id="L51">                    logger.error(&quot;Fail to connect to &quot; + channel, e);</span>
+<span class="nc" id="L52">                }</span>
+            // check pong at client
+<span class="nc bnc" id="L54" title="All 4 branches missed.">            } else if (lastRead != null &amp;&amp; now - lastRead &gt; idleTimeout) {</span>
+<span class="nc" id="L55">                logger.warn(&quot;Reconnect to channel &quot; + channel + &quot;, because heartbeat read idle time out: &quot;</span>
+                        + idleTimeout + &quot;ms&quot;);
+                try {
+<span class="nc" id="L58">                    ((Client) channel).reconnect();</span>
+<span class="nc" id="L59">                } catch (Exception e) {</span>
+<span class="nc" id="L60">                    logger.error(channel + &quot;reconnect failed during idle time.&quot;, e);</span>
+<span class="nc" id="L61">                }</span>
+            }
+<span class="nc" id="L63">        } catch (Throwable t) {</span>
+<span class="nc" id="L64">            logger.warn(&quot;Exception when reconnect to remote channel &quot; + channel.getRemoteAddress(), t);</span>
+<span class="nc" id="L65">        }</span>
+<span class="nc" id="L66">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

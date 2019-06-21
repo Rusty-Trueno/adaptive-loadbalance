@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TelnetCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.telnet.codec</a> &gt; <span class="el_source">TelnetCodec.java</span></div><h1>TelnetCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.telnet.codec;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.transport.codec.TransportCodec;
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+
+/**
+ * TelnetCodec
+ */
+<span class="nc" id="L40">public class TelnetCodec extends TransportCodec {</span>
+
+<span class="nc" id="L42">    private static final Logger logger = LoggerFactory.getLogger(TelnetCodec.class);</span>
+
+    private static final String HISTORY_LIST_KEY = &quot;telnet.history.list&quot;;
+
+    private static final String HISTORY_INDEX_KEY = &quot;telnet.history.index&quot;;
+
+<span class="nc" id="L48">    private static final byte[] UP = new byte[]{27, 91, 65};</span>
+
+<span class="nc" id="L50">    private static final byte[] DOWN = new byte[]{27, 91, 66};</span>
+
+<span class="nc" id="L52">    private static final List&lt;?&gt; ENTER = Arrays.asList(</span>
+            new byte[]{'\r', '\n'} /* Windows Enter */,
+            new byte[]{'\n'} /* Linux Enter */);
+
+<span class="nc" id="L56">    private static final List&lt;?&gt; EXIT = Arrays.asList(</span>
+            new byte[]{3} /* Windows Ctrl+C */,
+            new byte[]{-1, -12, -1, -3, 6} /* Linux Ctrl+C */,
+            new byte[]{-1, -19, -1, -3, 6} /* Linux Pause */);
+
+    private static Charset getCharset(Channel channel) {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (channel != null) {</span>
+<span class="nc" id="L63">            Object attribute = channel.getAttribute(Constants.CHARSET_KEY);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (attribute instanceof String) {</span>
+                try {
+<span class="nc" id="L66">                    return Charset.forName((String) attribute);</span>
+<span class="nc" id="L67">                } catch (Throwable t) {</span>
+<span class="nc" id="L68">                    logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L69">                }</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            } else if (attribute instanceof Charset) {</span>
+<span class="nc" id="L71">                return (Charset) attribute;</span>
+            }
+<span class="nc" id="L73">            URL url = channel.getUrl();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (url != null) {</span>
+<span class="nc" id="L75">                String parameter = url.getParameter(Constants.CHARSET_KEY);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(parameter)) {</span>
+                    try {
+<span class="nc" id="L78">                        return Charset.forName(parameter);</span>
+<span class="nc" id="L79">                    } catch (Throwable t) {</span>
+<span class="nc" id="L80">                        logger.warn(t.getMessage(), t);</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L86">            return Charset.forName(Constants.DEFAULT_CHARSET);</span>
+<span class="nc" id="L87">        } catch (Throwable t) {</span>
+<span class="nc" id="L88">            logger.warn(t.getMessage(), t);</span>
+        }
+<span class="nc" id="L90">        return Charset.defaultCharset();</span>
+    }
+
+    private static String toString(byte[] message, Charset charset) throws UnsupportedEncodingException {
+<span class="nc" id="L94">        byte[] copy = new byte[message.length];</span>
+<span class="nc" id="L95">        int index = 0;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (int i = 0; i &lt; message.length; i++) {</span>
+<span class="nc" id="L97">            byte b = message[i];</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (b == '\b') { // backspace</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (index &gt; 0) {</span>
+<span class="nc" id="L100">                    index--;</span>
+                }
+<span class="nc bnc" id="L102" title="All 4 branches missed.">                if (i &gt; 2 &amp;&amp; message[i - 2] &lt; 0) { // double byte char</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                    if (index &gt; 0) {</span>
+<span class="nc" id="L104">                        index--;</span>
+                    }
+                }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            } else if (b == 27) { // escape</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">                if (i &lt; message.length - 4 &amp;&amp; message[i + 4] == 126) {</span>
+<span class="nc" id="L109">                    i = i + 4;</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">                } else if (i &lt; message.length - 3 &amp;&amp; message[i + 3] == 126) {</span>
+<span class="nc" id="L111">                    i = i + 3;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                } else if (i &lt; message.length - 2) {</span>
+<span class="nc" id="L113">                    i = i + 2;</span>
+                }
+<span class="nc bnc" id="L115" title="All 8 branches missed.">            } else if (b == -1 &amp;&amp; i &lt; message.length - 2</span>
+                    &amp;&amp; (message[i + 1] == -3 || message[i + 1] == -5)) { // handshake
+<span class="nc" id="L117">                i = i + 2;</span>
+            } else {
+<span class="nc" id="L119">                copy[index++] = message[i];</span>
+            }
+        }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (index == 0) {</span>
+<span class="nc" id="L123">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L125">        return new String(copy, 0, index, charset.name()).trim();</span>
+    }
+
+    private static boolean isEquals(byte[] message, byte[] command) throws IOException {
+<span class="nc bnc" id="L129" title="All 4 branches missed.">        return message.length == command.length &amp;&amp; endsWith(message, command);</span>
+    }
+
+    private static boolean endsWith(byte[] message, byte[] command) throws IOException {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (message.length &lt; command.length) {</span>
+<span class="nc" id="L134">            return false;</span>
+        }
+<span class="nc" id="L136">        int offset = message.length - command.length;</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (int i = command.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (message[offset + i] != command[i]) {</span>
+<span class="nc" id="L139">                return false;</span>
+            }
+        }
+<span class="nc" id="L142">        return true;</span>
+    }
+
+    @Override
+    public void encode(Channel channel, ChannelBuffer buffer, Object message) throws IOException {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (message instanceof String) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (isClientSide(channel)) {</span>
+<span class="nc" id="L149">                message = message + &quot;\r\n&quot;;</span>
+            }
+<span class="nc" id="L151">            byte[] msgData = ((String) message).getBytes(getCharset(channel).name());</span>
+<span class="nc" id="L152">            buffer.writeBytes(msgData);</span>
+<span class="nc" id="L153">        } else {</span>
+<span class="nc" id="L154">            super.encode(channel, buffer, message);</span>
+        }
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+<span class="nc" id="L160">        int readable = buffer.readableBytes();</span>
+<span class="nc" id="L161">        byte[] message = new byte[readable];</span>
+<span class="nc" id="L162">        buffer.readBytes(message);</span>
+<span class="nc" id="L163">        return decode(channel, buffer, readable, message);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] message) throws IOException {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (isClientSide(channel)) {</span>
+<span class="nc" id="L169">            return toString(message, getCharset(channel));</span>
+        }
+<span class="nc" id="L171">        checkPayload(channel, readable);</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if (message == null || message.length == 0) {</span>
+<span class="nc" id="L173">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (message[message.length - 1] == '\b') { // Windows backspace echo</span>
+            try {
+<span class="nc bnc" id="L178" title="All 4 branches missed.">                boolean doublechar = message.length &gt;= 3 &amp;&amp; message[message.length - 3] &lt; 0; // double byte char</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                channel.send(new String(doublechar ? new byte[]{32, 32, 8, 8} : new byte[]{32, 8}, getCharset(channel).name()));</span>
+<span class="nc" id="L180">            } catch (RemotingException e) {</span>
+<span class="nc" id="L181">                throw new IOException(StringUtils.toString(e));</span>
+<span class="nc" id="L182">            }</span>
+<span class="nc" id="L183">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        for (Object command : EXIT) {</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (isEquals(message, (byte[]) command)) {</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L189">                    logger.info(new Exception(&quot;Close channel &quot; + channel + &quot; on exit command: &quot; + Arrays.toString((byte[]) command)));</span>
+                }
+<span class="nc" id="L191">                channel.close();</span>
+<span class="nc" id="L192">                return null;</span>
+            }
+<span class="nc" id="L194">        }</span>
+
+<span class="nc" id="L196">        boolean up = endsWith(message, UP);</span>
+<span class="nc" id="L197">        boolean down = endsWith(message, DOWN);</span>
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        if (up || down) {</span>
+<span class="nc" id="L199">            LinkedList&lt;String&gt; history = (LinkedList&lt;String&gt;) channel.getAttribute(HISTORY_LIST_KEY);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (CollectionUtils.isEmpty(history)) {</span>
+<span class="nc" id="L201">                return DecodeResult.NEED_MORE_INPUT;</span>
+            }
+<span class="nc" id="L203">            Integer index = (Integer) channel.getAttribute(HISTORY_INDEX_KEY);</span>
+<span class="nc" id="L204">            Integer old = index;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (index == null) {</span>
+<span class="nc" id="L206">                index = history.size() - 1;</span>
+            } else {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (up) {</span>
+<span class="nc" id="L209">                    index = index - 1;</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                    if (index &lt; 0) {</span>
+<span class="nc" id="L211">                        index = history.size() - 1;</span>
+                    }
+                } else {
+<span class="nc" id="L214">                    index = index + 1;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    if (index &gt; history.size() - 1) {</span>
+<span class="nc" id="L216">                        index = 0;</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L220" title="All 4 branches missed.">            if (old == null || !old.equals(index)) {</span>
+<span class="nc" id="L221">                channel.setAttribute(HISTORY_INDEX_KEY, index);</span>
+<span class="nc" id="L222">                String value = history.get(index);</span>
+<span class="nc bnc" id="L223" title="All 6 branches missed.">                if (old != null &amp;&amp; old &gt;= 0 &amp;&amp; old &lt; history.size()) {</span>
+<span class="nc" id="L224">                    String ov = history.get(old);</span>
+<span class="nc" id="L225">                    StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                    for (int i = 0; i &lt; ov.length(); i++) {</span>
+<span class="nc" id="L227">                        buf.append(&quot;\b&quot;);</span>
+                    }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    for (int i = 0; i &lt; ov.length(); i++) {</span>
+<span class="nc" id="L230">                        buf.append(&quot; &quot;);</span>
+                    }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                    for (int i = 0; i &lt; ov.length(); i++) {</span>
+<span class="nc" id="L233">                        buf.append(&quot;\b&quot;);</span>
+                    }
+<span class="nc" id="L235">                    value = buf.toString() + value;</span>
+                }
+                try {
+<span class="nc" id="L238">                    channel.send(value);</span>
+<span class="nc" id="L239">                } catch (RemotingException e) {</span>
+<span class="nc" id="L240">                    throw new IOException(StringUtils.toString(e));</span>
+<span class="nc" id="L241">                }</span>
+            }
+<span class="nc" id="L243">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        for (Object command : EXIT) {</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (isEquals(message, (byte[]) command)) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L248">                    logger.info(new Exception(&quot;Close channel &quot; + channel + &quot; on exit command &quot; + command));</span>
+                }
+<span class="nc" id="L250">                channel.close();</span>
+<span class="nc" id="L251">                return null;</span>
+            }
+<span class="nc" id="L253">        }</span>
+<span class="nc" id="L254">        byte[] enter = null;</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        for (Object command : ENTER) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (endsWith(message, (byte[]) command)) {</span>
+<span class="nc" id="L257">                enter = (byte[]) command;</span>
+<span class="nc" id="L258">                break;</span>
+            }
+<span class="nc" id="L260">        }</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (enter == null) {</span>
+<span class="nc" id="L262">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+<span class="nc" id="L264">        LinkedList&lt;String&gt; history = (LinkedList&lt;String&gt;) channel.getAttribute(HISTORY_LIST_KEY);</span>
+<span class="nc" id="L265">        Integer index = (Integer) channel.getAttribute(HISTORY_INDEX_KEY);</span>
+<span class="nc" id="L266">        channel.removeAttribute(HISTORY_INDEX_KEY);</span>
+<span class="nc bnc" id="L267" title="All 8 branches missed.">        if (CollectionUtils.isNotEmpty(history) &amp;&amp; index != null &amp;&amp; index &gt;= 0 &amp;&amp; index &lt; history.size()) {</span>
+<span class="nc" id="L268">            String value = history.get(index);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (value != null) {</span>
+<span class="nc" id="L270">                byte[] b1 = value.getBytes();</span>
+<span class="nc" id="L271">                byte[] b2 = new byte[b1.length + message.length];</span>
+<span class="nc" id="L272">                System.arraycopy(b1, 0, b2, 0, b1.length);</span>
+<span class="nc" id="L273">                System.arraycopy(message, 0, b2, b1.length, message.length);</span>
+<span class="nc" id="L274">                message = b2;</span>
+            }
+        }
+<span class="nc" id="L277">        String result = toString(message, getCharset(channel));</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (result.trim().length() &gt; 0) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (history == null) {</span>
+<span class="nc" id="L280">                history = new LinkedList&lt;String&gt;();</span>
+<span class="nc" id="L281">                channel.setAttribute(HISTORY_LIST_KEY, history);</span>
+            }
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            if (history.isEmpty()) {</span>
+<span class="nc" id="L284">                history.addLast(result);</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            } else if (!result.equals(history.getLast())) {</span>
+<span class="nc" id="L286">                history.remove(result);</span>
+<span class="nc" id="L287">                history.addLast(result);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                if (history.size() &gt; 10) {</span>
+<span class="nc" id="L289">                    history.removeFirst();</span>
+                }
+            }
+        }
+<span class="nc" id="L293">        return result;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

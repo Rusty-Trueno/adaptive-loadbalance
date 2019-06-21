@@ -1,0 +1,869 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExtensionLoader.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-container-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.extension</a> &gt; <span class="el_source">ExtensionLoader.java</span></div><h1>ExtensionLoader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.extension;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.support.ActivateComparator;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.Holder;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
+
+/**
+ * Load dubbo extensions
+ * &lt;ul&gt;
+ * &lt;li&gt;auto inject dependency extension &lt;/li&gt;
+ * &lt;li&gt;auto wrap extension in wrapper &lt;/li&gt;
+ * &lt;li&gt;default extension is an adaptive instance&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @see &lt;a href=&quot;http://java.sun.com/j2se/1.5.0/docs/guide/jar/jar.html#Service%20Provider&quot;&gt;Service Provider in Java 5&lt;/a&gt;
+ * @see org.apache.dubbo.common.extension.SPI
+ * @see org.apache.dubbo.common.extension.Adaptive
+ * @see org.apache.dubbo.common.extension.Activate
+ */
+public class ExtensionLoader&lt;T&gt; {
+
+<span class="nc" id="L66">    private static final Logger logger = LoggerFactory.getLogger(ExtensionLoader.class);</span>
+
+    private static final String SERVICES_DIRECTORY = &quot;META-INF/services/&quot;;
+
+    private static final String DUBBO_DIRECTORY = &quot;META-INF/dubbo/&quot;;
+
+    private static final String DUBBO_INTERNAL_DIRECTORY = DUBBO_DIRECTORY + &quot;internal/&quot;;
+
+<span class="nc" id="L74">    private static final Pattern NAME_SEPARATOR = Pattern.compile(&quot;\\s*[,]+\\s*&quot;);</span>
+
+<span class="nc" id="L76">    private static final ConcurrentMap&lt;Class&lt;?&gt;, ExtensionLoader&lt;?&gt;&gt; EXTENSION_LOADERS = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L78">    private static final ConcurrentMap&lt;Class&lt;?&gt;, Object&gt; EXTENSION_INSTANCES = new ConcurrentHashMap&lt;&gt;();</span>
+
+    // ==============================
+
+    private final Class&lt;?&gt; type;
+
+    private final ExtensionFactory objectFactory;
+
+<span class="nc" id="L86">    private final ConcurrentMap&lt;Class&lt;?&gt;, String&gt; cachedNames = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L88">    private final Holder&lt;Map&lt;String, Class&lt;?&gt;&gt;&gt; cachedClasses = new Holder&lt;&gt;();</span>
+
+<span class="nc" id="L90">    private final Map&lt;String, Object&gt; cachedActivates = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L91">    private final ConcurrentMap&lt;String, Holder&lt;Object&gt;&gt; cachedInstances = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L92">    private final Holder&lt;Object&gt; cachedAdaptiveInstance = new Holder&lt;&gt;();</span>
+<span class="nc" id="L93">    private volatile Class&lt;?&gt; cachedAdaptiveClass = null;</span>
+    private String cachedDefaultName;
+    private volatile Throwable createAdaptiveInstanceError;
+
+    private Set&lt;Class&lt;?&gt;&gt; cachedWrapperClasses;
+
+<span class="nc" id="L99">    private Map&lt;String, IllegalStateException&gt; exceptions = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L101">    private ExtensionLoader(Class&lt;?&gt; type) {</span>
+<span class="nc" id="L102">        this.type = type;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());</span>
+<span class="nc" id="L104">    }</span>
+
+    private static &lt;T&gt; boolean withExtensionAnnotation(Class&lt;T&gt; type) {
+<span class="nc" id="L107">        return type.isAnnotationPresent(SPI.class);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; ExtensionLoader&lt;T&gt; getExtensionLoader(Class&lt;T&gt; type) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;Extension type == null&quot;);</span>
+        }
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (!type.isInterface()) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;Extension type (&quot; + type + &quot;) is not an interface!&quot;);</span>
+        }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (!withExtensionAnnotation(type)) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;Extension type (&quot; + type +</span>
+<span class="nc" id="L120">                    &quot;) is not an extension, because it is NOT annotated with @&quot; + SPI.class.getSimpleName() + &quot;!&quot;);</span>
+        }
+
+<span class="nc" id="L123">        ExtensionLoader&lt;T&gt; loader = (ExtensionLoader&lt;T&gt;) EXTENSION_LOADERS.get(type);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (loader == null) {</span>
+<span class="nc" id="L125">            EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader&lt;T&gt;(type));</span>
+<span class="nc" id="L126">            loader = (ExtensionLoader&lt;T&gt;) EXTENSION_LOADERS.get(type);</span>
+        }
+<span class="nc" id="L128">        return loader;</span>
+    }
+
+    // For testing purposes only
+    public static void resetExtensionLoader(Class type) {
+<span class="nc" id="L133">        ExtensionLoader loader = EXTENSION_LOADERS.get(type);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (loader != null) {</span>
+            // Remove all instances associated with this loader as well
+<span class="nc" id="L136">            Map&lt;String, Class&lt;?&gt;&gt; classes = loader.getExtensionClasses();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            for (Map.Entry&lt;String, Class&lt;?&gt;&gt; entry : classes.entrySet()) {</span>
+<span class="nc" id="L138">                EXTENSION_INSTANCES.remove(entry.getValue());</span>
+<span class="nc" id="L139">            }</span>
+<span class="nc" id="L140">            classes.clear();</span>
+<span class="nc" id="L141">            EXTENSION_LOADERS.remove(type);</span>
+        }
+<span class="nc" id="L143">    }</span>
+
+    private static ClassLoader findClassLoader() {
+<span class="nc" id="L146">        return ClassUtils.getClassLoader(ExtensionLoader.class);</span>
+    }
+
+    public String getExtensionName(T extensionInstance) {
+<span class="nc" id="L150">        return getExtensionName(extensionInstance.getClass());</span>
+    }
+
+    public String getExtensionName(Class&lt;?&gt; extensionClass) {
+<span class="nc" id="L154">        getExtensionClasses();// load class</span>
+<span class="nc" id="L155">        return cachedNames.get(extensionClass);</span>
+    }
+
+    /**
+     * This is equivalent to {@code getActivateExtension(url, key, null)}
+     *
+     * @param url url
+     * @param key url parameter key which used to get extension point names
+     * @return extension list which are activated.
+     * @see #getActivateExtension(org.apache.dubbo.common.URL, String, String)
+     */
+    public List&lt;T&gt; getActivateExtension(URL url, String key) {
+<span class="nc" id="L167">        return getActivateExtension(url, key, null);</span>
+    }
+
+    /**
+     * This is equivalent to {@code getActivateExtension(url, values, null)}
+     *
+     * @param url    url
+     * @param values extension point names
+     * @return extension list which are activated
+     * @see #getActivateExtension(org.apache.dubbo.common.URL, String[], String)
+     */
+    public List&lt;T&gt; getActivateExtension(URL url, String[] values) {
+<span class="nc" id="L179">        return getActivateExtension(url, values, null);</span>
+    }
+
+    /**
+     * This is equivalent to {@code getActivateExtension(url, url.getParameter(key).split(&quot;,&quot;), null)}
+     *
+     * @param url   url
+     * @param key   url parameter key which used to get extension point names
+     * @param group group
+     * @return extension list which are activated.
+     * @see #getActivateExtension(org.apache.dubbo.common.URL, String[], String)
+     */
+    public List&lt;T&gt; getActivateExtension(URL url, String key, String group) {
+<span class="nc" id="L192">        String value = url.getParameter(key);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        return getActivateExtension(url, StringUtils.isEmpty(value) ? null : Constants.COMMA_SPLIT_PATTERN.split(value), group);</span>
+    }
+
+    /**
+     * Get activate extensions.
+     *
+     * @param url    url
+     * @param values extension point names
+     * @param group  group
+     * @return extension list which are activated
+     * @see org.apache.dubbo.common.extension.Activate
+     */
+    public List&lt;T&gt; getActivateExtension(URL url, String[] values, String group) {
+<span class="nc" id="L206">        List&lt;T&gt; exts = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        List&lt;String&gt; names = values == null ? new ArrayList&lt;&gt;(0) : Arrays.asList(values);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (!names.contains(Constants.REMOVE_VALUE_PREFIX + Constants.DEFAULT_KEY)) {</span>
+<span class="nc" id="L209">            getExtensionClasses();</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; entry : cachedActivates.entrySet()) {</span>
+<span class="nc" id="L211">                String name = entry.getKey();</span>
+<span class="nc" id="L212">                Object activate = entry.getValue();</span>
+
+                String[] activateGroup, activateValue;
+
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                if (activate instanceof Activate) {</span>
+<span class="nc" id="L217">                    activateGroup = ((Activate) activate).group();</span>
+<span class="nc" id="L218">                    activateValue = ((Activate) activate).value();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                } else if (activate instanceof com.alibaba.dubbo.common.extension.Activate) {</span>
+<span class="nc" id="L220">                    activateGroup = ((com.alibaba.dubbo.common.extension.Activate) activate).group();</span>
+<span class="nc" id="L221">                    activateValue = ((com.alibaba.dubbo.common.extension.Activate) activate).value();</span>
+                } else {
+                    continue;
+                }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                if (isMatchGroup(group, activateGroup)) {</span>
+<span class="nc" id="L226">                    T ext = getExtension(name);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                    if (!names.contains(name)</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                            &amp;&amp; !names.contains(Constants.REMOVE_VALUE_PREFIX + name)</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                            &amp;&amp; isActive(activateValue, url)) {</span>
+<span class="nc" id="L230">                        exts.add(ext);</span>
+                    }
+                }
+<span class="nc" id="L233">            }</span>
+<span class="nc" id="L234">            exts.sort(ActivateComparator.COMPARATOR);</span>
+        }
+<span class="nc" id="L236">        List&lt;T&gt; usrs = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        for (int i = 0; i &lt; names.size(); i++) {</span>
+<span class="nc" id="L238">            String name = names.get(i);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if (!name.startsWith(Constants.REMOVE_VALUE_PREFIX)</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                    &amp;&amp; !names.contains(Constants.REMOVE_VALUE_PREFIX + name)) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                if (Constants.DEFAULT_KEY.equals(name)) {</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                    if (!usrs.isEmpty()) {</span>
+<span class="nc" id="L243">                        exts.addAll(0, usrs);</span>
+<span class="nc" id="L244">                        usrs.clear();</span>
+                    }
+                } else {
+<span class="nc" id="L247">                    T ext = getExtension(name);</span>
+<span class="nc" id="L248">                    usrs.add(ext);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!usrs.isEmpty()) {</span>
+<span class="nc" id="L253">            exts.addAll(usrs);</span>
+        }
+<span class="nc" id="L255">        return exts;</span>
+    }
+
+    private boolean isMatchGroup(String group, String[] groups) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (StringUtils.isEmpty(group)) {</span>
+<span class="nc" id="L260">            return true;</span>
+        }
+<span class="nc bnc" id="L262" title="All 4 branches missed.">        if (groups != null &amp;&amp; groups.length &gt; 0) {</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            for (String g : groups) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                if (group.equals(g)) {</span>
+<span class="nc" id="L265">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L269">        return false;</span>
+    }
+
+    private boolean isActive(String[] keys, URL url) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (keys.length == 0) {</span>
+<span class="nc" id="L274">            return true;</span>
+        }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        for (String key : keys) {</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; entry : url.getParameters().entrySet()) {</span>
+<span class="nc" id="L278">                String k = entry.getKey();</span>
+<span class="nc" id="L279">                String v = entry.getValue();</span>
+<span class="nc bnc" id="L280" title="All 4 branches missed.">                if ((k.equals(key) || k.endsWith(&quot;.&quot; + key))</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                        &amp;&amp; ConfigUtils.isNotEmpty(v)) {</span>
+<span class="nc" id="L282">                    return true;</span>
+                }
+<span class="nc" id="L284">            }</span>
+        }
+<span class="nc" id="L286">        return false;</span>
+    }
+
+    /**
+     * Get extension's instance. Return &lt;code&gt;null&lt;/code&gt; if extension is not found or is not initialized. Pls. note
+     * that this method will not trigger extension load.
+     * &lt;p&gt;
+     * In order to trigger extension load, call {@link #getExtension(String)} instead.
+     *
+     * @see #getExtension(String)
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public T getLoadedExtension(String name) {
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (StringUtils.isEmpty(name)) {</span>
+<span class="nc" id="L300">            throw new IllegalArgumentException(&quot;Extension name == null&quot;);</span>
+        }
+<span class="nc" id="L302">        Holder&lt;Object&gt; holder = getOrCreateHolder(name);</span>
+<span class="nc" id="L303">        return (T) holder.get();</span>
+    }
+
+    private Holder&lt;Object&gt; getOrCreateHolder(String name) {
+<span class="nc" id="L307">        Holder&lt;Object&gt; holder = cachedInstances.get(name);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (holder == null) {</span>
+<span class="nc" id="L309">            cachedInstances.putIfAbsent(name, new Holder&lt;&gt;());</span>
+<span class="nc" id="L310">            holder = cachedInstances.get(name);</span>
+        }
+<span class="nc" id="L312">        return holder;</span>
+    }
+
+    /**
+     * Return the list of extensions which are already loaded.
+     * &lt;p&gt;
+     * Usually {@link #getSupportedExtensions()} should be called in order to get all extensions.
+     *
+     * @see #getSupportedExtensions()
+     */
+    public Set&lt;String&gt; getLoadedExtensions() {
+<span class="nc" id="L323">        return Collections.unmodifiableSet(new TreeSet&lt;&gt;(cachedInstances.keySet()));</span>
+    }
+
+    public Object getLoadedAdaptiveExtensionInstances() {
+<span class="nc" id="L327">        return cachedAdaptiveInstance.get();</span>
+    }
+
+    /**
+     * Find the extension with the given name. If the specified name is not found, then {@link IllegalStateException}
+     * will be thrown.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public T getExtension(String name) {
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (StringUtils.isEmpty(name)) {</span>
+<span class="nc" id="L337">            throw new IllegalArgumentException(&quot;Extension name == null&quot;);</span>
+        }
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (&quot;true&quot;.equals(name)) {</span>
+<span class="nc" id="L340">            return getDefaultExtension();</span>
+        }
+<span class="nc" id="L342">        Holder&lt;Object&gt; holder = getOrCreateHolder(name);</span>
+<span class="nc" id="L343">        Object instance = holder.get();</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L345">            synchronized (holder) {</span>
+<span class="nc" id="L346">                instance = holder.get();</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                if (instance == null) {</span>
+<span class="nc" id="L348">                    instance = createExtension(name);</span>
+<span class="nc" id="L349">                    holder.set(instance);</span>
+                }
+<span class="nc" id="L351">            }</span>
+        }
+<span class="nc" id="L353">        return (T) instance;</span>
+    }
+
+    /**
+     * Return default extension, return &lt;code&gt;null&lt;/code&gt; if it's not configured.
+     */
+    public T getDefaultExtension() {
+<span class="nc" id="L360">        getExtensionClasses();</span>
+<span class="nc bnc" id="L361" title="All 4 branches missed.">        if (StringUtils.isBlank(cachedDefaultName) || &quot;true&quot;.equals(cachedDefaultName)) {</span>
+<span class="nc" id="L362">            return null;</span>
+        }
+<span class="nc" id="L364">        return getExtension(cachedDefaultName);</span>
+    }
+
+    public boolean hasExtension(String name) {
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (StringUtils.isEmpty(name)) {</span>
+<span class="nc" id="L369">            throw new IllegalArgumentException(&quot;Extension name == null&quot;);</span>
+        }
+<span class="nc" id="L371">        Class&lt;?&gt; c = this.getExtensionClass(name);</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        return c != null;</span>
+    }
+
+    public Set&lt;String&gt; getSupportedExtensions() {
+<span class="nc" id="L376">        Map&lt;String, Class&lt;?&gt;&gt; clazzes = getExtensionClasses();</span>
+<span class="nc" id="L377">        return Collections.unmodifiableSet(new TreeSet&lt;&gt;(clazzes.keySet()));</span>
+    }
+
+    /**
+     * Return default extension name, return &lt;code&gt;null&lt;/code&gt; if not configured.
+     */
+    public String getDefaultExtensionName() {
+<span class="nc" id="L384">        getExtensionClasses();</span>
+<span class="nc" id="L385">        return cachedDefaultName;</span>
+    }
+
+    /**
+     * Register new extension via API
+     *
+     * @param name  extension name
+     * @param clazz extension class
+     * @throws IllegalStateException when extension with the same name has already been registered.
+     */
+    public void addExtension(String name, Class&lt;?&gt; clazz) {
+<span class="nc" id="L396">        getExtensionClasses(); // load classes</span>
+
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (!type.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L399">            throw new IllegalStateException(&quot;Input type &quot; +</span>
+                    clazz + &quot; doesn't implement the Extension &quot; + type);
+        }
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        if (clazz.isInterface()) {</span>
+<span class="nc" id="L403">            throw new IllegalStateException(&quot;Input type &quot; +</span>
+                    clazz + &quot; can't be interface!&quot;);
+        }
+
+<span class="nc bnc" id="L407" title="All 2 branches missed.">        if (!clazz.isAnnotationPresent(Adaptive.class)) {</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">            if (StringUtils.isBlank(name)) {</span>
+<span class="nc" id="L409">                throw new IllegalStateException(&quot;Extension name is blank (Extension &quot; + type + &quot;)!&quot;);</span>
+            }
+<span class="nc bnc" id="L411" title="All 2 branches missed.">            if (cachedClasses.get().containsKey(name)) {</span>
+<span class="nc" id="L412">                throw new IllegalStateException(&quot;Extension name &quot; +</span>
+                        name + &quot; already exists (Extension &quot; + type + &quot;)!&quot;);
+            }
+
+<span class="nc" id="L416">            cachedNames.put(clazz, name);</span>
+<span class="nc" id="L417">            cachedClasses.get().put(name, clazz);</span>
+        } else {
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            if (cachedAdaptiveClass != null) {</span>
+<span class="nc" id="L420">                throw new IllegalStateException(&quot;Adaptive Extension already exists (Extension &quot; + type + &quot;)!&quot;);</span>
+            }
+
+<span class="nc" id="L423">            cachedAdaptiveClass = clazz;</span>
+        }
+<span class="nc" id="L425">    }</span>
+
+    /**
+     * Replace the existing extension via API
+     *
+     * @param name  extension name
+     * @param clazz extension class
+     * @throws IllegalStateException when extension to be placed doesn't exist
+     * @deprecated not recommended any longer, and use only when test
+     */
+    @Deprecated
+    public void replaceExtension(String name, Class&lt;?&gt; clazz) {
+<span class="nc" id="L437">        getExtensionClasses(); // load classes</span>
+
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (!type.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L440">            throw new IllegalStateException(&quot;Input type &quot; +</span>
+                    clazz + &quot; doesn't implement Extension &quot; + type);
+        }
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (clazz.isInterface()) {</span>
+<span class="nc" id="L444">            throw new IllegalStateException(&quot;Input type &quot; +</span>
+                    clazz + &quot; can't be interface!&quot;);
+        }
+
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        if (!clazz.isAnnotationPresent(Adaptive.class)) {</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            if (StringUtils.isBlank(name)) {</span>
+<span class="nc" id="L450">                throw new IllegalStateException(&quot;Extension name is blank (Extension &quot; + type + &quot;)!&quot;);</span>
+            }
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (!cachedClasses.get().containsKey(name)) {</span>
+<span class="nc" id="L453">                throw new IllegalStateException(&quot;Extension name &quot; +</span>
+                        name + &quot; doesn't exist (Extension &quot; + type + &quot;)!&quot;);
+            }
+
+<span class="nc" id="L457">            cachedNames.put(clazz, name);</span>
+<span class="nc" id="L458">            cachedClasses.get().put(name, clazz);</span>
+<span class="nc" id="L459">            cachedInstances.remove(name);</span>
+        } else {
+<span class="nc bnc" id="L461" title="All 2 branches missed.">            if (cachedAdaptiveClass == null) {</span>
+<span class="nc" id="L462">                throw new IllegalStateException(&quot;Adaptive Extension doesn't exist (Extension &quot; + type + &quot;)!&quot;);</span>
+            }
+
+<span class="nc" id="L465">            cachedAdaptiveClass = clazz;</span>
+<span class="nc" id="L466">            cachedAdaptiveInstance.set(null);</span>
+        }
+<span class="nc" id="L468">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public T getAdaptiveExtension() {
+<span class="nc" id="L472">        Object instance = cachedAdaptiveInstance.get();</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            if (createAdaptiveInstanceError == null) {</span>
+<span class="nc" id="L475">                synchronized (cachedAdaptiveInstance) {</span>
+<span class="nc" id="L476">                    instance = cachedAdaptiveInstance.get();</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                    if (instance == null) {</span>
+                        try {
+<span class="nc" id="L479">                            instance = createAdaptiveExtension();</span>
+<span class="nc" id="L480">                            cachedAdaptiveInstance.set(instance);</span>
+<span class="nc" id="L481">                        } catch (Throwable t) {</span>
+<span class="nc" id="L482">                            createAdaptiveInstanceError = t;</span>
+<span class="nc" id="L483">                            throw new IllegalStateException(&quot;Failed to create adaptive instance: &quot; + t.toString(), t);</span>
+<span class="nc" id="L484">                        }</span>
+                    }
+<span class="nc" id="L486">                }</span>
+            } else {
+<span class="nc" id="L488">                throw new IllegalStateException(&quot;Failed to create adaptive instance: &quot; + createAdaptiveInstanceError.toString(), createAdaptiveInstanceError);</span>
+            }
+        }
+
+<span class="nc" id="L492">        return (T) instance;</span>
+    }
+
+    private IllegalStateException findException(String name) {
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        for (Map.Entry&lt;String, IllegalStateException&gt; entry : exceptions.entrySet()) {</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">            if (entry.getKey().toLowerCase().contains(name.toLowerCase())) {</span>
+<span class="nc" id="L498">                return entry.getValue();</span>
+            }
+<span class="nc" id="L500">        }</span>
+<span class="nc" id="L501">        StringBuilder buf = new StringBuilder(&quot;No such extension &quot; + type.getName() + &quot; by name &quot; + name);</span>
+
+
+<span class="nc" id="L504">        int i = 1;</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        for (Map.Entry&lt;String, IllegalStateException&gt; entry : exceptions.entrySet()) {</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            if (i == 1) {</span>
+<span class="nc" id="L507">                buf.append(&quot;, possible causes: &quot;);</span>
+            }
+
+<span class="nc" id="L510">            buf.append(&quot;\r\n(&quot;);</span>
+<span class="nc" id="L511">            buf.append(i++);</span>
+<span class="nc" id="L512">            buf.append(&quot;) &quot;);</span>
+<span class="nc" id="L513">            buf.append(entry.getKey());</span>
+<span class="nc" id="L514">            buf.append(&quot;:\r\n&quot;);</span>
+<span class="nc" id="L515">            buf.append(StringUtils.toString(entry.getValue()));</span>
+<span class="nc" id="L516">        }</span>
+<span class="nc" id="L517">        return new IllegalStateException(buf.toString());</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private T createExtension(String name) {
+<span class="nc" id="L522">        Class&lt;?&gt; clazz = getExtensionClasses().get(name);</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">        if (clazz == null) {</span>
+<span class="nc" id="L524">            throw findException(name);</span>
+        }
+        try {
+<span class="nc" id="L527">            T instance = (T) EXTENSION_INSTANCES.get(clazz);</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">            if (instance == null) {</span>
+<span class="nc" id="L529">                EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());</span>
+<span class="nc" id="L530">                instance = (T) EXTENSION_INSTANCES.get(clazz);</span>
+            }
+<span class="nc" id="L532">            injectExtension(instance);</span>
+<span class="nc" id="L533">            Set&lt;Class&lt;?&gt;&gt; wrapperClasses = cachedWrapperClasses;</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(wrapperClasses)) {</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                for (Class&lt;?&gt; wrapperClass : wrapperClasses) {</span>
+<span class="nc" id="L536">                    instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));</span>
+<span class="nc" id="L537">                }</span>
+            }
+<span class="nc" id="L539">            return instance;</span>
+<span class="nc" id="L540">        } catch (Throwable t) {</span>
+<span class="nc" id="L541">            throw new IllegalStateException(&quot;Extension instance (name: &quot; + name + &quot;, class: &quot; +</span>
+<span class="nc" id="L542">                    type + &quot;) couldn't be instantiated: &quot; + t.getMessage(), t);</span>
+        }
+    }
+
+    private T injectExtension(T instance) {
+        try {
+<span class="nc bnc" id="L548" title="All 2 branches missed.">            if (objectFactory != null) {</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">                for (Method method : instance.getClass().getMethods()) {</span>
+<span class="nc bnc" id="L550" title="All 2 branches missed.">                    if (isSetter(method)) {</span>
+                        /**
+                         * Check {@link DisableInject} to see if we need auto injection for this property
+                         */
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                        if (method.getAnnotation(DisableInject.class) != null) {</span>
+<span class="nc" id="L555">                            continue;</span>
+                        }
+<span class="nc" id="L557">                        Class&lt;?&gt; pt = method.getParameterTypes()[0];</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">                        if (ReflectUtils.isPrimitives(pt)) {</span>
+<span class="nc" id="L559">                            continue;</span>
+                        }
+                        try {
+<span class="nc" id="L562">                            String property = getSetterProperty(method);</span>
+<span class="nc" id="L563">                            Object object = objectFactory.getExtension(pt, property);</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                            if (object != null) {</span>
+<span class="nc" id="L565">                                method.invoke(instance, object);</span>
+                            }
+<span class="nc" id="L567">                        } catch (Exception e) {</span>
+<span class="nc" id="L568">                            logger.error(&quot;Failed to inject via method &quot; + method.getName()</span>
+<span class="nc" id="L569">                                    + &quot; of interface &quot; + type.getName() + &quot;: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L570">                        }</span>
+                    }
+                }
+            }
+<span class="nc" id="L574">        } catch (Exception e) {</span>
+<span class="nc" id="L575">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L576">        }</span>
+<span class="nc" id="L577">        return instance;</span>
+    }
+
+    /**
+     * get properties name for setter, for instance: setVersion, return &quot;version&quot;
+     * &lt;p&gt;
+     * return &quot;&quot;, if setter name with length less than 3
+     */
+    private String getSetterProperty(Method method) {
+<span class="nc bnc" id="L586" title="All 2 branches missed.">        return method.getName().length() &gt; 3 ? method.getName().substring(3, 4).toLowerCase() + method.getName().substring(4) : &quot;&quot;;</span>
+    }
+
+    /**
+     * return true if and only if:
+     * &lt;p&gt;
+     * 1, public
+     * &lt;p&gt;
+     * 2, name starts with &quot;set&quot;
+     * &lt;p&gt;
+     * 3, only has one parameter
+     */
+    private boolean isSetter(Method method) {
+<span class="nc bnc" id="L599" title="All 2 branches missed.">        return method.getName().startsWith(&quot;set&quot;)</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                &amp;&amp; method.getParameterTypes().length == 1</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">                &amp;&amp; Modifier.isPublic(method.getModifiers());</span>
+    }
+
+    private Class&lt;?&gt; getExtensionClass(String name) {
+<span class="nc bnc" id="L605" title="All 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L606">            throw new IllegalArgumentException(&quot;Extension type == null&quot;);</span>
+        }
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L609">            throw new IllegalArgumentException(&quot;Extension name == null&quot;);</span>
+        }
+<span class="nc" id="L611">        return getExtensionClasses().get(name);</span>
+    }
+
+    private Map&lt;String, Class&lt;?&gt;&gt; getExtensionClasses() {
+<span class="nc" id="L615">        Map&lt;String, Class&lt;?&gt;&gt; classes = cachedClasses.get();</span>
+<span class="nc bnc" id="L616" title="All 2 branches missed.">        if (classes == null) {</span>
+<span class="nc" id="L617">            synchronized (cachedClasses) {</span>
+<span class="nc" id="L618">                classes = cachedClasses.get();</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                if (classes == null) {</span>
+<span class="nc" id="L620">                    classes = loadExtensionClasses();</span>
+<span class="nc" id="L621">                    cachedClasses.set(classes);</span>
+                }
+<span class="nc" id="L623">            }</span>
+        }
+<span class="nc" id="L625">        return classes;</span>
+    }
+
+    // synchronized in getExtensionClasses
+    private Map&lt;String, Class&lt;?&gt;&gt; loadExtensionClasses() {
+<span class="nc" id="L630">        cacheDefaultExtensionName();</span>
+
+<span class="nc" id="L632">        Map&lt;String, Class&lt;?&gt;&gt; extensionClasses = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L633">        loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName());</span>
+<span class="nc" id="L634">        loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName().replace(&quot;org.apache&quot;, &quot;com.alibaba&quot;));</span>
+<span class="nc" id="L635">        loadDirectory(extensionClasses, DUBBO_DIRECTORY, type.getName());</span>
+<span class="nc" id="L636">        loadDirectory(extensionClasses, DUBBO_DIRECTORY, type.getName().replace(&quot;org.apache&quot;, &quot;com.alibaba&quot;));</span>
+<span class="nc" id="L637">        loadDirectory(extensionClasses, SERVICES_DIRECTORY, type.getName());</span>
+<span class="nc" id="L638">        loadDirectory(extensionClasses, SERVICES_DIRECTORY, type.getName().replace(&quot;org.apache&quot;, &quot;com.alibaba&quot;));</span>
+<span class="nc" id="L639">        return extensionClasses;</span>
+    }
+
+    /**
+     * extract and cache default extension name if exists
+     */
+    private void cacheDefaultExtensionName() {
+<span class="nc" id="L646">        final SPI defaultAnnotation = type.getAnnotation(SPI.class);</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">        if (defaultAnnotation != null) {</span>
+<span class="nc" id="L648">            String value = defaultAnnotation.value();</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">            if ((value = value.trim()).length() &gt; 0) {</span>
+<span class="nc" id="L650">                String[] names = NAME_SEPARATOR.split(value);</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                if (names.length &gt; 1) {</span>
+<span class="nc" id="L652">                    throw new IllegalStateException(&quot;More than 1 default extension name on extension &quot; + type.getName()</span>
+<span class="nc" id="L653">                            + &quot;: &quot; + Arrays.toString(names));</span>
+                }
+<span class="nc bnc" id="L655" title="All 2 branches missed.">                if (names.length == 1) {</span>
+<span class="nc" id="L656">                    cachedDefaultName = names[0];</span>
+                }
+            }
+        }
+<span class="nc" id="L660">    }</span>
+
+    private void loadDirectory(Map&lt;String, Class&lt;?&gt;&gt; extensionClasses, String dir, String type) {
+<span class="nc" id="L663">        String fileName = dir + type;</span>
+        try {
+            Enumeration&lt;java.net.URL&gt; urls;
+<span class="nc" id="L666">            ClassLoader classLoader = findClassLoader();</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">            if (classLoader != null) {</span>
+<span class="nc" id="L668">                urls = classLoader.getResources(fileName);</span>
+            } else {
+<span class="nc" id="L670">                urls = ClassLoader.getSystemResources(fileName);</span>
+            }
+<span class="nc bnc" id="L672" title="All 2 branches missed.">            if (urls != null) {</span>
+<span class="nc bnc" id="L673" title="All 2 branches missed.">                while (urls.hasMoreElements()) {</span>
+<span class="nc" id="L674">                    java.net.URL resourceURL = urls.nextElement();</span>
+<span class="nc" id="L675">                    loadResource(extensionClasses, classLoader, resourceURL);</span>
+<span class="nc" id="L676">                }</span>
+            }
+<span class="nc" id="L678">        } catch (Throwable t) {</span>
+<span class="nc" id="L679">            logger.error(&quot;Exception occurred when loading extension class (interface: &quot; +</span>
+                    type + &quot;, description file: &quot; + fileName + &quot;).&quot;, t);
+<span class="nc" id="L681">        }</span>
+<span class="nc" id="L682">    }</span>
+
+    private void loadResource(Map&lt;String, Class&lt;?&gt;&gt; extensionClasses, ClassLoader classLoader, java.net.URL resourceURL) {
+        try {
+<span class="nc" id="L686">            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resourceURL.openStream(), StandardCharsets.UTF_8))) {</span>
+                String line;
+<span class="nc bnc" id="L688" title="All 2 branches missed.">                while ((line = reader.readLine()) != null) {</span>
+<span class="nc" id="L689">                    final int ci = line.indexOf('#');</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">                    if (ci &gt;= 0) {</span>
+<span class="nc" id="L691">                        line = line.substring(0, ci);</span>
+                    }
+<span class="nc" id="L693">                    line = line.trim();</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">                    if (line.length() &gt; 0) {</span>
+                        try {
+<span class="nc" id="L696">                            String name = null;</span>
+<span class="nc" id="L697">                            int i = line.indexOf('=');</span>
+<span class="nc bnc" id="L698" title="All 2 branches missed.">                            if (i &gt; 0) {</span>
+<span class="nc" id="L699">                                name = line.substring(0, i).trim();</span>
+<span class="nc" id="L700">                                line = line.substring(i + 1).trim();</span>
+                            }
+<span class="nc bnc" id="L702" title="All 2 branches missed.">                            if (line.length() &gt; 0) {</span>
+<span class="nc" id="L703">                                loadClass(extensionClasses, resourceURL, Class.forName(line, true, classLoader), name);</span>
+                            }
+<span class="nc" id="L705">                        } catch (Throwable t) {</span>
+<span class="nc" id="L706">                            IllegalStateException e = new IllegalStateException(&quot;Failed to load extension class (interface: &quot; + type + &quot;, class line: &quot; + line + &quot;) in &quot; + resourceURL + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L707">                            exceptions.put(line, e);</span>
+<span class="nc" id="L708">                        }</span>
+                    }
+<span class="nc" id="L710">                }</span>
+            }
+<span class="nc" id="L712">        } catch (Throwable t) {</span>
+<span class="nc" id="L713">            logger.error(&quot;Exception occurred when loading extension class (interface: &quot; +</span>
+                    type + &quot;, class file: &quot; + resourceURL + &quot;) in &quot; + resourceURL, t);
+<span class="nc" id="L715">        }</span>
+<span class="nc" id="L716">    }</span>
+
+    private void loadClass(Map&lt;String, Class&lt;?&gt;&gt; extensionClasses, java.net.URL resourceURL, Class&lt;?&gt; clazz, String name) throws NoSuchMethodException {
+<span class="nc bnc" id="L719" title="All 2 branches missed.">        if (!type.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L720">            throw new IllegalStateException(&quot;Error occurred when loading extension class (interface: &quot; +</span>
+<span class="nc" id="L721">                    type + &quot;, class line: &quot; + clazz.getName() + &quot;), class &quot;</span>
+<span class="nc" id="L722">                    + clazz.getName() + &quot; is not subtype of interface.&quot;);</span>
+        }
+<span class="nc bnc" id="L724" title="All 2 branches missed.">        if (clazz.isAnnotationPresent(Adaptive.class)) {</span>
+<span class="nc" id="L725">            cacheAdaptiveClass(clazz);</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">        } else if (isWrapperClass(clazz)) {</span>
+<span class="nc" id="L727">            cacheWrapperClass(clazz);</span>
+        } else {
+<span class="nc" id="L729">            clazz.getConstructor();</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">            if (StringUtils.isEmpty(name)) {</span>
+<span class="nc" id="L731">                name = findAnnotationName(clazz);</span>
+<span class="nc bnc" id="L732" title="All 2 branches missed.">                if (name.length() == 0) {</span>
+<span class="nc" id="L733">                    throw new IllegalStateException(&quot;No such extension name for the class &quot; + clazz.getName() + &quot; in the config &quot; + resourceURL);</span>
+                }
+            }
+
+<span class="nc" id="L737">            String[] names = NAME_SEPARATOR.split(name);</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">            if (ArrayUtils.isNotEmpty(names)) {</span>
+<span class="nc" id="L739">                cacheActivateClass(clazz, names[0]);</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">                for (String n : names) {</span>
+<span class="nc" id="L741">                    cacheName(clazz, n);</span>
+<span class="nc" id="L742">                    saveInExtensionClass(extensionClasses, clazz, name);</span>
+                }
+            }
+        }
+<span class="nc" id="L746">    }</span>
+
+    /**
+     * cache name
+     */
+    private void cacheName(Class&lt;?&gt; clazz, String name) {
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        if (!cachedNames.containsKey(clazz)) {</span>
+<span class="nc" id="L753">            cachedNames.put(clazz, name);</span>
+        }
+<span class="nc" id="L755">    }</span>
+
+    /**
+     * put clazz in extensionClasses
+     */
+    private void saveInExtensionClass(Map&lt;String, Class&lt;?&gt;&gt; extensionClasses, Class&lt;?&gt; clazz, String name) {
+<span class="nc" id="L761">        Class&lt;?&gt; c = extensionClasses.get(name);</span>
+<span class="nc bnc" id="L762" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L763">            extensionClasses.put(name, clazz);</span>
+<span class="nc bnc" id="L764" title="All 2 branches missed.">        } else if (c != clazz) {</span>
+<span class="nc" id="L765">            throw new IllegalStateException(&quot;Duplicate extension &quot; + type.getName() + &quot; name &quot; + name + &quot; on &quot; + c.getName() + &quot; and &quot; + clazz.getName());</span>
+        }
+<span class="nc" id="L767">    }</span>
+
+    /**
+     * cache Activate class which is annotated with &lt;code&gt;Activate&lt;/code&gt;
+     * &lt;p&gt;
+     * for compatibility, also cache class with old alibaba Activate annotation
+     */
+    private void cacheActivateClass(Class&lt;?&gt; clazz, String name) {
+<span class="nc" id="L775">        Activate activate = clazz.getAnnotation(Activate.class);</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">        if (activate != null) {</span>
+<span class="nc" id="L777">            cachedActivates.put(name, activate);</span>
+        } else {
+            // support com.alibaba.dubbo.common.extension.Activate
+<span class="nc" id="L780">            com.alibaba.dubbo.common.extension.Activate oldActivate = clazz.getAnnotation(com.alibaba.dubbo.common.extension.Activate.class);</span>
+<span class="nc bnc" id="L781" title="All 2 branches missed.">            if (oldActivate != null) {</span>
+<span class="nc" id="L782">                cachedActivates.put(name, oldActivate);</span>
+            }
+        }
+<span class="nc" id="L785">    }</span>
+
+    /**
+     * cache Adaptive class which is annotated with &lt;code&gt;Adaptive&lt;/code&gt;
+     */
+    private void cacheAdaptiveClass(Class&lt;?&gt; clazz) {
+<span class="nc bnc" id="L791" title="All 2 branches missed.">        if (cachedAdaptiveClass == null) {</span>
+<span class="nc" id="L792">            cachedAdaptiveClass = clazz;</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">        } else if (!cachedAdaptiveClass.equals(clazz)) {</span>
+<span class="nc" id="L794">            throw new IllegalStateException(&quot;More than 1 adaptive class found: &quot;</span>
+<span class="nc" id="L795">                    + cachedAdaptiveClass.getClass().getName()</span>
+<span class="nc" id="L796">                    + &quot;, &quot; + clazz.getClass().getName());</span>
+        }
+<span class="nc" id="L798">    }</span>
+
+    /**
+     * cache wrapper class
+     * &lt;p&gt;
+     * like: ProtocolFilterWrapper, ProtocolListenerWrapper
+     */
+    private void cacheWrapperClass(Class&lt;?&gt; clazz) {
+<span class="nc bnc" id="L806" title="All 2 branches missed.">        if (cachedWrapperClasses == null) {</span>
+<span class="nc" id="L807">            cachedWrapperClasses = new ConcurrentHashSet&lt;&gt;();</span>
+        }
+<span class="nc" id="L809">        cachedWrapperClasses.add(clazz);</span>
+<span class="nc" id="L810">    }</span>
+
+    /**
+     * test if clazz is a wrapper class
+     * &lt;p&gt;
+     * which has Constructor with given class type as its only argument
+     */
+    private boolean isWrapperClass(Class&lt;?&gt; clazz) {
+        try {
+<span class="nc" id="L819">            clazz.getConstructor(type);</span>
+<span class="nc" id="L820">            return true;</span>
+<span class="nc" id="L821">        } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L822">            return false;</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;deprecation&quot;)
+    private String findAnnotationName(Class&lt;?&gt; clazz) {
+<span class="nc" id="L828">        org.apache.dubbo.common.Extension extension = clazz.getAnnotation(org.apache.dubbo.common.Extension.class);</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (extension == null) {</span>
+<span class="nc" id="L830">            String name = clazz.getSimpleName();</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">            if (name.endsWith(type.getSimpleName())) {</span>
+<span class="nc" id="L832">                name = name.substring(0, name.length() - type.getSimpleName().length());</span>
+            }
+<span class="nc" id="L834">            return name.toLowerCase();</span>
+        }
+<span class="nc" id="L836">        return extension.value();</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private T createAdaptiveExtension() {
+        try {
+<span class="nc" id="L842">            return injectExtension((T) getAdaptiveExtensionClass().newInstance());</span>
+<span class="nc" id="L843">        } catch (Exception e) {</span>
+<span class="nc" id="L844">            throw new IllegalStateException(&quot;Can't create adaptive extension &quot; + type + &quot;, cause: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    private Class&lt;?&gt; getAdaptiveExtensionClass() {
+<span class="nc" id="L849">        getExtensionClasses();</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">        if (cachedAdaptiveClass != null) {</span>
+<span class="nc" id="L851">            return cachedAdaptiveClass;</span>
+        }
+<span class="nc" id="L853">        return cachedAdaptiveClass = createAdaptiveExtensionClass();</span>
+    }
+
+    private Class&lt;?&gt; createAdaptiveExtensionClass() {
+<span class="nc" id="L857">        String code = new AdaptiveClassCodeGenerator(type, cachedDefaultName).generate();</span>
+<span class="nc" id="L858">        ClassLoader classLoader = findClassLoader();</span>
+<span class="nc" id="L859">        org.apache.dubbo.common.compiler.Compiler compiler = ExtensionLoader.getExtensionLoader(org.apache.dubbo.common.compiler.Compiler.class).getAdaptiveExtension();</span>
+<span class="nc" id="L860">        return compiler.compile(code, classLoader);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L865">        return this.getClass().getName() + &quot;[&quot; + type.getName() + &quot;]&quot;;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

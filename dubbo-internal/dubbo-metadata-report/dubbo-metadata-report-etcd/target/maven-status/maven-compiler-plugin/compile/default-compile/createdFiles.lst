@@ -1,0 +1,2 @@
+org/apache/dubbo/metadata/store/etcd/EtcdMetadataReportFactory.class
+org/apache/dubbo/metadata/store/etcd/EtcdMetadataReport.class

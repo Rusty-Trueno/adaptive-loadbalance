@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractInterfaceBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">AbstractInterfaceBuilder.java</span></div><h1>AbstractInterfaceBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.AbstractInterfaceConfig;
+import org.apache.dubbo.config.ApplicationConfig;
+import org.apache.dubbo.config.ConfigCenterConfig;
+import org.apache.dubbo.config.MetadataReportConfig;
+import org.apache.dubbo.config.ModuleConfig;
+import org.apache.dubbo.config.MonitorConfig;
+import org.apache.dubbo.config.RegistryConfig;
+import org.apache.dubbo.rpc.Filter;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * AbstractBuilder
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L37">public abstract class AbstractInterfaceBuilder&lt;T extends AbstractInterfaceConfig, B extends AbstractInterfaceBuilder&lt;T, B&gt;&gt;</span>
+        extends AbstractMethodBuilder&lt;T, B&gt; {
+    /**
+     * Local impl class name for the service interface
+     */
+    protected String local;
+
+    /**
+     * Local stub class name for the service interface
+     */
+    protected String stub;
+
+    /**
+     * Service monitor
+     */
+    protected MonitorConfig monitor;
+
+    /**
+     * Strategies for generating dynamic agents，there are two strategies can be choosed: jdk and javassist
+     */
+    protected String proxy;
+
+    /**
+     * Cluster type
+     */
+    protected String cluster;
+
+    /**
+     * The {@link Filter} when the provider side exposed a service or the customer side references a remote service used,
+     * if there are more than one, you can use commas to separate them
+     */
+    protected String filter;
+
+    /**
+     * The Listener when the provider side exposes a service or the customer side references a remote service used
+     * if there are more than one, you can use commas to separate them
+     */
+    protected String listener;
+
+    /**
+     * The owner of the service providers
+     */
+    protected String owner;
+
+    /**
+     * Connection limits, 0 means shared connection, otherwise it defines the connections delegated to the current service
+     */
+    protected Integer connections;
+
+    /**
+     * The layer of service providers
+     */
+    protected String layer;
+
+    /**
+     * The application info
+     */
+    protected ApplicationConfig application;
+
+    /**
+     * The module info
+     */
+    protected ModuleConfig module;
+
+    /**
+     * Registry centers
+     */
+    protected List&lt;RegistryConfig&gt; registries;
+
+    protected String registryIds;
+
+    // connection events
+    protected String onconnect;
+
+    /**
+     * Disconnection events
+     */
+    protected String ondisconnect;
+    protected MetadataReportConfig metadataReportConfig;
+
+    protected ConfigCenterConfig configCenter;
+
+    // callback limits
+    private Integer callbacks;
+    // the scope for referring/exporting a service, if it's local, it means searching in current JVM only.
+    private String scope;
+
+    private String tag;
+
+    /**
+     * @param local
+     * @see org.apache.dubbo.config.builders.AbstractInterfaceBuilder#stub(String)
+     * @deprecated Replace to &lt;code&gt;stub(String)&lt;/code&gt;
+     */
+    @Deprecated
+    public B local(String local) {
+<span class="nc" id="L133">        this.local = local;</span>
+<span class="nc" id="L134">        return getThis();</span>
+    }
+
+    /**
+     * @param local
+     * @see org.apache.dubbo.config.builders.AbstractInterfaceBuilder#stub(Boolean)
+     * @deprecated Replace to &lt;code&gt;stub(Boolean)&lt;/code&gt;
+     */
+    @Deprecated
+    public B local(Boolean local) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (local != null) {</span>
+<span class="nc" id="L145">            this.local = local.toString();</span>
+        } else {
+<span class="nc" id="L147">            this.local = null;</span>
+        }
+<span class="nc" id="L149">        return getThis();</span>
+    }
+
+    public B stub(String stub) {
+<span class="nc" id="L153">        this.stub = stub;</span>
+<span class="nc" id="L154">        return getThis();</span>
+    }
+
+    public B stub(Boolean stub) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (stub != null) {</span>
+<span class="nc" id="L159">            this.stub = stub.toString();</span>
+        } else {
+<span class="nc" id="L161">            this.stub = null;</span>
+        }
+<span class="nc" id="L163">        return getThis();</span>
+    }
+
+    public B monitor(MonitorConfig monitor) {
+<span class="nc" id="L167">        this.monitor = monitor;</span>
+<span class="nc" id="L168">        return getThis();</span>
+    }
+
+    public B monitor(String monitor) {
+<span class="nc" id="L172">        this.monitor = new MonitorConfig(monitor);</span>
+<span class="nc" id="L173">        return getThis();</span>
+    }
+
+    public B proxy(String proxy) {
+<span class="nc" id="L177">        this.proxy = proxy;</span>
+<span class="nc" id="L178">        return getThis();</span>
+    }
+
+    public B cluster(String cluster) {
+<span class="nc" id="L182">        this.cluster = cluster;</span>
+<span class="nc" id="L183">        return getThis();</span>
+    }
+
+    public B filter(String filter) {
+<span class="nc" id="L187">        this.filter = filter;</span>
+<span class="nc" id="L188">        return getThis();</span>
+    }
+
+    public B listener(String listener) {
+<span class="nc" id="L192">        this.listener = listener;</span>
+<span class="nc" id="L193">        return getThis();</span>
+    }
+
+    public B owner(String owner) {
+<span class="nc" id="L197">        this.owner = owner;</span>
+<span class="nc" id="L198">        return getThis();</span>
+    }
+
+    public B connections(Integer connections) {
+<span class="nc" id="L202">        this.connections = connections;</span>
+<span class="nc" id="L203">        return getThis();</span>
+    }
+
+    public B layer(String layer) {
+<span class="nc" id="L207">        this.layer = layer;</span>
+<span class="nc" id="L208">        return getThis();</span>
+    }
+
+    public B application(ApplicationConfig application) {
+<span class="nc" id="L212">        this.application = application;</span>
+<span class="nc" id="L213">        return getThis();</span>
+    }
+
+    public B module(ModuleConfig module) {
+<span class="nc" id="L217">        this.module = module;</span>
+<span class="nc" id="L218">        return getThis();</span>
+    }
+
+    public B addRegistries(List&lt;RegistryConfig&gt; registries) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (this.registries == null) {</span>
+<span class="nc" id="L223">            this.registries = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L225">        this.registries.addAll(registries);</span>
+<span class="nc" id="L226">        return getThis();</span>
+    }
+
+    public B addRegistry(RegistryConfig registry) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (this.registries == null) {</span>
+<span class="nc" id="L231">            this.registries = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L233">        this.registries.add(registry);</span>
+<span class="nc" id="L234">        return getThis();</span>
+    }
+
+    public B registryIds(String registryIds) {
+<span class="nc" id="L238">        this.registryIds = registryIds;</span>
+<span class="nc" id="L239">        return getThis();</span>
+    }
+
+    public B onconnect(String onconnect) {
+<span class="nc" id="L243">        this.onconnect = onconnect;</span>
+<span class="nc" id="L244">        return getThis();</span>
+    }
+
+    public B ondisconnect(String ondisconnect) {
+<span class="nc" id="L248">        this.ondisconnect = ondisconnect;</span>
+<span class="nc" id="L249">        return getThis();</span>
+    }
+
+    public B metadataReportConfig(MetadataReportConfig metadataReportConfig) {
+<span class="nc" id="L253">        this.metadataReportConfig = metadataReportConfig;</span>
+<span class="nc" id="L254">        return getThis();</span>
+    }
+
+    public B configCenter(ConfigCenterConfig configCenter) {
+<span class="nc" id="L258">        this.configCenter = configCenter;</span>
+<span class="nc" id="L259">        return getThis();</span>
+    }
+
+    public B callbacks(Integer callbacks) {
+<span class="nc" id="L263">        this.callbacks = callbacks;</span>
+<span class="nc" id="L264">        return getThis();</span>
+    }
+
+    public B scope(String scope) {
+<span class="nc" id="L268">        this.scope = scope;</span>
+<span class="nc" id="L269">        return getThis();</span>
+    }
+
+    public B tag(String tag) {
+<span class="nc" id="L273">        this.tag = tag;</span>
+<span class="nc" id="L274">        return getThis();</span>
+    }
+
+    @Override
+    public void build(T instance) {
+<span class="nc" id="L279">        super.build(instance);</span>
+
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (!StringUtils.isEmpty(local)) {</span>
+<span class="nc" id="L282">            instance.setLocal(local);</span>
+        }
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        if (!StringUtils.isEmpty(stub)) {</span>
+<span class="nc" id="L285">            instance.setStub(stub);</span>
+        }
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (monitor != null) {</span>
+<span class="nc" id="L288">            instance.setMonitor(monitor);</span>
+        }
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (!StringUtils.isEmpty(proxy)) {</span>
+<span class="nc" id="L291">            instance.setProxy(proxy);</span>
+        }
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (!StringUtils.isEmpty(cluster)) {</span>
+<span class="nc" id="L294">            instance.setCluster(cluster);</span>
+        }
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (!StringUtils.isEmpty(filter)) {</span>
+<span class="nc" id="L297">            instance.setFilter(filter);</span>
+        }
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (!StringUtils.isEmpty(listener)) {</span>
+<span class="nc" id="L300">            instance.setListener(listener);</span>
+        }
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (!StringUtils.isEmpty(owner)) {</span>
+<span class="nc" id="L303">            instance.setOwner(owner);</span>
+        }
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (connections != null) {</span>
+<span class="nc" id="L306">            instance.setConnections(connections);</span>
+        }
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (!StringUtils.isEmpty(layer)) {</span>
+<span class="nc" id="L309">            instance.setLayer(layer);</span>
+        }
+<span class="nc bnc" id="L311" title="All 2 branches missed.">        if (application != null) {</span>
+<span class="nc" id="L312">            instance.setApplication(application);</span>
+        }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (module != null) {</span>
+<span class="nc" id="L315">            instance.setModule(module);</span>
+        }
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (registries != null) {</span>
+<span class="nc" id="L318">            instance.setRegistries(registries);</span>
+        }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (!StringUtils.isEmpty(registryIds)) {</span>
+<span class="nc" id="L321">            instance.setRegistryIds(registryIds);</span>
+        }
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        if (!StringUtils.isEmpty(onconnect)) {</span>
+<span class="nc" id="L324">            instance.setOnconnect(onconnect);</span>
+        }
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (!StringUtils.isEmpty(ondisconnect)) {</span>
+<span class="nc" id="L327">            instance.setOndisconnect(ondisconnect);</span>
+        }
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        if (metadataReportConfig != null) {</span>
+<span class="nc" id="L330">            instance.setMetadataReportConfig(metadataReportConfig);</span>
+        }
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (configCenter != null) {</span>
+<span class="nc" id="L333">            instance.setConfigCenter(configCenter);</span>
+        }
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (callbacks != null) {</span>
+<span class="nc" id="L336">            instance.setCallbacks(callbacks);</span>
+        }
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (!StringUtils.isEmpty(scope)) {</span>
+<span class="nc" id="L339">            instance.setScope(scope);</span>
+        }
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(tag)) {</span>
+<span class="nc" id="L342">            instance.setTag(tag);</span>
+        }
+<span class="nc" id="L344">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

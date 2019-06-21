@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LazyConnectExchangeClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">LazyConnectExchangeClient.java</span></div><h1>LazyConnectExchangeClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.Parameters;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.exchange.Exchangers;
+import org.apache.dubbo.remoting.exchange.ResponseFuture;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * dubbo protocol support class.
+ */
+@SuppressWarnings(&quot;deprecation&quot;)
+final class LazyConnectExchangeClient implements ExchangeClient {
+
+    /**
+     * when this warning rises from invocation, program probably have bug.
+     */
+    protected static final String REQUEST_WITH_WARNING_KEY = &quot;lazyclient_request_with_warning&quot;;
+<span class="nc" id="L47">    private final static Logger logger = LoggerFactory.getLogger(LazyConnectExchangeClient.class);</span>
+    protected final boolean requestWithWarning;
+    private final URL url;
+    private final ExchangeHandler requestHandler;
+<span class="nc" id="L51">    private final Lock connectLock = new ReentrantLock();</span>
+<span class="nc" id="L52">    private final int warning_period = 5000;</span>
+    /**
+     * lazy connect, initial state for connection
+     */
+    private final boolean initialState;
+    private volatile ExchangeClient client;
+<span class="nc" id="L58">    private AtomicLong warningcount = new AtomicLong(0);</span>
+
+<span class="nc" id="L60">    public LazyConnectExchangeClient(URL url, ExchangeHandler requestHandler) {</span>
+        // lazy connect, need set send.reconnect = true, to avoid channel bad status.
+<span class="nc" id="L62">        this.url = url.addParameter(Constants.SEND_RECONNECT_KEY, Boolean.TRUE.toString());</span>
+<span class="nc" id="L63">        this.requestHandler = requestHandler;</span>
+<span class="nc" id="L64">        this.initialState = url.getParameter(Constants.LAZY_CONNECT_INITIAL_STATE_KEY, Constants.DEFAULT_LAZY_CONNECT_INITIAL_STATE);</span>
+<span class="nc" id="L65">        this.requestWithWarning = url.getParameter(REQUEST_WITH_WARNING_KEY, false);</span>
+<span class="nc" id="L66">    }</span>
+
+    private void initClient() throws RemotingException {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L70">            return;</span>
+        }
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L73">            logger.info(&quot;Lazy connect to &quot; + url);</span>
+        }
+<span class="nc" id="L75">        connectLock.lock();</span>
+        try {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (client != null) {</span>
+<span class="nc" id="L78">                return;</span>
+            }
+<span class="nc" id="L80">            this.client = Exchangers.connect(url, requestHandler);</span>
+        } finally {
+<span class="nc" id="L82">            connectLock.unlock();</span>
+        }
+<span class="nc" id="L84">    }</span>
+
+    @Override
+    public ResponseFuture request(Object request) throws RemotingException {
+<span class="nc" id="L88">        warning();</span>
+<span class="nc" id="L89">        initClient();</span>
+<span class="nc" id="L90">        return client.request(request);</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L95">        return url;</span>
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L101">            return InetSocketAddress.createUnresolved(url.getHost(), url.getPort());</span>
+        } else {
+<span class="nc" id="L103">            return client.getRemoteAddress();</span>
+        }
+    }
+
+    @Override
+    public ResponseFuture request(Object request, int timeout) throws RemotingException {
+<span class="nc" id="L109">        warning();</span>
+<span class="nc" id="L110">        initClient();</span>
+<span class="nc" id="L111">        return client.request(request, timeout);</span>
+    }
+
+    /**
+     * If {@link #REQUEST_WITH_WARNING_KEY} is configured, then warn once every 5000 invocations.
+     */
+    private void warning() {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (requestWithWarning) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (warningcount.get() % warning_period == 0) {</span>
+<span class="nc" id="L120">                logger.warn(new IllegalStateException(&quot;safe guard client , should not be called ,must have a bug.&quot;));</span>
+            }
+<span class="nc" id="L122">            warningcount.incrementAndGet();</span>
+        }
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public ChannelHandler getChannelHandler() {
+<span class="nc" id="L128">        checkClient();</span>
+<span class="nc" id="L129">        return client.getChannelHandler();</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L135">            return initialState;</span>
+        } else {
+<span class="nc" id="L137">            return client.isConnected();</span>
+        }
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L144">            return InetSocketAddress.createUnresolved(NetUtils.getLocalHost(), 0);</span>
+        } else {
+<span class="nc" id="L146">            return client.getLocalAddress();</span>
+        }
+    }
+
+    @Override
+    public ExchangeHandler getExchangeHandler() {
+<span class="nc" id="L152">        return requestHandler;</span>
+    }
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc" id="L157">        initClient();</span>
+<span class="nc" id="L158">        client.send(message);</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L163">        initClient();</span>
+<span class="nc" id="L164">        client.send(message, sent);</span>
+<span class="nc" id="L165">    }</span>
+
+    @Override
+    public boolean isClosed() {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L170">            return client.isClosed();</span>
+        } else {
+<span class="nc" id="L172">            return true;</span>
+        }
+    }
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L179">            client.close();</span>
+        }
+<span class="nc" id="L181">    }</span>
+
+    @Override
+    public void close(int timeout) {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L186">            client.close(timeout);</span>
+        }
+<span class="nc" id="L188">    }</span>
+
+    @Override
+    public void startClose() {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (client != null) {</span>
+<span class="nc" id="L193">            client.startClose();</span>
+        }
+<span class="nc" id="L195">    }</span>
+
+    @Override
+    public void reset(URL url) {
+<span class="nc" id="L199">        checkClient();</span>
+<span class="nc" id="L200">        client.reset(url);</span>
+<span class="nc" id="L201">    }</span>
+
+    @Override
+    @Deprecated
+    public void reset(Parameters parameters) {
+<span class="nc" id="L206">        reset(getUrl().addParameters(parameters.getParameters()));</span>
+<span class="nc" id="L207">    }</span>
+
+    @Override
+    public void reconnect() throws RemotingException {
+<span class="nc" id="L211">        checkClient();</span>
+<span class="nc" id="L212">        client.reconnect();</span>
+<span class="nc" id="L213">    }</span>
+
+    @Override
+    public Object getAttribute(String key) {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L218">            return null;</span>
+        } else {
+<span class="nc" id="L220">            return client.getAttribute(key);</span>
+        }
+    }
+
+    @Override
+    public void setAttribute(String key, Object value) {
+<span class="nc" id="L226">        checkClient();</span>
+<span class="nc" id="L227">        client.setAttribute(key, value);</span>
+<span class="nc" id="L228">    }</span>
+
+    @Override
+    public void removeAttribute(String key) {
+<span class="nc" id="L232">        checkClient();</span>
+<span class="nc" id="L233">        client.removeAttribute(key);</span>
+<span class="nc" id="L234">    }</span>
+
+    @Override
+    public boolean hasAttribute(String key) {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L239">            return false;</span>
+        } else {
+<span class="nc" id="L241">            return client.hasAttribute(key);</span>
+        }
+    }
+
+    private void checkClient() {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L247">            throw new IllegalStateException(</span>
+                    &quot;LazyConnectExchangeClient state error. the client has not be init .url:&quot; + url);
+        }
+<span class="nc" id="L250">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

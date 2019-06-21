@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceDefinition.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-definition</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.definition.model</a> &gt; <span class="el_source">ServiceDefinition.java</span></div><h1>ServiceDefinition.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.definition.model;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * 2015/1/27.
+ */
+<span class="nc" id="L26">public class ServiceDefinition {</span>
+
+    private String canonicalName;
+    private String codeSource;
+    private List&lt;MethodDefinition&gt; methods;
+    private List&lt;TypeDefinition&gt; types;
+
+    public String getCanonicalName() {
+<span class="nc" id="L34">        return canonicalName;</span>
+    }
+
+    public String getCodeSource() {
+<span class="nc" id="L38">        return codeSource;</span>
+    }
+
+    public List&lt;MethodDefinition&gt; getMethods() {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (methods == null) {</span>
+<span class="nc" id="L43">            methods = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L45">        return methods;</span>
+    }
+
+    public List&lt;TypeDefinition&gt; getTypes() {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (types == null) {</span>
+<span class="nc" id="L50">            types = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L52">        return types;</span>
+    }
+
+    public String getUniqueId() {
+<span class="nc" id="L56">        return canonicalName + &quot;@&quot; + codeSource;</span>
+    }
+
+    public void setCanonicalName(String canonicalName) {
+<span class="nc" id="L60">        this.canonicalName = canonicalName;</span>
+<span class="nc" id="L61">    }</span>
+
+    public void setCodeSource(String codeSource) {
+<span class="nc" id="L64">        this.codeSource = codeSource;</span>
+<span class="nc" id="L65">    }</span>
+
+    public void setMethods(List&lt;MethodDefinition&gt; methods) {
+<span class="nc" id="L68">        this.methods = methods;</span>
+<span class="nc" id="L69">    }</span>
+
+    public void setTypes(List&lt;TypeDefinition&gt; types) {
+<span class="nc" id="L72">        this.types = types;</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L77">        return &quot;ServiceDefinition [canonicalName=&quot; + canonicalName + &quot;, codeSource=&quot; + codeSource + &quot;, methods=&quot;</span>
+                + methods + &quot;]&quot;;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L84">            return true;</span>
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (!(o instanceof ServiceDefinition)) {</span>
+<span class="nc" id="L87">            return false;</span>
+        }
+<span class="nc" id="L89">        ServiceDefinition that = (ServiceDefinition) o;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        return Objects.equals(getCanonicalName(), that.getCanonicalName()) &amp;&amp;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                Objects.equals(getCodeSource(), that.getCodeSource()) &amp;&amp;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                Objects.equals(getMethods(), that.getMethods()) &amp;&amp;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                Objects.equals(getTypes(), that.getTypes());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L98">        return Objects.hash(getCanonicalName(), getCodeSource(), getMethods(), getTypes());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

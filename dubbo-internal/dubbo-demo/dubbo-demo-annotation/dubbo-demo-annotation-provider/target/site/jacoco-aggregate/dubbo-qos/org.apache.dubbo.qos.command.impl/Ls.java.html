@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Ls.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.command.impl</a> &gt; <span class="el_source">Ls.java</span></div><h1>Ls.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.command.impl;
+
+import org.apache.dubbo.qos.command.BaseCommand;
+import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.command.annotation.Cmd;
+import org.apache.dubbo.qos.textui.TTable;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ConsumerModel;
+import org.apache.dubbo.rpc.model.ProviderModel;
+
+import java.util.Collection;
+
+import static org.apache.dubbo.registry.support.ProviderConsumerRegTable.getConsumerAddressNum;
+import static org.apache.dubbo.registry.support.ProviderConsumerRegTable.isRegistered;
+
+@Cmd(name = &quot;ls&quot;, summary = &quot;ls service&quot;, example = {
+        &quot;ls&quot;
+})
+<span class="nc" id="L35">public class Ls implements BaseCommand {</span>
+    @Override
+    public String execute(CommandContext commandContext, String[] args) {
+<span class="nc" id="L38">        StringBuilder result = new StringBuilder();</span>
+<span class="nc" id="L39">        result.append(listProvider());</span>
+<span class="nc" id="L40">        result.append(listConsumer());</span>
+
+<span class="nc" id="L42">        return result.toString();</span>
+    }
+
+    public String listProvider() {
+<span class="nc" id="L46">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="nc" id="L47">        stringBuilder.append(&quot;As Provider side:&quot; + System.lineSeparator());</span>
+<span class="nc" id="L48">        Collection&lt;ProviderModel&gt; ProviderModelList = ApplicationModel.allProviderModels();</span>
+
+<span class="nc" id="L50">        TTable tTable = new TTable(new TTable.ColumnDefine[]{</span>
+                new TTable.ColumnDefine(TTable.Align.MIDDLE),
+                new TTable.ColumnDefine(TTable.Align.MIDDLE)
+        });
+
+        //Header
+<span class="nc" id="L56">        tTable.addRow(&quot;Provider Service Name&quot;, &quot;PUB&quot;);</span>
+
+        //Content
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (ProviderModel providerModel : ProviderModelList) {</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            tTable.addRow(providerModel.getServiceName(), isRegistered(providerModel.getServiceName()) ? &quot;Y&quot; : &quot;N&quot;);</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">        stringBuilder.append(tTable.rendering());</span>
+
+<span class="nc" id="L64">        return stringBuilder.toString();</span>
+    }
+
+    public String listConsumer() {
+<span class="nc" id="L68">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="nc" id="L69">        stringBuilder.append(&quot;As Consumer side:&quot; + System.lineSeparator());</span>
+<span class="nc" id="L70">        Collection&lt;ConsumerModel&gt; consumerModelList = ApplicationModel.allConsumerModels();</span>
+
+<span class="nc" id="L72">        TTable tTable = new TTable(new TTable.ColumnDefine[]{</span>
+                new TTable.ColumnDefine(TTable.Align.MIDDLE),
+                new TTable.ColumnDefine(TTable.Align.MIDDLE)
+        });
+
+        //Header
+<span class="nc" id="L78">        tTable.addRow(&quot;Consumer Service Name&quot;, &quot;NUM&quot;);</span>
+
+        //Content
+        //TODO to calculate consumerAddressNum
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        for (ConsumerModel consumerModel : consumerModelList) {</span>
+<span class="nc" id="L83">            tTable.addRow(consumerModel.getServiceName(), getConsumerAddressNum(consumerModel.getServiceName()));</span>
+<span class="nc" id="L84">        }</span>
+
+<span class="nc" id="L86">        stringBuilder.append(tTable.rendering());</span>
+
+<span class="nc" id="L88">        return stringBuilder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

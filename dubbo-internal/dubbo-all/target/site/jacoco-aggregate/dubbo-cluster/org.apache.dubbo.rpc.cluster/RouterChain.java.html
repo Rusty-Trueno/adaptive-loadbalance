@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RouterChain.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster</a> &gt; <span class="el_source">RouterChain.java</span></div><h1>RouterChain.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Router chain
+ */
+public class RouterChain&lt;T&gt; {
+
+    // full list of addresses from registry, classified by method name.
+<span class="nc" id="L36">    private List&lt;Invoker&lt;T&gt;&gt; invokers = Collections.emptyList();</span>
+
+    // containing all routers, reconstruct every time 'route://' urls change.
+<span class="nc" id="L39">    private volatile List&lt;Router&gt; routers = Collections.emptyList();</span>
+
+    // Fixed router instances: ConfigConditionRouter, TagRouter, e.g., the rule for each instance may change but the
+    // instance will never delete or recreate.
+<span class="nc" id="L43">    private List&lt;Router&gt; builtinRouters = Collections.emptyList();</span>
+
+    public static &lt;T&gt; RouterChain&lt;T&gt; buildChain(URL url) {
+<span class="nc" id="L46">        return new RouterChain&lt;&gt;(url);</span>
+    }
+
+<span class="nc" id="L49">    private RouterChain(URL url) {</span>
+<span class="nc" id="L50">        List&lt;RouterFactory&gt; extensionFactories = ExtensionLoader.getExtensionLoader(RouterFactory.class)</span>
+<span class="nc" id="L51">                .getActivateExtension(url, (String[]) null);</span>
+
+<span class="nc" id="L53">        List&lt;Router&gt; routers = extensionFactories.stream()</span>
+<span class="nc" id="L54">                .map(factory -&gt; factory.getRouter(url))</span>
+<span class="nc" id="L55">                .collect(Collectors.toList());</span>
+
+<span class="nc" id="L57">        initWithRouters(routers);</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * the resident routers must being initialized before address notification.
+     * FIXME: this method should not be public
+     */
+    public void initWithRouters(List&lt;Router&gt; builtinRouters) {
+<span class="nc" id="L65">        this.builtinRouters = builtinRouters;</span>
+<span class="nc" id="L66">        this.routers = new ArrayList&lt;&gt;(builtinRouters);</span>
+<span class="nc" id="L67">        this.sort();</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * If we use route:// protocol in version before 2.7.0, each URL will generate a Router instance, so we should
+     * keep the routers up to date, that is, each time router URLs changes, we should update the routers list, only
+     * keep the builtinRouters which are available all the time and the latest notified routers which are generated
+     * from URLs.
+     *
+     * @param routers routers from 'router://' rules in 2.6.x or before.
+     */
+    public void addRouters(List&lt;Router&gt; routers) {
+<span class="nc" id="L79">        List&lt;Router&gt; newRouters = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L80">        newRouters.addAll(builtinRouters);</span>
+<span class="nc" id="L81">        newRouters.addAll(routers);</span>
+<span class="nc" id="L82">        CollectionUtils.sort(routers);</span>
+<span class="nc" id="L83">        this.routers = newRouters;</span>
+<span class="nc" id="L84">    }</span>
+
+    private void sort() {
+<span class="nc" id="L87">        Collections.sort(routers);</span>
+<span class="nc" id="L88">    }</span>
+
+    /**
+     *
+     * @param url
+     * @param invocation
+     * @return
+     */
+    public List&lt;Invoker&lt;T&gt;&gt; route(URL url, Invocation invocation) {
+<span class="nc" id="L97">        List&lt;Invoker&lt;T&gt;&gt; finalInvokers = invokers;</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        for (Router router : routers) {</span>
+<span class="nc" id="L99">            finalInvokers = router.route(finalInvokers, url, invocation);</span>
+<span class="nc" id="L100">        }</span>
+<span class="nc" id="L101">        return finalInvokers;</span>
+    }
+
+    /**
+     * Notify router chain of the initial addresses from registry at the first time.
+     * Notify whenever addresses in registry change.
+     */
+    public void setInvokers(List&lt;Invoker&lt;T&gt;&gt; invokers) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        this.invokers = (invokers == null ? Collections.emptyList() : invokers);</span>
+<span class="nc" id="L110">        routers.forEach(router -&gt; router.notify(this.invokers));</span>
+<span class="nc" id="L111">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

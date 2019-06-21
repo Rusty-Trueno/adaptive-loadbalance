@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractZookeeperTransporter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-zookeeper</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-zookeeper</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.zookeeper.support</a> &gt; <span class="el_source">AbstractZookeeperTransporter.java</span></div><h1>AbstractZookeeperTransporter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.zookeeper.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.zookeeper.ZookeeperClient;
+import org.apache.dubbo.remoting.zookeeper.ZookeeperTransporter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * AbstractZookeeperTransporter is abstract implements of ZookeeperTransporter.
+ * &lt;p&gt;
+ * If you want to extends this, implements createZookeeperClient.
+ */
+<span class="nc" id="L38">public abstract class AbstractZookeeperTransporter implements ZookeeperTransporter {</span>
+<span class="nc" id="L39">    private static final Logger logger = LoggerFactory.getLogger(ZookeeperTransporter.class);</span>
+<span class="nc" id="L40">    private final Map&lt;String, ZookeeperClient&gt; zookeeperClientMap = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /**
+     * share connnect for registry, metadata, etc..
+     * &lt;p&gt;
+     * Make sure the connection is connected.
+     *
+     * @param url
+     * @return
+     */
+    @Override
+    public ZookeeperClient connect(URL url) {
+        ZookeeperClient zookeeperClient;
+<span class="nc" id="L53">        List&lt;String&gt; addressList = getURLBackupAddress(url);</span>
+        // The field define the zookeeper server , including protocol, host, port, username, password
+<span class="nc bnc" id="L55" title="All 4 branches missed.">        if ((zookeeperClient = fetchAndUpdateZookeeperClientCache(addressList)) != null &amp;&amp; zookeeperClient.isConnected()) {</span>
+<span class="nc" id="L56">            logger.info(&quot;find valid zookeeper client from the cache for address: &quot; + url);</span>
+<span class="nc" id="L57">            return zookeeperClient;</span>
+        }
+        // avoid creating too many connections， so add lock
+<span class="nc" id="L60">        synchronized (zookeeperClientMap) {</span>
+<span class="nc bnc" id="L61" title="All 4 branches missed.">            if ((zookeeperClient = fetchAndUpdateZookeeperClientCache(addressList)) != null &amp;&amp; zookeeperClient.isConnected()) {</span>
+<span class="nc" id="L62">                logger.info(&quot;find valid zookeeper client from the cache for address: &quot; + url);</span>
+<span class="nc" id="L63">                return zookeeperClient;</span>
+            }
+
+<span class="nc" id="L66">            zookeeperClient = createZookeeperClient(toClientURL(url));</span>
+<span class="nc" id="L67">            logger.info(&quot;No valid zookeeper client found from cache, therefore create a new client for url. &quot; + url);</span>
+<span class="nc" id="L68">            writeToClientMap(addressList, zookeeperClient);</span>
+<span class="nc" id="L69">        }</span>
+<span class="nc" id="L70">        return zookeeperClient;</span>
+    }
+
+    /**
+     * @param url the url that will create zookeeper connection .
+     *            The url in AbstractZookeeperTransporter#connect parameter is rewritten by this one.
+     *            such as: zookeeper://127.0.0.1:2181/org.apache.dubbo.remoting.zookeeper.ZookeeperTransporter
+     * @return
+     */
+    protected abstract ZookeeperClient createZookeeperClient(URL url);
+
+    /**
+     * get the ZookeeperClient from cache, the ZookeeperClient must be connected.
+     * &lt;p&gt;
+     * It is not private method for unit test.
+     *
+     * @param addressList
+     * @return
+     */
+    ZookeeperClient fetchAndUpdateZookeeperClientCache(List&lt;String&gt; addressList) {
+
+<span class="nc" id="L91">        ZookeeperClient zookeeperClient = null;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (String address : addressList) {</span>
+<span class="nc bnc" id="L93" title="All 4 branches missed.">            if ((zookeeperClient = zookeeperClientMap.get(address)) != null &amp;&amp; zookeeperClient.isConnected()) {</span>
+<span class="nc" id="L94">                break;</span>
+            }
+<span class="nc" id="L96">        }</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (zookeeperClient != null &amp;&amp; zookeeperClient.isConnected()) {</span>
+<span class="nc" id="L98">            writeToClientMap(addressList, zookeeperClient);</span>
+        }
+<span class="nc" id="L100">        return zookeeperClient;</span>
+    }
+
+    /**
+     * get all zookeeper urls (such as :zookeeper://127.0.0.1:2181?127.0.0.1:8989,127.0.0.1:9999)
+     *
+     * @param url such as:zookeeper://127.0.0.1:2181?127.0.0.1:8989,127.0.0.1:9999
+     * @return such as 127.0.0.1:2181,127.0.0.1:8989,127.0.0.1:9999
+     */
+    List&lt;String&gt; getURLBackupAddress(URL url) {
+<span class="nc" id="L110">        List&lt;String&gt; addressList = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L111">        addressList.add(url.getAddress());</span>
+
+<span class="nc" id="L113">        addressList.addAll(url.getParameter(Constants.BACKUP_KEY, Collections.EMPTY_LIST));</span>
+<span class="nc" id="L114">        return addressList;</span>
+    }
+
+    /**
+     * write address-ZookeeperClient relationship to Map
+     *
+     * @param addressList
+     * @param zookeeperClient
+     */
+    void writeToClientMap(List&lt;String&gt; addressList, ZookeeperClient zookeeperClient) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        for (String address : addressList) {</span>
+<span class="nc" id="L125">            zookeeperClientMap.put(address, zookeeperClient);</span>
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">    }</span>
+
+    /**
+     * redefine the url for zookeeper. just keep protocol, username, password, host, port, and individual parameter.
+     *
+     * @param url
+     * @return
+     */
+    URL toClientURL(URL url) {
+<span class="nc" id="L136">        Map&lt;String, String&gt; parameterMap = new HashMap&lt;&gt;();</span>
+        // for CuratorZookeeperClient
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (url.getParameter(Constants.TIMEOUT_KEY) != null) {</span>
+<span class="nc" id="L139">            parameterMap.put(Constants.TIMEOUT_KEY, url.getParameter(Constants.TIMEOUT_KEY));</span>
+        }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (url.getParameter(Constants.BACKUP_KEY) != null) {</span>
+<span class="nc" id="L142">            parameterMap.put(Constants.BACKUP_KEY, url.getParameter(Constants.BACKUP_KEY));</span>
+        }
+<span class="nc" id="L144">        return new URL(url.getProtocol(), url.getUsername(), url.getPassword(), url.getHost(), url.getPort(),</span>
+<span class="nc" id="L145">                ZookeeperTransporter.class.getName(), parameterMap);</span>
+    }
+
+    /**
+     * for unit test
+     *
+     * @return
+     */
+    Map&lt;String, ZookeeperClient&gt; getZookeeperClientMap() {
+<span class="nc" id="L154">        return zookeeperClientMap;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

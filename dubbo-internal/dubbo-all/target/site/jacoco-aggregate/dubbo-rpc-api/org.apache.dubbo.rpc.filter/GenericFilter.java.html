@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GenericFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.filter</a> &gt; <span class="el_source">GenericFilter.java</span></div><h1>GenericFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.beanutil.JavaBeanAccessor;
+import org.apache.dubbo.common.beanutil.JavaBeanDescriptor;
+import org.apache.dubbo.common.beanutil.JavaBeanSerializeUtil;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.io.UnsafeByteArrayInputStream;
+import org.apache.dubbo.common.io.UnsafeByteArrayOutputStream;
+import org.apache.dubbo.common.serialize.Serialization;
+import org.apache.dubbo.common.utils.PojoUtils;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.service.GenericException;
+import org.apache.dubbo.rpc.service.GenericService;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+
+/**
+ * GenericInvokerFilter.
+ */
+@Activate(group = Constants.PROVIDER, order = -20000)
+<span class="nc" id="L50">public class GenericFilter implements Filter {</span>
+
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation inv) throws RpcException {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (inv.getMethodName().equals(Constants.$INVOKE)</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                &amp;&amp; inv.getArguments() != null</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                &amp;&amp; inv.getArguments().length == 3</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                &amp;&amp; !GenericService.class.isAssignableFrom(invoker.getInterface())) {</span>
+<span class="nc" id="L58">            String name = ((String) inv.getArguments()[0]).trim();</span>
+<span class="nc" id="L59">            String[] types = (String[]) inv.getArguments()[1];</span>
+<span class="nc" id="L60">            Object[] args = (Object[]) inv.getArguments()[2];</span>
+            try {
+<span class="nc" id="L62">                Method method = ReflectUtils.findMethodByMethodSignature(invoker.getInterface(), name, types);</span>
+<span class="nc" id="L63">                Class&lt;?&gt;[] params = method.getParameterTypes();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                if (args == null) {</span>
+<span class="nc" id="L65">                    args = new Object[params.length];</span>
+                }
+<span class="nc" id="L67">                String generic = inv.getAttachment(Constants.GENERIC_KEY);</span>
+
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if (StringUtils.isBlank(generic)) {</span>
+<span class="nc" id="L70">                    generic = RpcContext.getContext().getAttachment(Constants.GENERIC_KEY);</span>
+                }
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                if (StringUtils.isEmpty(generic)</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                        || ProtocolUtils.isDefaultGenericSerialization(generic)</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                        || ProtocolUtils.isGenericReturnRawResult(generic)) {</span>
+<span class="nc" id="L76">                    args = PojoUtils.realize(args, params, method.getGenericParameterTypes());</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                } else if (ProtocolUtils.isJavaGenericSerialization(generic)) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                        if (byte[].class == args[i].getClass()) {</span>
+<span class="nc" id="L80">                            try(UnsafeByteArrayInputStream is = new UnsafeByteArrayInputStream((byte[]) args[i])) {</span>
+<span class="nc" id="L81">                                args[i] = ExtensionLoader.getExtensionLoader(Serialization.class)</span>
+<span class="nc" id="L82">                                        .getExtension(Constants.GENERIC_SERIALIZATION_NATIVE_JAVA)</span>
+<span class="nc" id="L83">                                        .deserialize(null, is).readObject();</span>
+<span class="nc" id="L84">                            } catch (Exception e) {</span>
+<span class="nc" id="L85">                                throw new RpcException(&quot;Deserialize argument [&quot; + (i + 1) + &quot;] failed.&quot;, e);</span>
+<span class="nc" id="L86">                            }</span>
+                        } else {
+<span class="nc" id="L88">                            throw new RpcException(</span>
+                                    &quot;Generic serialization [&quot; +
+                                            Constants.GENERIC_SERIALIZATION_NATIVE_JAVA +
+                                            &quot;] only support message type &quot; +
+                                            byte[].class +
+                                            &quot; and your message type is &quot; +
+<span class="nc" id="L94">                                            args[i].getClass());</span>
+                        }
+                    }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                } else if (ProtocolUtils.isBeanGenericSerialization(generic)) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                    for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                        if (args[i] instanceof JavaBeanDescriptor) {</span>
+<span class="nc" id="L100">                            args[i] = JavaBeanSerializeUtil.deserialize((JavaBeanDescriptor) args[i]);</span>
+                        } else {
+<span class="nc" id="L102">                            throw new RpcException(</span>
+                                    &quot;Generic serialization [&quot; +
+                                            Constants.GENERIC_SERIALIZATION_BEAN +
+                                            &quot;] only support message type &quot; +
+<span class="nc" id="L106">                                            JavaBeanDescriptor.class.getName() +</span>
+                                            &quot; and your message type is &quot; +
+<span class="nc" id="L108">                                            args[i].getClass().getName());</span>
+                        }
+                    }
+                }
+<span class="nc" id="L112">                Result result = invoker.invoke(new RpcInvocation(method, args, inv.getAttachments()));</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                if (result.hasException()</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                        &amp;&amp; !(result.getException() instanceof GenericException)) {</span>
+<span class="nc" id="L115">                    return new RpcResult(new GenericException(result.getException()));</span>
+                }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (ProtocolUtils.isJavaGenericSerialization(generic)) {</span>
+                    try {
+<span class="nc" id="L119">                        UnsafeByteArrayOutputStream os = new UnsafeByteArrayOutputStream(512);</span>
+<span class="nc" id="L120">                        ExtensionLoader.getExtensionLoader(Serialization.class)</span>
+<span class="nc" id="L121">                                .getExtension(Constants.GENERIC_SERIALIZATION_NATIVE_JAVA)</span>
+<span class="nc" id="L122">                                .serialize(null, os).writeObject(result.getValue());</span>
+<span class="nc" id="L123">                        return new RpcResult(os.toByteArray());</span>
+<span class="nc" id="L124">                    } catch (IOException e) {</span>
+<span class="nc" id="L125">                        throw new RpcException(&quot;Serialize result failed.&quot;, e);</span>
+                    }
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                } else if (ProtocolUtils.isBeanGenericSerialization(generic)) {</span>
+<span class="nc" id="L128">                    return new RpcResult(JavaBeanSerializeUtil.serialize(result.getValue(), JavaBeanAccessor.METHOD));</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                } else if (ProtocolUtils.isGenericReturnRawResult(generic)) {</span>
+<span class="nc" id="L130">                    return result;</span>
+                } else {
+<span class="nc" id="L132">                    return new RpcResult(PojoUtils.generalize(result.getValue()));</span>
+                }
+<span class="nc" id="L134">            } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L135">                throw new RpcException(e.getMessage(), e);</span>
+<span class="nc" id="L136">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L137">                throw new RpcException(e.getMessage(), e);</span>
+            }
+        }
+<span class="nc" id="L140">        return invoker.invoke(inv);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

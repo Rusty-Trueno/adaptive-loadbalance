@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TimeoutException.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting</a> &gt; <span class="el_source">TimeoutException.java</span></div><h1>TimeoutException.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting;
+
+import java.net.InetSocketAddress;
+
+/**
+ * TimeoutException. (API, Prototype, ThreadSafe)
+ *
+ * @export
+ * @see org.apache.dubbo.remoting.exchange.ResponseFuture#get()
+ * @see org.apache.dubbo.remoting.exchange.ResponseFuture#get(int)
+ */
+public class TimeoutException extends RemotingException {
+
+    public static final int CLIENT_SIDE = 0;
+    public static final int SERVER_SIDE = 1;
+    private static final long serialVersionUID = 3122966731958222692L;
+    private final int phase;
+
+    public TimeoutException(boolean serverSide, Channel channel, String message) {
+<span class="nc" id="L36">        super(channel, message);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        this.phase = serverSide ? SERVER_SIDE : CLIENT_SIDE;</span>
+<span class="nc" id="L38">    }</span>
+
+    public TimeoutException(boolean serverSide, InetSocketAddress localAddress,
+                            InetSocketAddress remoteAddress, String message) {
+<span class="nc" id="L42">        super(localAddress, remoteAddress, message);</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        this.phase = serverSide ? SERVER_SIDE : CLIENT_SIDE;</span>
+<span class="nc" id="L44">    }</span>
+
+    public int getPhase() {
+<span class="nc" id="L47">        return phase;</span>
+    }
+
+    public boolean isServerSide() {
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        return phase == 1;</span>
+    }
+
+    public boolean isClientSide() {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        return phase == 0;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

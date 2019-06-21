@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExchangeCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.codec</a> &gt; <span class="el_source">ExchangeCodec.java</span></div><h1>ExchangeCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.codec;
+
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.io.Bytes;
+import org.apache.dubbo.common.io.StreamUtils;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.serialize.Cleanable;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.ObjectOutput;
+import org.apache.dubbo.common.serialize.Serialization;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBufferInputStream;
+import org.apache.dubbo.remoting.buffer.ChannelBufferOutputStream;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.exchange.support.DefaultFuture;
+import org.apache.dubbo.remoting.telnet.codec.TelnetCodec;
+import org.apache.dubbo.remoting.transport.CodecSupport;
+import org.apache.dubbo.remoting.transport.ExceedPayloadLimitException;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * ExchangeCodec.
+ */
+<span class="nc" id="L47">public class ExchangeCodec extends TelnetCodec {</span>
+
+    // header length.
+    protected static final int HEADER_LENGTH = 16;
+    // magic header.
+    protected static final short MAGIC = (short) 0xdabb;
+<span class="nc" id="L53">    protected static final byte MAGIC_HIGH = Bytes.short2bytes(MAGIC)[0];</span>
+<span class="nc" id="L54">    protected static final byte MAGIC_LOW = Bytes.short2bytes(MAGIC)[1];</span>
+    // message flag.
+    protected static final byte FLAG_REQUEST = (byte) 0x80;
+    protected static final byte FLAG_TWOWAY = (byte) 0x40;
+    protected static final byte FLAG_EVENT = (byte) 0x20;
+    protected static final int SERIALIZATION_MASK = 0x1f;
+<span class="nc" id="L60">    private static final Logger logger = LoggerFactory.getLogger(ExchangeCodec.class);</span>
+
+    public Short getMagicCode() {
+<span class="nc" id="L63">        return MAGIC;</span>
+    }
+
+    @Override
+    public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (msg instanceof Request) {</span>
+<span class="nc" id="L69">            encodeRequest(channel, buffer, (Request) msg);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        } else if (msg instanceof Response) {</span>
+<span class="nc" id="L71">            encodeResponse(channel, buffer, (Response) msg);</span>
+        } else {
+<span class="nc" id="L73">            super.encode(channel, buffer, msg);</span>
+        }
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+<span class="nc" id="L79">        int readable = buffer.readableBytes();</span>
+<span class="nc" id="L80">        byte[] header = new byte[Math.min(readable, HEADER_LENGTH)];</span>
+<span class="nc" id="L81">        buffer.readBytes(header);</span>
+<span class="nc" id="L82">        return decode(channel, buffer, readable, header);</span>
+    }
+
+    @Override
+    protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
+        // check magic number.
+<span class="nc bnc" id="L88" title="All 8 branches missed.">        if (readable &gt; 0 &amp;&amp; header[0] != MAGIC_HIGH</span>
+                || readable &gt; 1 &amp;&amp; header[1] != MAGIC_LOW) {
+<span class="nc" id="L90">            int length = header.length;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (header.length &lt; readable) {</span>
+<span class="nc" id="L92">                header = Bytes.copyOf(header, readable);</span>
+<span class="nc" id="L93">                buffer.readBytes(header, length, readable - length);</span>
+            }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            for (int i = 1; i &lt; header.length - 1; i++) {</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">                if (header[i] == MAGIC_HIGH &amp;&amp; header[i + 1] == MAGIC_LOW) {</span>
+<span class="nc" id="L97">                    buffer.readerIndex(buffer.readerIndex() - header.length + i);</span>
+<span class="nc" id="L98">                    header = Bytes.copyOf(header, i);</span>
+<span class="nc" id="L99">                    break;</span>
+                }
+            }
+<span class="nc" id="L102">            return super.decode(channel, buffer, readable, header);</span>
+        }
+        // check length.
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (readable &lt; HEADER_LENGTH) {</span>
+<span class="nc" id="L106">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+
+        // get data length.
+<span class="nc" id="L110">        int len = Bytes.bytes2int(header, 12);</span>
+<span class="nc" id="L111">        checkPayload(channel, len);</span>
+
+<span class="nc" id="L113">        int tt = len + HEADER_LENGTH;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (readable &lt; tt) {</span>
+<span class="nc" id="L115">            return DecodeResult.NEED_MORE_INPUT;</span>
+        }
+
+        // limit input stream.
+<span class="nc" id="L119">        ChannelBufferInputStream is = new ChannelBufferInputStream(buffer, len);</span>
+
+        try {
+<span class="nc" id="L122">            return decodeBody(channel, is, header);</span>
+        } finally {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            if (is.available() &gt; 0) {</span>
+                try {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L127">                        logger.warn(&quot;Skip input stream &quot; + is.available());</span>
+                    }
+<span class="nc" id="L129">                    StreamUtils.skipUnusedStream(is);</span>
+<span class="nc" id="L130">                } catch (IOException e) {</span>
+<span class="nc" id="L131">                    logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L132">                }</span>
+            }
+        }
+    }
+
+    protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+<span class="nc" id="L138">        byte flag = header[2], proto = (byte) (flag &amp; SERIALIZATION_MASK);</span>
+        // get request id.
+<span class="nc" id="L140">        long id = Bytes.bytes2long(header, 4);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if ((flag &amp; FLAG_REQUEST) == 0) {</span>
+            // decode response.
+<span class="nc" id="L143">            Response res = new Response(id);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if ((flag &amp; FLAG_EVENT) != 0) {</span>
+<span class="nc" id="L145">                res.setEvent(true);</span>
+            }
+            // get status.
+<span class="nc" id="L148">            byte status = header[3];</span>
+<span class="nc" id="L149">            res.setStatus(status);</span>
+            try {
+<span class="nc" id="L151">                ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (status == Response.OK) {</span>
+                    Object data;
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    if (res.isHeartbeat()) {</span>
+<span class="nc" id="L155">                        data = decodeHeartbeatData(channel, in);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    } else if (res.isEvent()) {</span>
+<span class="nc" id="L157">                        data = decodeEventData(channel, in);</span>
+                    } else {
+<span class="nc" id="L159">                        data = decodeResponseData(channel, in, getRequestData(id));</span>
+                    }
+<span class="nc" id="L161">                    res.setResult(data);</span>
+<span class="nc" id="L162">                } else {</span>
+<span class="nc" id="L163">                    res.setErrorMessage(in.readUTF());</span>
+                }
+<span class="nc" id="L165">            } catch (Throwable t) {</span>
+<span class="nc" id="L166">                res.setStatus(Response.CLIENT_ERROR);</span>
+<span class="nc" id="L167">                res.setErrorMessage(StringUtils.toString(t));</span>
+<span class="nc" id="L168">            }</span>
+<span class="nc" id="L169">            return res;</span>
+        } else {
+            // decode request.
+<span class="nc" id="L172">            Request req = new Request(id);</span>
+<span class="nc" id="L173">            req.setVersion(Version.getProtocolVersion());</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            req.setTwoWay((flag &amp; FLAG_TWOWAY) != 0);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if ((flag &amp; FLAG_EVENT) != 0) {</span>
+<span class="nc" id="L176">                req.setEvent(true);</span>
+            }
+            try {
+<span class="nc" id="L179">                ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);</span>
+                Object data;
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                if (req.isHeartbeat()) {</span>
+<span class="nc" id="L182">                    data = decodeHeartbeatData(channel, in);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                } else if (req.isEvent()) {</span>
+<span class="nc" id="L184">                    data = decodeEventData(channel, in);</span>
+                } else {
+<span class="nc" id="L186">                    data = decodeRequestData(channel, in);</span>
+                }
+<span class="nc" id="L188">                req.setData(data);</span>
+<span class="nc" id="L189">            } catch (Throwable t) {</span>
+                // bad request
+<span class="nc" id="L191">                req.setBroken(true);</span>
+<span class="nc" id="L192">                req.setData(t);</span>
+<span class="nc" id="L193">            }</span>
+<span class="nc" id="L194">            return req;</span>
+        }
+    }
+
+    protected Object getRequestData(long id) {
+<span class="nc" id="L199">        DefaultFuture future = DefaultFuture.getFuture(id);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (future == null) {</span>
+<span class="nc" id="L201">            return null;</span>
+        }
+<span class="nc" id="L203">        Request req = future.getRequest();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (req == null) {</span>
+<span class="nc" id="L205">            return null;</span>
+        }
+<span class="nc" id="L207">        return req.getData();</span>
+    }
+
+    protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req) throws IOException {
+<span class="nc" id="L211">        Serialization serialization = getSerialization(channel);</span>
+        // header.
+<span class="nc" id="L213">        byte[] header = new byte[HEADER_LENGTH];</span>
+        // set magic number.
+<span class="nc" id="L215">        Bytes.short2bytes(MAGIC, header);</span>
+
+        // set request and serialization flag.
+<span class="nc" id="L218">        header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());</span>
+
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (req.isTwoWay()) {</span>
+<span class="nc" id="L221">            header[2] |= FLAG_TWOWAY;</span>
+        }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (req.isEvent()) {</span>
+<span class="nc" id="L224">            header[2] |= FLAG_EVENT;</span>
+        }
+
+        // set request id.
+<span class="nc" id="L228">        Bytes.long2bytes(req.getId(), header, 4);</span>
+
+        // encode request data.
+<span class="nc" id="L231">        int savedWriteIndex = buffer.writerIndex();</span>
+<span class="nc" id="L232">        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);</span>
+<span class="nc" id="L233">        ChannelBufferOutputStream bos = new ChannelBufferOutputStream(buffer);</span>
+<span class="nc" id="L234">        ObjectOutput out = serialization.serialize(channel.getUrl(), bos);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (req.isEvent()) {</span>
+<span class="nc" id="L236">            encodeEventData(channel, out, req.getData());</span>
+        } else {
+<span class="nc" id="L238">            encodeRequestData(channel, out, req.getData(), req.getVersion());</span>
+        }
+<span class="nc" id="L240">        out.flushBuffer();</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (out instanceof Cleanable) {</span>
+<span class="nc" id="L242">            ((Cleanable) out).cleanup();</span>
+        }
+<span class="nc" id="L244">        bos.flush();</span>
+<span class="nc" id="L245">        bos.close();</span>
+<span class="nc" id="L246">        int len = bos.writtenBytes();</span>
+<span class="nc" id="L247">        checkPayload(channel, len);</span>
+<span class="nc" id="L248">        Bytes.int2bytes(len, header, 12);</span>
+
+        // write
+<span class="nc" id="L251">        buffer.writerIndex(savedWriteIndex);</span>
+<span class="nc" id="L252">        buffer.writeBytes(header); // write header.</span>
+<span class="nc" id="L253">        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);</span>
+<span class="nc" id="L254">    }</span>
+
+    protected void encodeResponse(Channel channel, ChannelBuffer buffer, Response res) throws IOException {
+<span class="nc" id="L257">        int savedWriteIndex = buffer.writerIndex();</span>
+        try {
+<span class="nc" id="L259">            Serialization serialization = getSerialization(channel);</span>
+            // header.
+<span class="nc" id="L261">            byte[] header = new byte[HEADER_LENGTH];</span>
+            // set magic number.
+<span class="nc" id="L263">            Bytes.short2bytes(MAGIC, header);</span>
+            // set request and serialization flag.
+<span class="nc" id="L265">            header[2] = serialization.getContentTypeId();</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            if (res.isHeartbeat()) {</span>
+<span class="nc" id="L267">                header[2] |= FLAG_EVENT;</span>
+            }
+            // set response status.
+<span class="nc" id="L270">            byte status = res.getStatus();</span>
+<span class="nc" id="L271">            header[3] = status;</span>
+            // set request id.
+<span class="nc" id="L273">            Bytes.long2bytes(res.getId(), header, 4);</span>
+
+<span class="nc" id="L275">            buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);</span>
+<span class="nc" id="L276">            ChannelBufferOutputStream bos = new ChannelBufferOutputStream(buffer);</span>
+<span class="nc" id="L277">            ObjectOutput out = serialization.serialize(channel.getUrl(), bos);</span>
+            // encode response data or error message.
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (status == Response.OK) {</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                if (res.isHeartbeat()) {</span>
+<span class="nc" id="L281">                    encodeHeartbeatData(channel, out, res.getResult());</span>
+                } else {
+<span class="nc" id="L283">                    encodeResponseData(channel, out, res.getResult(), res.getVersion());</span>
+                }
+            } else {
+<span class="nc" id="L286">                out.writeUTF(res.getErrorMessage());</span>
+            }
+<span class="nc" id="L288">            out.flushBuffer();</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            if (out instanceof Cleanable) {</span>
+<span class="nc" id="L290">                ((Cleanable) out).cleanup();</span>
+            }
+<span class="nc" id="L292">            bos.flush();</span>
+<span class="nc" id="L293">            bos.close();</span>
+
+<span class="nc" id="L295">            int len = bos.writtenBytes();</span>
+<span class="nc" id="L296">            checkPayload(channel, len);</span>
+<span class="nc" id="L297">            Bytes.int2bytes(len, header, 12);</span>
+            // write
+<span class="nc" id="L299">            buffer.writerIndex(savedWriteIndex);</span>
+<span class="nc" id="L300">            buffer.writeBytes(header); // write header.</span>
+<span class="nc" id="L301">            buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);</span>
+<span class="nc" id="L302">        } catch (Throwable t) {</span>
+            // clear buffer
+<span class="nc" id="L304">            buffer.writerIndex(savedWriteIndex);</span>
+            // send error message to Consumer, otherwise, Consumer will wait till timeout.
+<span class="nc bnc" id="L306" title="All 4 branches missed.">            if (!res.isEvent() &amp;&amp; res.getStatus() != Response.BAD_RESPONSE) {</span>
+<span class="nc" id="L307">                Response r = new Response(res.getId(), res.getVersion());</span>
+<span class="nc" id="L308">                r.setStatus(Response.BAD_RESPONSE);</span>
+
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                if (t instanceof ExceedPayloadLimitException) {</span>
+<span class="nc" id="L311">                    logger.warn(t.getMessage(), t);</span>
+                    try {
+<span class="nc" id="L313">                        r.setErrorMessage(t.getMessage());</span>
+<span class="nc" id="L314">                        channel.send(r);</span>
+<span class="nc" id="L315">                        return;</span>
+<span class="nc" id="L316">                    } catch (RemotingException e) {</span>
+<span class="nc" id="L317">                        logger.warn(&quot;Failed to send bad_response info back: &quot; + t.getMessage() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L318">                    }</span>
+                } else {
+                    // FIXME log error message in Codec and handle in caught() of IoHanndler?
+<span class="nc" id="L321">                    logger.warn(&quot;Fail to encode response: &quot; + res + &quot;, send bad_response info instead, cause: &quot; + t.getMessage(), t);</span>
+                    try {
+<span class="nc" id="L323">                        r.setErrorMessage(&quot;Failed to send response: &quot; + res + &quot;, cause: &quot; + StringUtils.toString(t));</span>
+<span class="nc" id="L324">                        channel.send(r);</span>
+<span class="nc" id="L325">                        return;</span>
+<span class="nc" id="L326">                    } catch (RemotingException e) {</span>
+<span class="nc" id="L327">                        logger.warn(&quot;Failed to send bad_response info back: &quot; + res + &quot;, cause: &quot; + e.getMessage(), e);</span>
+                    }
+                }
+            }
+
+            // Rethrow exception
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (t instanceof IOException) {</span>
+<span class="nc" id="L334">                throw (IOException) t;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            } else if (t instanceof RuntimeException) {</span>
+<span class="nc" id="L336">                throw (RuntimeException) t;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            } else if (t instanceof Error) {</span>
+<span class="nc" id="L338">                throw (Error) t;</span>
+            } else {
+<span class="nc" id="L340">                throw new RuntimeException(t.getMessage(), t);</span>
+            }
+<span class="nc" id="L342">        }</span>
+<span class="nc" id="L343">    }</span>
+
+    @Override
+    protected Object decodeData(ObjectInput in) throws IOException {
+<span class="nc" id="L347">        return decodeRequestData(in);</span>
+    }
+
+    @Deprecated
+    protected Object decodeHeartbeatData(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L353">            return in.readObject();</span>
+<span class="nc" id="L354">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L355">            throw new IOException(StringUtils.toString(&quot;Read object failed.&quot;, e));</span>
+        }
+    }
+
+    protected Object decodeRequestData(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L361">            return in.readObject();</span>
+<span class="nc" id="L362">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L363">            throw new IOException(StringUtils.toString(&quot;Read object failed.&quot;, e));</span>
+        }
+    }
+
+    protected Object decodeResponseData(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L369">            return in.readObject();</span>
+<span class="nc" id="L370">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L371">            throw new IOException(StringUtils.toString(&quot;Read object failed.&quot;, e));</span>
+        }
+    }
+
+    @Override
+    protected void encodeData(ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L377">        encodeRequestData(out, data);</span>
+<span class="nc" id="L378">    }</span>
+
+    private void encodeEventData(ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L381">        out.writeObject(data);</span>
+<span class="nc" id="L382">    }</span>
+
+    @Deprecated
+    protected void encodeHeartbeatData(ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L386">        encodeEventData(out, data);</span>
+<span class="nc" id="L387">    }</span>
+
+    protected void encodeRequestData(ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L390">        out.writeObject(data);</span>
+<span class="nc" id="L391">    }</span>
+
+    protected void encodeResponseData(ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L394">        out.writeObject(data);</span>
+<span class="nc" id="L395">    }</span>
+
+    @Override
+    protected Object decodeData(Channel channel, ObjectInput in) throws IOException {
+<span class="nc" id="L399">        return decodeRequestData(channel, in);</span>
+    }
+
+    protected Object decodeEventData(Channel channel, ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L404">            return in.readObject();</span>
+<span class="nc" id="L405">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L406">            throw new IOException(StringUtils.toString(&quot;Read object failed.&quot;, e));</span>
+        }
+    }
+
+    @Deprecated
+    protected Object decodeHeartbeatData(Channel channel, ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L413">            return in.readObject();</span>
+<span class="nc" id="L414">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L415">            throw new IOException(StringUtils.toString(&quot;Read object failed.&quot;, e));</span>
+        }
+    }
+
+    protected Object decodeRequestData(Channel channel, ObjectInput in) throws IOException {
+<span class="nc" id="L420">        return decodeRequestData(in);</span>
+    }
+
+    protected Object decodeResponseData(Channel channel, ObjectInput in) throws IOException {
+<span class="nc" id="L424">        return decodeResponseData(in);</span>
+    }
+
+    protected Object decodeResponseData(Channel channel, ObjectInput in, Object requestData) throws IOException {
+<span class="nc" id="L428">        return decodeResponseData(channel, in);</span>
+    }
+
+    @Override
+    protected void encodeData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L433">        encodeRequestData(channel, out, data);</span>
+<span class="nc" id="L434">    }</span>
+
+    private void encodeEventData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L437">        encodeEventData(out, data);</span>
+<span class="nc" id="L438">    }</span>
+
+    @Deprecated
+    protected void encodeHeartbeatData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L442">        encodeHeartbeatData(out, data);</span>
+<span class="nc" id="L443">    }</span>
+
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L446">        encodeRequestData(out, data);</span>
+<span class="nc" id="L447">    }</span>
+
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L450">        encodeResponseData(out, data);</span>
+<span class="nc" id="L451">    }</span>
+
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+<span class="nc" id="L454">        encodeRequestData(out, data);</span>
+<span class="nc" id="L455">    }</span>
+
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+<span class="nc" id="L458">        encodeResponseData(out, data);</span>
+<span class="nc" id="L459">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

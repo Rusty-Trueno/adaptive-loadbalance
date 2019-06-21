@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MetadataReportService.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-report-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.integration</a> &gt; <span class="el_source">MetadataReportService.java</span></div><h1>MetadataReportService.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.integration;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.metadata.definition.ServiceDefinitionBuilder;
+import org.apache.dubbo.metadata.definition.model.FullServiceDefinition;
+import org.apache.dubbo.metadata.identifier.MetadataIdentifier;
+import org.apache.dubbo.metadata.store.MetadataReport;
+import org.apache.dubbo.metadata.store.MetadataReportFactory;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.function.Supplier;
+
+/**
+ * @since 2.7.0
+ */
+public class MetadataReportService {
+
+<span class="nc" id="L40">    protected final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+    private static volatile MetadataReportService metadataReportService;
+<span class="nc" id="L43">    private static Object lock = new Object();</span>
+
+<span class="nc" id="L45">    private MetadataReportFactory metadataReportFactory = ExtensionLoader.getExtensionLoader(MetadataReportFactory.class).getAdaptiveExtension();</span>
+    MetadataReport metadataReport;
+    URL metadataReportUrl;
+
+<span class="nc" id="L49">    MetadataReportService(URL metadataReportURL) {</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (Constants.METADATA_REPORT_KEY.equals(metadataReportURL.getProtocol())) {</span>
+<span class="nc" id="L51">            String protocol = metadataReportURL.getParameter(Constants.METADATA_REPORT_KEY, Constants.DEFAULT_DIRECTORY);</span>
+<span class="nc" id="L52">            metadataReportURL = URLBuilder.from(metadataReportURL)</span>
+<span class="nc" id="L53">                    .setProtocol(protocol)</span>
+<span class="nc" id="L54">                    .removeParameter(Constants.METADATA_REPORT_KEY)</span>
+<span class="nc" id="L55">                    .build();</span>
+        }
+<span class="nc" id="L57">        this.metadataReportUrl = metadataReportURL;</span>
+<span class="nc" id="L58">        metadataReport = metadataReportFactory.getMetadataReport(this.metadataReportUrl);</span>
+
+<span class="nc" id="L60">    }</span>
+
+
+    public static MetadataReportService instance(Supplier&lt;URL&gt; metadataReportUrl) {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (metadataReportService == null) {</span>
+<span class="nc" id="L65">            synchronized (lock) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                if (metadataReportService == null) {</span>
+<span class="nc" id="L67">                    URL metadataReportURLTmp = metadataReportUrl.get();</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                    if (metadataReportURLTmp == null) {</span>
+<span class="nc" id="L69">                        return null;</span>
+                    }
+<span class="nc" id="L71">                    metadataReportService = new MetadataReportService(metadataReportURLTmp);</span>
+                }
+<span class="nc" id="L73">            }</span>
+        }
+<span class="nc" id="L75">        return metadataReportService;</span>
+    }
+
+    public void publishProvider(URL providerUrl) throws RpcException {
+        //first add into the list
+        // remove the individul param
+<span class="nc" id="L81">        providerUrl = providerUrl.removeParameters(Constants.PID_KEY, Constants.TIMESTAMP_KEY, Constants.BIND_IP_KEY, Constants.BIND_PORT_KEY, Constants.TIMESTAMP_KEY);</span>
+
+        try {
+<span class="nc" id="L84">            String interfaceName = providerUrl.getParameter(Constants.INTERFACE_KEY);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(interfaceName)) {</span>
+<span class="nc" id="L86">                Class interfaceClass = Class.forName(interfaceName);</span>
+<span class="nc" id="L87">                FullServiceDefinition fullServiceDefinition = ServiceDefinitionBuilder.buildFullDefinition(interfaceClass, providerUrl.getParameters());</span>
+<span class="nc" id="L88">                metadataReport.storeProviderMetadata(new MetadataIdentifier(providerUrl.getServiceInterface(),</span>
+<span class="nc" id="L89">                        providerUrl.getParameter(Constants.VERSION_KEY), providerUrl.getParameter(Constants.GROUP_KEY),</span>
+<span class="nc" id="L90">                        Constants.PROVIDER_SIDE,providerUrl.getParameter(Constants.APPLICATION_KEY)), fullServiceDefinition);</span>
+<span class="nc" id="L91">                return;</span>
+            }
+<span class="nc" id="L93">            logger.error(&quot;publishProvider interfaceName is empty . providerUrl: &quot; + providerUrl.toFullString());</span>
+<span class="nc" id="L94">        } catch (ClassNotFoundException e) {</span>
+            //ignore error
+<span class="nc" id="L96">            logger.error(&quot;publishProvider getServiceDescriptor error. providerUrl: &quot; + providerUrl.toFullString(), e);</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">    }</span>
+
+    public void publishConsumer(URL consumerURL) throws RpcException {
+<span class="nc" id="L101">        consumerURL = consumerURL.removeParameters(Constants.PID_KEY, Constants.TIMESTAMP_KEY, Constants.BIND_IP_KEY, Constants.BIND_PORT_KEY, Constants.TIMESTAMP_KEY);</span>
+<span class="nc" id="L102">        metadataReport.storeConsumerMetadata(new MetadataIdentifier(consumerURL.getServiceInterface(),</span>
+<span class="nc" id="L103">                consumerURL.getParameter(Constants.VERSION_KEY), consumerURL.getParameter(Constants.GROUP_KEY),Constants.CONSUMER_SIDE,</span>
+<span class="nc" id="L104">                consumerURL.getParameter(Constants.APPLICATION_KEY)), consumerURL.getParameters());</span>
+<span class="nc" id="L105">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

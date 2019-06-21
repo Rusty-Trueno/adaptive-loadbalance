@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExchangeServerPeer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-p2p</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.p2p.exchange.support</a> &gt; <span class="el_source">ExchangeServerPeer.java</span></div><h1>ExchangeServerPeer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.p2p.exchange.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Client;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ExchangeServer;
+import org.apache.dubbo.remoting.exchange.support.ExchangeServerDelegate;
+import org.apache.dubbo.remoting.p2p.exchange.ExchangeGroup;
+import org.apache.dubbo.remoting.p2p.exchange.ExchangePeer;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
+
+/**
+ * ServerPeer
+ */
+public class ExchangeServerPeer extends ExchangeServerDelegate implements ExchangePeer {
+
+<span class="nc" id="L43">    private static final Logger logger = LoggerFactory.getLogger(ExchangeServerPeer.class);</span>
+
+    private final Map&lt;URL, ExchangeClient&gt; clients;
+
+    private final ExchangeGroup group;
+
+    public ExchangeServerPeer(ExchangeServer server, Map&lt;URL, ExchangeClient&gt; clients, ExchangeGroup group) {
+<span class="nc" id="L50">        super(server);</span>
+<span class="nc" id="L51">        this.clients = clients;</span>
+<span class="nc" id="L52">        this.group = group;</span>
+<span class="nc" id="L53">    }</span>
+
+    @Override
+    public void leave() throws RemotingException {
+<span class="nc" id="L57">        group.leave(getUrl());</span>
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L63">            leave();</span>
+<span class="nc" id="L64">        } catch (RemotingException e) {</span>
+<span class="nc" id="L65">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L66">        }</span>
+<span class="nc" id="L67">    }</span>
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    @Override
+    public Collection&lt;Channel&gt; getChannels() {
+<span class="nc" id="L72">        return (Collection) getExchangeChannels();</span>
+    }
+
+    @Override
+    public Channel getChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L77">        return getExchangeChannel(remoteAddress);</span>
+    }
+
+    @Override
+    public Collection&lt;ExchangeChannel&gt; getExchangeChannels() {
+<span class="nc" id="L82">        Collection&lt;ExchangeChannel&gt; channels = super.getExchangeChannels();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (clients.size() &gt; 0) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            channels = channels == null ? new ArrayList&lt;ExchangeChannel&gt;() : new ArrayList&lt;ExchangeChannel&gt;(channels);</span>
+<span class="nc" id="L85">            channels.addAll(clients.values());</span>
+        }
+<span class="nc" id="L87">        return channels;</span>
+    }
+
+    @Override
+    public ExchangeChannel getExchangeChannel(InetSocketAddress remoteAddress) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        String host = remoteAddress.getAddress() != null ? remoteAddress.getAddress().getHostAddress() : remoteAddress.getHostName();</span>
+<span class="nc" id="L93">        int port = remoteAddress.getPort();</span>
+<span class="nc" id="L94">        ExchangeChannel channel = super.getExchangeChannel(remoteAddress);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (channel == null) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            for (Map.Entry&lt;URL, ExchangeClient&gt; entry : clients.entrySet()) {</span>
+<span class="nc" id="L97">                URL url = entry.getKey();</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">                if (url.getIp().equals(host) &amp;&amp; url.getPort() == port) {</span>
+<span class="nc" id="L99">                    return entry.getValue();</span>
+                }
+<span class="nc" id="L101">            }</span>
+        }
+<span class="nc" id="L103">        return channel;</span>
+    }
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc" id="L108">        send(message, getUrl().getParameter(Constants.SENT_KEY, false));</span>
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L113">        Throwable last = null;</span>
+        try {
+<span class="nc" id="L115">            super.send(message, sent);</span>
+<span class="nc" id="L116">        } catch (Throwable t) {</span>
+<span class="nc" id="L117">            last = t;</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (Client client : clients.values()) {</span>
+            try {
+<span class="nc" id="L121">                client.send(message, sent);</span>
+<span class="nc" id="L122">            } catch (Throwable t) {</span>
+<span class="nc" id="L123">                last = t;</span>
+<span class="nc" id="L124">            }</span>
+<span class="nc" id="L125">        }</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (last != null) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (last instanceof RemotingException) {</span>
+<span class="nc" id="L128">                throw (RemotingException) last;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            } else if (last instanceof RuntimeException) {</span>
+<span class="nc" id="L130">                throw (RuntimeException) last;</span>
+            } else {
+<span class="nc" id="L132">                throw new RuntimeException(last.getMessage(), last);</span>
+            }
+        }
+<span class="nc" id="L135">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConfigCenterBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">ConfigCenterBuilder.java</span></div><h1>ConfigCenterBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.ConfigCenterConfig;
+
+import java.util.Map;
+
+/**
+ * This is a builder for build {@link ConfigCenterConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L28">public class ConfigCenterBuilder extends AbstractBuilder&lt;ConfigCenterConfig, ConfigCenterBuilder&gt; {</span>
+
+    private String protocol;
+    private String address;
+    private String cluster;
+<span class="nc" id="L33">    private String namespace = &quot;dubbo&quot;;</span>
+<span class="nc" id="L34">    private String group = &quot;dubbo&quot;;</span>
+    private String username;
+    private String password;
+<span class="nc" id="L37">    private Long timeout = 3000L;</span>
+<span class="nc" id="L38">    private Boolean highestPriority = true;</span>
+<span class="nc" id="L39">    private Boolean check = true;</span>
+
+    private String appName;
+<span class="nc" id="L42">    private String configFile = &quot;dubbo.properties&quot;;</span>
+    private String appConfigFile;
+
+    private Map&lt;String, String&gt; parameters;
+
+    public ConfigCenterBuilder protocol(String protocol) {
+<span class="nc" id="L48">        this.protocol = protocol;</span>
+<span class="nc" id="L49">        return getThis();</span>
+    }
+
+	public ConfigCenterBuilder address(String address) {
+<span class="nc" id="L53">        this.address = address;</span>
+<span class="nc" id="L54">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder cluster(String cluster) {
+<span class="nc" id="L58">        this.cluster = cluster;</span>
+<span class="nc" id="L59">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder namespace(String namespace) {
+<span class="nc" id="L63">        this.namespace = namespace;</span>
+<span class="nc" id="L64">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder group(String group) {
+<span class="nc" id="L68">        this.group = group;</span>
+<span class="nc" id="L69">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder username(String username) {
+<span class="nc" id="L73">        this.username = username;</span>
+<span class="nc" id="L74">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder password(String password) {
+<span class="nc" id="L78">        this.password = password;</span>
+<span class="nc" id="L79">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder timeout(Long timeout) {
+<span class="nc" id="L83">        this.timeout = timeout;</span>
+<span class="nc" id="L84">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder highestPriority(Boolean highestPriority) {
+<span class="nc" id="L88">        this.highestPriority = highestPriority;</span>
+<span class="nc" id="L89">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder check(Boolean check) {
+<span class="nc" id="L93">        this.check = check;</span>
+<span class="nc" id="L94">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder appName(String appName) {
+<span class="nc" id="L98">        this.appName = appName;</span>
+<span class="nc" id="L99">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder configFile(String configFile) {
+<span class="nc" id="L103">        this.configFile = configFile;</span>
+<span class="nc" id="L104">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder appConfigFile(String appConfigFile) {
+<span class="nc" id="L108">        this.appConfigFile = appConfigFile;</span>
+<span class="nc" id="L109">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder appendParameters(Map&lt;String, String&gt; appendParameters) {
+<span class="nc" id="L113">        this.parameters = appendParameters(this.parameters, appendParameters);</span>
+<span class="nc" id="L114">        return getThis();</span>
+    }
+
+    public ConfigCenterBuilder appendParameter(String key, String value) {
+<span class="nc" id="L118">        this.parameters = appendParameter(this.parameters, key, value);</span>
+<span class="nc" id="L119">        return getThis();</span>
+    }
+
+    public ConfigCenterConfig build() {
+<span class="nc" id="L123">        ConfigCenterConfig configCenter = new ConfigCenterConfig();</span>
+<span class="nc" id="L124">        super.build(configCenter);</span>
+
+<span class="nc" id="L126">        configCenter.setProtocol(protocol);</span>
+<span class="nc" id="L127">        configCenter.setAddress(address);</span>
+<span class="nc" id="L128">        configCenter.setCluster(cluster);</span>
+<span class="nc" id="L129">        configCenter.setNamespace(namespace);</span>
+<span class="nc" id="L130">        configCenter.setGroup(group);</span>
+<span class="nc" id="L131">        configCenter.setUsername(username);</span>
+<span class="nc" id="L132">        configCenter.setPassword(password);</span>
+<span class="nc" id="L133">        configCenter.setTimeout(timeout);</span>
+<span class="nc" id="L134">        configCenter.setHighestPriority(highestPriority);</span>
+<span class="nc" id="L135">        configCenter.setCheck(check);</span>
+<span class="nc" id="L136">        configCenter.setAppName(appName);</span>
+<span class="nc" id="L137">        configCenter.setConfigFile(configFile);</span>
+<span class="nc" id="L138">        configCenter.setAppConfigFile(appConfigFile);</span>
+<span class="nc" id="L139">        configCenter.setParameters(parameters);</span>
+
+<span class="nc" id="L141">        return configCenter;</span>
+    }
+
+    @Override
+    protected ConfigCenterBuilder getThis() {
+<span class="nc" id="L146">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

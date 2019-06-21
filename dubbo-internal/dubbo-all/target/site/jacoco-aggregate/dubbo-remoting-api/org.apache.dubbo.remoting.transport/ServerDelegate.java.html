@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServerDelegate.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport</a> &gt; <span class="el_source">ServerDelegate.java</span></div><h1>ServerDelegate.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Server;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+
+/**
+ * ServerDelegate
+ *
+ *
+ */
+public class ServerDelegate implements Server {
+
+    private transient Server server;
+
+<span class="nc" id="L37">    public ServerDelegate() {</span>
+<span class="nc" id="L38">    }</span>
+
+<span class="nc" id="L40">    public ServerDelegate(Server server) {</span>
+<span class="nc" id="L41">        setServer(server);</span>
+<span class="nc" id="L42">    }</span>
+
+    public Server getServer() {
+<span class="nc" id="L45">        return server;</span>
+    }
+
+    public void setServer(Server server) {
+<span class="nc" id="L49">        this.server = server;</span>
+<span class="nc" id="L50">    }</span>
+
+    @Override
+    public boolean isBound() {
+<span class="nc" id="L54">        return server.isBound();</span>
+    }
+
+    @Override
+    public void reset(URL url) {
+<span class="nc" id="L59">        server.reset(url);</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    @Deprecated
+    public void reset(org.apache.dubbo.common.Parameters parameters) {
+<span class="nc" id="L65">        reset(getUrl().addParameters(parameters.getParameters()));</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public Collection&lt;Channel&gt; getChannels() {
+<span class="nc" id="L70">        return server.getChannels();</span>
+    }
+
+    @Override
+    public Channel getChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L75">        return server.getChannel(remoteAddress);</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L80">        return server.getUrl();</span>
+    }
+
+    @Override
+    public ChannelHandler getChannelHandler() {
+<span class="nc" id="L85">        return server.getChannelHandler();</span>
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L90">        return server.getLocalAddress();</span>
+    }
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc" id="L95">        server.send(message);</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L100">        server.send(message, sent);</span>
+<span class="nc" id="L101">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L105">        server.close();</span>
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public void close(int timeout) {
+<span class="nc" id="L110">        server.close(timeout);</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public void startClose() {
+<span class="nc" id="L115">        server.startClose();</span>
+<span class="nc" id="L116">    }</span>
+
+    @Override
+    public boolean isClosed() {
+<span class="nc" id="L120">        return server.isClosed();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

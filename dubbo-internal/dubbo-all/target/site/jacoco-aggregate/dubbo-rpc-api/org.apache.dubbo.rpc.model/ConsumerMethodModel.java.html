@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerMethodModel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.model</a> &gt; <span class="el_source">ConsumerMethodModel.java</span></div><h1>ConsumerMethodModel.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.model;
+
+import org.apache.dubbo.common.Constants;
+
+import java.lang.reflect.Method;
+import java.util.Map;
+
+public class ConsumerMethodModel {
+    private final Method method;
+    //    private final boolean isCallBack;
+//    private final boolean isFuture;
+    private final String[] parameterTypes;
+    private final Class&lt;?&gt;[] parameterClasses;
+    private final Class&lt;?&gt; returnClass;
+    private final String methodName;
+    private final boolean generic;
+
+    private final AsyncMethodInfo asyncInfo;
+
+
+<span class="nc" id="L37">    public ConsumerMethodModel(Method method, Map&lt;String, Object&gt; attributes) {</span>
+<span class="nc" id="L38">        this.method = method;</span>
+<span class="nc" id="L39">        this.parameterClasses = method.getParameterTypes();</span>
+<span class="nc" id="L40">        this.returnClass = method.getReturnType();</span>
+<span class="nc" id="L41">        this.parameterTypes = this.createParamSignature(parameterClasses);</span>
+<span class="nc" id="L42">        this.methodName = method.getName();</span>
+<span class="nc bnc" id="L43" title="All 6 branches missed.">        this.generic = methodName.equals(Constants.$INVOKE) &amp;&amp; parameterTypes != null &amp;&amp; parameterTypes.length == 3;</span>
+
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (attributes != null) {</span>
+<span class="nc" id="L46">            asyncInfo = (AsyncMethodInfo) attributes.get(methodName);</span>
+        } else {
+<span class="nc" id="L48">            asyncInfo = null;</span>
+        }
+<span class="nc" id="L50">    }</span>
+
+    public Method getMethod() {
+<span class="nc" id="L53">        return method;</span>
+    }
+
+    public Class&lt;?&gt; getReturnClass() {
+<span class="nc" id="L57">        return returnClass;</span>
+    }
+
+    public AsyncMethodInfo getAsyncInfo() {
+<span class="nc" id="L61">        return asyncInfo;</span>
+    }
+
+    public String getMethodName() {
+<span class="nc" id="L65">        return methodName;</span>
+    }
+
+    public String[] getParameterTypes() {
+<span class="nc" id="L69">        return parameterTypes;</span>
+    }
+
+    private String[] createParamSignature(Class&lt;?&gt;[] args) {
+<span class="nc bnc" id="L73" title="All 4 branches missed.">        if (args == null || args.length == 0) {</span>
+<span class="nc" id="L74">            return new String[]{};</span>
+        }
+<span class="nc" id="L76">        String[] paramSig = new String[args.length];</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (int x = 0; x &lt; args.length; x++) {</span>
+<span class="nc" id="L78">            paramSig[x] = args[x].getName();</span>
+        }
+<span class="nc" id="L80">        return paramSig;</span>
+    }
+
+
+    public boolean isGeneric() {
+<span class="nc" id="L85">        return generic;</span>
+    }
+
+    public Class&lt;?&gt;[] getParameterClasses() {
+<span class="nc" id="L89">        return parameterClasses;</span>
+    }
+
+
+<span class="nc" id="L93">    public static class AsyncMethodInfo {</span>
+        // callback instance when async-call is invoked
+        private Object oninvokeInstance;
+
+        // callback method when async-call is invoked
+        private Method oninvokeMethod;
+
+        // callback instance when async-call is returned
+        private Object onreturnInstance;
+
+        // callback method when async-call is returned
+        private Method onreturnMethod;
+
+        // callback instance when async-call has exception thrown
+        private Object onthrowInstance;
+
+        // callback method when async-call has exception thrown
+        private Method onthrowMethod;
+
+        public Object getOninvokeInstance() {
+<span class="nc" id="L113">            return oninvokeInstance;</span>
+        }
+
+        public void setOninvokeInstance(Object oninvokeInstance) {
+<span class="nc" id="L117">            this.oninvokeInstance = oninvokeInstance;</span>
+<span class="nc" id="L118">        }</span>
+
+        public Method getOninvokeMethod() {
+<span class="nc" id="L121">            return oninvokeMethod;</span>
+        }
+
+        public void setOninvokeMethod(Method oninvokeMethod) {
+<span class="nc" id="L125">            this.oninvokeMethod = oninvokeMethod;</span>
+<span class="nc" id="L126">        }</span>
+
+        public Object getOnreturnInstance() {
+<span class="nc" id="L129">            return onreturnInstance;</span>
+        }
+
+        public void setOnreturnInstance(Object onreturnInstance) {
+<span class="nc" id="L133">            this.onreturnInstance = onreturnInstance;</span>
+<span class="nc" id="L134">        }</span>
+
+        public Method getOnreturnMethod() {
+<span class="nc" id="L137">            return onreturnMethod;</span>
+        }
+
+        public void setOnreturnMethod(Method onreturnMethod) {
+<span class="nc" id="L141">            this.onreturnMethod = onreturnMethod;</span>
+<span class="nc" id="L142">        }</span>
+
+        public Object getOnthrowInstance() {
+<span class="nc" id="L145">            return onthrowInstance;</span>
+        }
+
+        public void setOnthrowInstance(Object onthrowInstance) {
+<span class="nc" id="L149">            this.onthrowInstance = onthrowInstance;</span>
+<span class="nc" id="L150">        }</span>
+
+        public Method getOnthrowMethod() {
+<span class="nc" id="L153">            return onthrowMethod;</span>
+        }
+
+        public void setOnthrowMethod(Method onthrowMethod) {
+<span class="nc" id="L157">            this.onthrowMethod = onthrowMethod;</span>
+<span class="nc" id="L158">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

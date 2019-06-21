@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Transporters.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting</a> &gt; <span class="el_source">Transporters.java</span></div><h1>Transporters.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.remoting.transport.ChannelHandlerAdapter;
+import org.apache.dubbo.remoting.transport.ChannelHandlerDispatcher;
+
+/**
+ * Transporter facade. (API, Static, ThreadSafe)
+ */
+public class Transporters {
+
+    static {
+        // check duplicate jar package
+<span class="nc" id="L32">        Version.checkDuplicate(Transporters.class);</span>
+<span class="nc" id="L33">        Version.checkDuplicate(RemotingException.class);</span>
+<span class="nc" id="L34">    }</span>
+
+    private Transporters() {
+    }
+
+    public static Server bind(String url, ChannelHandler... handler) throws RemotingException {
+<span class="nc" id="L40">        return bind(URL.valueOf(url), handler);</span>
+    }
+
+    public static Server bind(URL url, ChannelHandler... handlers) throws RemotingException {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        if (handlers == null || handlers.length == 0) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;handlers == null&quot;);</span>
+        }
+        ChannelHandler handler;
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (handlers.length == 1) {</span>
+<span class="nc" id="L52">            handler = handlers[0];</span>
+        } else {
+<span class="nc" id="L54">            handler = new ChannelHandlerDispatcher(handlers);</span>
+        }
+<span class="nc" id="L56">        return getTransporter().bind(url, handler);</span>
+    }
+
+    public static Client connect(String url, ChannelHandler... handler) throws RemotingException {
+<span class="nc" id="L60">        return connect(URL.valueOf(url), handler);</span>
+    }
+
+    public static Client connect(URL url, ChannelHandler... handlers) throws RemotingException {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+        ChannelHandler handler;
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (handlers == null || handlers.length == 0) {</span>
+<span class="nc" id="L69">            handler = new ChannelHandlerAdapter();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        } else if (handlers.length == 1) {</span>
+<span class="nc" id="L71">            handler = handlers[0];</span>
+        } else {
+<span class="nc" id="L73">            handler = new ChannelHandlerDispatcher(handlers);</span>
+        }
+<span class="nc" id="L75">        return getTransporter().connect(url, handler);</span>
+    }
+
+    public static Transporter getTransporter() {
+<span class="nc" id="L79">        return ExtensionLoader.getExtensionLoader(Transporter.class).getAdaptiveExtension();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

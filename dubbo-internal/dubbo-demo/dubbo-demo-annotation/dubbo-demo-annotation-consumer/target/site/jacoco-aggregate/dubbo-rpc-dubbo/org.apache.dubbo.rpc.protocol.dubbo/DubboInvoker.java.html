@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">DubboInvoker.java</span></div><h1>DubboInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.config.ConfigurationUtils;
+import org.apache.dubbo.common.utils.AtomicPositiveInteger;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.TimeoutException;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ResponseFuture;
+import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.SimpleAsyncRpcResult;
+import org.apache.dubbo.rpc.protocol.AbstractInvoker;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * DubboInvoker
+ */
+public class DubboInvoker&lt;T&gt; extends AbstractInvoker&lt;T&gt; {
+
+    private final ExchangeClient[] clients;
+
+<span class="nc" id="L49">    private final AtomicPositiveInteger index = new AtomicPositiveInteger();</span>
+
+    private final String version;
+
+<span class="nc" id="L53">    private final ReentrantLock destroyLock = new ReentrantLock();</span>
+
+    private final Set&lt;Invoker&lt;?&gt;&gt; invokers;
+
+    public DubboInvoker(Class&lt;T&gt; serviceType, URL url, ExchangeClient[] clients) {
+<span class="nc" id="L58">        this(serviceType, url, clients, null);</span>
+<span class="nc" id="L59">    }</span>
+
+    public DubboInvoker(Class&lt;T&gt; serviceType, URL url, ExchangeClient[] clients, Set&lt;Invoker&lt;?&gt;&gt; invokers) {
+<span class="nc" id="L62">        super(serviceType, url, new String[]{Constants.INTERFACE_KEY, Constants.GROUP_KEY, Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});</span>
+<span class="nc" id="L63">        this.clients = clients;</span>
+        // get version.
+<span class="nc" id="L65">        this.version = url.getParameter(Constants.VERSION_KEY, &quot;0.0.0&quot;);</span>
+<span class="nc" id="L66">        this.invokers = invokers;</span>
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    protected Result doInvoke(final Invocation invocation) throws Throwable {
+<span class="nc" id="L71">        RpcInvocation inv = (RpcInvocation) invocation;</span>
+<span class="nc" id="L72">        final String methodName = RpcUtils.getMethodName(invocation);</span>
+<span class="nc" id="L73">        inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());</span>
+<span class="nc" id="L74">        inv.setAttachment(Constants.VERSION_KEY, version);</span>
+
+        ExchangeClient currentClient;
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (clients.length == 1) {</span>
+<span class="nc" id="L78">            currentClient = clients[0];</span>
+        } else {
+<span class="nc" id="L80">            currentClient = clients[index.getAndIncrement() % clients.length];</span>
+        }
+        try {
+<span class="nc" id="L83">            boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);</span>
+<span class="nc" id="L84">            boolean isAsyncFuture = RpcUtils.isReturnTypeFuture(inv);</span>
+<span class="nc" id="L85">            boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);</span>
+<span class="nc" id="L86">            int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (isOneway) {</span>
+<span class="nc" id="L88">                boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);</span>
+<span class="nc" id="L89">                currentClient.send(inv, isSent);</span>
+<span class="nc" id="L90">                RpcContext.getContext().setFuture(null);</span>
+<span class="nc" id="L91">                return new RpcResult();</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            } else if (isAsync) {</span>
+<span class="nc" id="L93">                ResponseFuture future = currentClient.request(inv, timeout);</span>
+                // For compatibility
+<span class="nc" id="L95">                FutureAdapter&lt;Object&gt; futureAdapter = new FutureAdapter&lt;&gt;(future);</span>
+<span class="nc" id="L96">                RpcContext.getContext().setFuture(futureAdapter);</span>
+
+                Result result;
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (isAsyncFuture) {</span>
+                    // register resultCallback, sometimes we need the async result being processed by the filter chain.
+<span class="nc" id="L101">                    result = new AsyncRpcResult(futureAdapter, futureAdapter.getResultFuture(), false);</span>
+                } else {
+<span class="nc" id="L103">                    result = new SimpleAsyncRpcResult(futureAdapter, futureAdapter.getResultFuture(), false);</span>
+                }
+<span class="nc" id="L105">                return result;</span>
+            } else {
+<span class="nc" id="L107">                RpcContext.getContext().setFuture(null);</span>
+<span class="nc" id="L108">                return (Result) currentClient.request(inv, timeout).get();</span>
+            }
+<span class="nc" id="L110">        } catch (TimeoutException e) {</span>
+<span class="nc" id="L111">            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, &quot;Invoke remote method timeout. method: &quot; + invocation.getMethodName() + &quot;, provider: &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L112">        } catch (RemotingException e) {</span>
+<span class="nc" id="L113">            throw new RpcException(RpcException.NETWORK_EXCEPTION, &quot;Failed to invoke remote method: &quot; + invocation.getMethodName() + &quot;, provider: &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (!super.isAvailable()) {</span>
+<span class="nc" id="L120">            return false;</span>
+        }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        for (ExchangeClient client : clients) {</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (client.isConnected() &amp;&amp; !client.hasAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY)) {</span>
+                //cannot write == not Available ?
+<span class="nc" id="L125">                return true;</span>
+            }
+        }
+<span class="nc" id="L128">        return false;</span>
+    }
+
+    @Override
+    public void destroy() {
+        // in order to avoid closing a client multiple times, a counter is used in case of connection per jvm, every
+        // time when client.close() is called, counter counts down once, and when counter reaches zero, client will be
+        // closed.
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (super.isDestroyed()) {</span>
+<span class="nc" id="L137">            return;</span>
+        } else {
+            // double check to avoid dup close
+<span class="nc" id="L140">            destroyLock.lock();</span>
+            try {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (super.isDestroyed()) {</span>
+<span class="nc" id="L143">                    return;</span>
+                }
+<span class="nc" id="L145">                super.destroy();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (invokers != null) {</span>
+<span class="nc" id="L147">                    invokers.remove(this);</span>
+                }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                for (ExchangeClient client : clients) {</span>
+                    try {
+<span class="nc" id="L151">                        client.close(ConfigurationUtils.getServerShutdownTimeout());</span>
+<span class="nc" id="L152">                    } catch (Throwable t) {</span>
+<span class="nc" id="L153">                        logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L154">                    }</span>
+                }
+
+            } finally {
+<span class="nc" id="L158">                destroyLock.unlock();</span>
+            }
+        }
+<span class="nc" id="L161">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

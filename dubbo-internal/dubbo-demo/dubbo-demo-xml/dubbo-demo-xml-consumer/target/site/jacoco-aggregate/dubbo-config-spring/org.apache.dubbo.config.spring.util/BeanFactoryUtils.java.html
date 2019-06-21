@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BeanFactoryUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.util</a> &gt; <span class="el_source">BeanFactoryUtils.java</span></div><h1>BeanFactoryUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.util;
+
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.ListableBeanFactory;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.support.AbstractApplicationContext;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import static org.springframework.beans.factory.BeanFactoryUtils.beanNamesForTypeIncludingAncestors;
+import static org.springframework.beans.factory.BeanFactoryUtils.beansOfTypeIncludingAncestors;
+import static org.springframework.util.ObjectUtils.containsElement;
+
+/**
+ * {@link BeanFactory} Utilities class
+ *
+ * @see BeanFactory
+ * @see ConfigurableBeanFactory
+ * @see org.springframework.beans.factory.BeanFactoryUtils
+ * @since 2.5.7
+ */
+<span class="nc" id="L44">public class BeanFactoryUtils {</span>
+
+    public static boolean addApplicationListener(ApplicationContext applicationContext, ApplicationListener listener) {
+        try {
+            // backward compatibility to spring 2.0.1
+<span class="nc" id="L49">            Method method = applicationContext.getClass().getMethod(&quot;addApplicationListener&quot;, ApplicationListener.class);</span>
+<span class="nc" id="L50">            method.invoke(applicationContext, listener);</span>
+<span class="nc" id="L51">            return true;</span>
+<span class="nc" id="L52">        } catch (Throwable t) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (applicationContext instanceof AbstractApplicationContext) {</span>
+                try {
+                    // backward compatibility to spring 2.0.1
+<span class="nc" id="L56">                    Method method = AbstractApplicationContext.class.getDeclaredMethod(&quot;addListener&quot;, ApplicationListener.class);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                    if (!method.isAccessible()) {</span>
+<span class="nc" id="L58">                        method.setAccessible(true);</span>
+                    }
+<span class="nc" id="L60">                    method.invoke(applicationContext, listener);</span>
+<span class="nc" id="L61">                    return true;</span>
+<span class="nc" id="L62">                } catch (Throwable t2) {</span>
+                    // ignore
+                }
+            }
+        }
+<span class="nc" id="L67">        return false;</span>
+    }
+
+    /**
+     * Get optional Bean
+     *
+     * @param beanFactory {@link ListableBeanFactory}
+     * @param beanName    the name of Bean
+     * @param beanType    the {@link Class type} of Bean
+     * @param &lt;T&gt;         the {@link Class type} of Bean
+     * @return A bean if present , or &lt;code&gt;null&lt;/code&gt;
+     * @since 2.6.6
+     */
+    public static &lt;T&gt; T getOptionalBean(ListableBeanFactory beanFactory, String beanName, Class&lt;T&gt; beanType) {
+
+<span class="nc" id="L82">        String[] allBeanNames = beanNamesForTypeIncludingAncestors(beanFactory, beanType);</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (!containsElement(allBeanNames, beanName)) {</span>
+<span class="nc" id="L85">            return null;</span>
+        }
+
+<span class="nc" id="L88">        Map&lt;String, T&gt; beansOfType = beansOfTypeIncludingAncestors(beanFactory, beanType);</span>
+
+<span class="nc" id="L90">        return beansOfType.get(beanName);</span>
+
+    }
+
+
+    /**
+     * Gets name-matched Beans from {@link ListableBeanFactory BeanFactory}
+     *
+     * @param beanFactory {@link ListableBeanFactory BeanFactory}
+     * @param beanNames   the names of Bean
+     * @param beanType    the {@link Class type} of Bean
+     * @param &lt;T&gt;         the {@link Class type} of Bean
+     * @return the read-only and non-null {@link List} of Bean names
+     * @since 2.6.6
+     */
+    public static &lt;T&gt; List&lt;T&gt; getBeans(ListableBeanFactory beanFactory, String[] beanNames, Class&lt;T&gt; beanType) {
+
+<span class="nc" id="L107">        String[] allBeanNames = beanNamesForTypeIncludingAncestors(beanFactory, beanType);</span>
+
+<span class="nc" id="L109">        List&lt;T&gt; beans = new ArrayList&lt;T&gt;(beanNames.length);</span>
+
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        for (String beanName : beanNames) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (containsElement(allBeanNames, beanName)) {</span>
+<span class="nc" id="L113">                beans.add(beanFactory.getBean(beanName, beanType));</span>
+            }
+        }
+
+<span class="nc" id="L117">        return Collections.unmodifiableList(beans);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

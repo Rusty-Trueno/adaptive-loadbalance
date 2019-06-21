@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FailbackClusterInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.support</a> &gt; <span class="el_source">FailbackClusterInvoker.java</span></div><h1>FailbackClusterInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.timer.HashedWheelTimer;
+import org.apache.dubbo.common.timer.Timeout;
+import org.apache.dubbo.common.timer.Timer;
+import org.apache.dubbo.common.timer.TimerTask;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.cluster.Directory;
+import org.apache.dubbo.rpc.cluster.LoadBalance;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * When fails, record failure requests and schedule for retry on a regular interval.
+ * Especially useful for services of notification.
+ *
+ * &lt;a href=&quot;http://en.wikipedia.org/wiki/Failback&quot;&gt;Failback&lt;/a&gt;
+ */
+public class FailbackClusterInvoker&lt;T&gt; extends AbstractClusterInvoker&lt;T&gt; {
+
+<span class="nc" id="L47">    private static final Logger logger = LoggerFactory.getLogger(FailbackClusterInvoker.class);</span>
+
+    private static final long RETRY_FAILED_PERIOD = 5;
+
+    private final int retries;
+
+    private final int failbackTasks;
+
+    private volatile Timer failTimer;
+
+    public FailbackClusterInvoker(Directory&lt;T&gt; directory) {
+<span class="nc" id="L58">        super(directory);</span>
+
+<span class="nc" id="L60">        int retriesConfig = getUrl().getParameter(Constants.RETRIES_KEY, Constants.DEFAULT_FAILBACK_TIMES);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (retriesConfig &lt;= 0) {</span>
+<span class="nc" id="L62">            retriesConfig = Constants.DEFAULT_FAILBACK_TIMES;</span>
+        }
+<span class="nc" id="L64">        int failbackTasksConfig = getUrl().getParameter(Constants.FAIL_BACK_TASKS_KEY, Constants.DEFAULT_FAILBACK_TASKS);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (failbackTasksConfig &lt;= 0) {</span>
+<span class="nc" id="L66">            failbackTasksConfig = Constants.DEFAULT_FAILBACK_TASKS;</span>
+        }
+<span class="nc" id="L68">        retries = retriesConfig;</span>
+<span class="nc" id="L69">        failbackTasks = failbackTasksConfig;</span>
+<span class="nc" id="L70">    }</span>
+
+    private void addFailed(LoadBalance loadbalance, Invocation invocation, List&lt;Invoker&lt;T&gt;&gt; invokers, Invoker&lt;T&gt; lastInvoker) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (failTimer == null) {</span>
+<span class="nc" id="L74">            synchronized (this) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                if (failTimer == null) {</span>
+<span class="nc" id="L76">                    failTimer = new HashedWheelTimer(</span>
+                            new NamedThreadFactory(&quot;failback-cluster-timer&quot;, true),
+                            1,
+                            TimeUnit.SECONDS, 32, failbackTasks);
+                }
+<span class="nc" id="L81">            }</span>
+        }
+<span class="nc" id="L83">        RetryTimerTask retryTimerTask = new RetryTimerTask(loadbalance, invocation, invokers, lastInvoker, retries, RETRY_FAILED_PERIOD);</span>
+        try {
+<span class="nc" id="L85">            failTimer.newTimeout(retryTimerTask, RETRY_FAILED_PERIOD, TimeUnit.SECONDS);</span>
+<span class="nc" id="L86">        } catch (Throwable e) {</span>
+<span class="nc" id="L87">            logger.error(&quot;Failback background works error,invocation-&gt;&quot; + invocation + &quot;, exception: &quot; + e.getMessage());</span>
+<span class="nc" id="L88">        }</span>
+<span class="nc" id="L89">    }</span>
+
+    @Override
+    protected Result doInvoke(Invocation invocation, List&lt;Invoker&lt;T&gt;&gt; invokers, LoadBalance loadbalance) throws RpcException {
+<span class="nc" id="L93">        Invoker&lt;T&gt; invoker = null;</span>
+        try {
+<span class="nc" id="L95">            checkInvokers(invokers, invocation);</span>
+<span class="nc" id="L96">            invoker = select(loadbalance, invocation, invokers, null);</span>
+<span class="nc" id="L97">            return invoker.invoke(invocation);</span>
+<span class="nc" id="L98">        } catch (Throwable e) {</span>
+<span class="nc" id="L99">            logger.error(&quot;Failback to invoke method &quot; + invocation.getMethodName() + &quot;, wait for retry in background. Ignored exception: &quot;</span>
+<span class="nc" id="L100">                    + e.getMessage() + &quot;, &quot;, e);</span>
+<span class="nc" id="L101">            addFailed(loadbalance, invocation, invokers, invoker);</span>
+<span class="nc" id="L102">            return new RpcResult(); // ignore</span>
+        }
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L108">        super.destroy();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (failTimer != null) {</span>
+<span class="nc" id="L110">            failTimer.stop();</span>
+        }
+<span class="nc" id="L112">    }</span>
+
+    /**
+     * RetryTimerTask
+     */
+    private class RetryTimerTask implements TimerTask {
+        private final Invocation invocation;
+        private final LoadBalance loadbalance;
+        private final List&lt;Invoker&lt;T&gt;&gt; invokers;
+        private final int retries;
+        private final long tick;
+        private Invoker&lt;T&gt; lastInvoker;
+<span class="nc" id="L124">        private int retryTimes = 0;</span>
+
+<span class="nc" id="L126">        RetryTimerTask(LoadBalance loadbalance, Invocation invocation, List&lt;Invoker&lt;T&gt;&gt; invokers, Invoker&lt;T&gt; lastInvoker, int retries, long tick) {</span>
+<span class="nc" id="L127">            this.loadbalance = loadbalance;</span>
+<span class="nc" id="L128">            this.invocation = invocation;</span>
+<span class="nc" id="L129">            this.invokers = invokers;</span>
+<span class="nc" id="L130">            this.retries = retries;</span>
+<span class="nc" id="L131">            this.tick = tick;</span>
+<span class="nc" id="L132">            this.lastInvoker=lastInvoker;</span>
+<span class="nc" id="L133">        }</span>
+
+        @Override
+        public void run(Timeout timeout) {
+            try {
+<span class="nc" id="L138">                Invoker&lt;T&gt; retryInvoker = select(loadbalance, invocation, invokers, Collections.singletonList(lastInvoker));</span>
+<span class="nc" id="L139">                lastInvoker = retryInvoker;</span>
+<span class="nc" id="L140">                retryInvoker.invoke(invocation);</span>
+<span class="nc" id="L141">            } catch (Throwable e) {</span>
+<span class="nc" id="L142">                logger.error(&quot;Failed retry to invoke method &quot; + invocation.getMethodName() + &quot;, waiting again.&quot;, e);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if ((++retryTimes) &gt;= retries) {</span>
+<span class="nc" id="L144">                    logger.error(&quot;Failed retry times exceed threshold (&quot; + retries + &quot;), We have to abandon, invocation-&gt;&quot; + invocation);</span>
+                } else {
+<span class="nc" id="L146">                    rePut(timeout);</span>
+                }
+<span class="nc" id="L148">            }</span>
+<span class="nc" id="L149">        }</span>
+
+        private void rePut(Timeout timeout) {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (timeout == null) {</span>
+<span class="nc" id="L153">                return;</span>
+            }
+
+<span class="nc" id="L156">            Timer timer = timeout.timer();</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">            if (timer.isStop() || timeout.isCancelled()) {</span>
+<span class="nc" id="L158">                return;</span>
+            }
+
+<span class="nc" id="L161">            timer.newTimeout(timeout.task(), tick, TimeUnit.SECONDS);</span>
+<span class="nc" id="L162">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

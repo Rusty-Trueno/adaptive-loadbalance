@@ -1,0 +1,887 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.parser,ConfigParser,472,0,34,0,104,0,31,0,14,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.file,FileRouterFactory,74,0,4,0,21,0,5,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.override,OverrideConfiguratorFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.override,OverrideConfigurator,9,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.parser.model,ConfiguratorConfig,42,0,0,0,17,0,11,0,11,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.parser.model,ConfigItem,59,0,0,0,25,0,17,0,17,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster,Router,13,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster,CacheableRouterFactory,28,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster,Configurator,94,0,12,0,26,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster,RouterChain,117,0,4,0,32,0,11,0,9,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router,AbstractRouterRule,81,0,0,0,33,0,19,0,19,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router,AbstractRouter,51,0,0,0,20,0,10,0,10,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support.wrapper,MockClusterWrapper,15,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support.wrapper,MockClusterInvoker,277,0,22,0,56,0,22,0,11,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.mock,MockRouterFactory,7,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.mock,MockInvokersSelector,134,0,24,0,36,0,17,0,5,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.absent,AbsentConfigurator,9,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator.absent,AbsentConfiguratorFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,ConsistentHashLoadBalance.ConsistentHashSelector,250,0,16,0,39,0,14,0,6,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,AbstractLoadBalance,92,0,18,0,17,0,13,0,4,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,ConsistentHashLoadBalance,63,0,4,0,10,0,4,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,LeastActiveLoadBalance,143,0,24,0,36,0,14,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,RoundRobinLoadBalance,225,0,24,0,52,0,15,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,RandomLoadBalance,90,0,14,0,20,0,9,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.loadbalance,RoundRobinLoadBalance.WeightedRoundRobin,43,0,0,0,12,0,7,0,7,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config.model,ConditionRouterRule,10,0,0,0,5,0,3,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config.model,ConditionRuleParser,30,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition,ConditionRouter,616,0,84,0,118,0,53,0,11,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition,ConditionRouterFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition,ConditionRouter.MatchPair,121,0,28,0,26,0,16,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,LongArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,BooleanArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,IntArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,MapMerger,35,0,6,0,8,0,5,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,ListMerger,36,0,6,0,8,0,5,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,DoubleArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,MergerFactory,86,0,14,0,25,0,11,0,4,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,CharArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,FloatArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,ByteArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,SetMerger,36,0,6,0,8,0,5,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,ArrayMerger,120,0,22,0,27,0,14,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.merger,ShortArrayMerger,80,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config,ServiceRouterFactory,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config,AppRouterFactory,33,0,4,0,9,0,5,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config,ListenableRouter,190,0,28,0,42,0,24,0,10,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config,AppRouter,11,0,0,0,3,0,1,0,1,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.condition.config,ServiceRouter,10,0,0,0,3,0,1,0,1,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.script,ScriptRouter,210,0,10,0,44,0,16,0,11,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.script,ScriptRouterFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.directory,StaticDirectory,154,0,20,0,39,0,20,0,10,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.directory,AbstractDirectory,110,0,8,0,33,0,17,0,13,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailfastCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailsafeClusterInvoker,40,0,0,0,9,0,3,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailoverCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,AbstractClusterInvoker,473,0,78,0,98,0,55,0,16,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,BroadcastClusterInvoker,64,0,4,0,20,0,5,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,ClusterUtils,278,0,42,0,59,0,23,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,AvailableCluster,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailbackClusterInvoker,157,0,10,0,35,0,10,0,5,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailbackCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,AvailableClusterInvoker,34,0,4,0,7,0,4,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,RegistryAwareCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailoverClusterInvoker,234,0,14,0,45,0,10,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailfastClusterInvoker,92,0,8,0,15,0,6,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,ForkingClusterInvoker.new Runnable() {...},49,0,2,0,9,0,3,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailsafeCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,ForkingCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,MergeableClusterInvoker.new Callable() {...},23,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,AvailableCluster.new AbstractClusterInvoker() {...},37,0,4,0,6,0,4,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,MergeableClusterInvoker,465,0,40,0,91,0,28,0,8,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,RegistryAwareClusterInvoker,62,0,10,0,12,0,8,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,FailbackClusterInvoker.RetryTimerTask,118,0,8,0,26,0,7,0,3,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,BroadcastCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,MergeableCluster,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.support,ForkingClusterInvoker,168,0,16,0,27,0,10,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.configurator,AbstractConfigurator,301,0,64,0,56,0,37,0,5,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.tag,TagRouter,486,0,72,0,92,0,60,0,24,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.tag,TagRouterFactory,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.tag.model,TagRuleParser,50,0,2,0,12,0,3,0,2,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.tag.model,Tag,17,0,0,0,7,0,5,0,5,0
+dubbo-all/dubbo-cluster,org.apache.dubbo.rpc.cluster.router.tag.model,TagRouterRule,90,0,2,0,20,0,13,0,12,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension,AdaptiveClassCodeGenerator,857,0,54,0,117,0,55,0,28,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension,ExtensionLoader,2013,0,222,0,383,0,160,0,49,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,NoSuchPropertyException,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,Proxy,664,0,56,0,125,0,36,0,8,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,ClassGenerator,863,0,96,0,182,0,82,0,34,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,Proxy.new InvocationHandler() {...},18,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,NoSuchMethodException,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,Mixin,477,0,44,0,81,0,30,0,8,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,Wrapper,1133,0,96,0,175,0,59,0,11,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.bytecode,Wrapper.new Wrapper() {...},106,0,10,0,19,0,14,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadlocal,InternalThread,46,0,0,0,19,0,10,0,10,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadlocal,InternalThreadLocal,202,0,30,0,68,0,29,0,14,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadlocal,InternalThreadLocalMap,262,0,24,0,74,0,28,0,16,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadlocal,NamedInternalThreadFactory,40,0,0,0,10,0,4,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.timer,HashedWheelTimer.HashedWheelBucket,219,0,36,0,60,0,24,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.timer,HashedWheelTimer.Worker,262,0,30,0,65,0,21,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.timer,HashedWheelTimer,530,0,54,0,114,0,46,0,18,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.timer,HashedWheelTimer.HashedWheelTimeout,182,0,18,0,51,0,21,0,12,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.log4j2,Log4j2LoggerAdapter,89,0,24,0,35,0,21,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.log4j2,Log4j2Logger,136,0,10,0,38,0,26,0,21,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger,Level,74,0,0,0,8,0,1,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger,LoggerFactory,175,0,16,0,37,0,20,0,10,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.jcl,JclLogger,106,0,0,0,38,0,21,0,21,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.jcl,JclLoggerAdapter,29,0,0,0,9,0,7,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.log4j,Log4jLogger,177,0,10,0,39,0,27,0,22,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.log4j,Log4jLoggerAdapter,127,0,32,0,49,0,25,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.support,FailsafeLogger,195,0,0,0,82,0,24,0,24,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,AbstractPrefixConfiguration,84,0,16,0,14,0,10,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,PropertiesConfiguration,17,0,0,0,6,0,4,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,CompositeConfiguration,132,0,14,0,29,0,16,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,Configuration,168,0,44,0,32,0,28,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,ConfigurationUtils,95,0,10,0,25,0,12,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,EnvironmentConfiguration,13,0,0,0,5,0,3,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,InmemoryConfiguration,40,0,4,0,14,0,8,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,Environment,276,0,10,0,61,0,33,0,28,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.config,SystemConfiguration,13,0,0,0,5,0,3,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.status,Status.Level,44,0,0,0,5,0,1,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.status,Status,33,0,0,0,12,0,6,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common,URL,3359,0,478,0,716,0,381,0,142,0
+dubbo-all/dubbo-common,org.apache.dubbo.common,Constants,136,0,0,0,15,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common,URLBuilder,648,0,78,0,152,0,80,0,41,0
+dubbo-all/dubbo-common,org.apache.dubbo.common,Version,376,0,56,0,93,0,43,0,15,0
+dubbo-all/dubbo-common,org.apache.dubbo.common,Parameters,420,0,56,0,104,0,59,0,31,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONToken,42,0,13,0,20,0,15,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSON,1027,0,100,0,283,0,93,0,19,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSON.Entry,9,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONReader.new ThreadLocal() {...},3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter,674,0,52,0,158,0,30,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONArray,206,0,36,0,35,0,33,0,15,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,J2oVisitor,872,0,140,0,206,0,85,0,15,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONObject,244,0,38,0,41,0,35,0,16,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONWriter.State,9,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},13,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},16,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},16,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,Yylex,6730,0,102,0,218,0,99,0,21,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},12,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},19,0,4,0,4,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},19,0,4,0,4,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},14,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONWriter,464,0,31,0,91,0,35,0,18,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},9,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},16,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},14,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,JSONReader,68,0,8,0,19,0,10,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},11,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Encoder() {...},10,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},35,0,4,0,8,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},16,0,2,0,4,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,GenericJSONConverter.new GenericJSONConverter.Decoder() {...},52,0,6,0,9,0,5,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.json,ParseException,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support,AbortPolicyWithReport,201,0,6,0,36,0,8,0,5,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JdkCompiler.new PrivilegedAction() {...},17,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JdkCompiler.JavaFileManagerImpl,209,0,28,0,40,0,22,0,8,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,ClassUtils,842,0,169,0,191,0,131,0,39,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,AbstractCompiler,130,0,10,0,22,0,8,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JavassistCompiler,169,0,12,0,31,0,12,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JdkCompiler.ClassLoaderImpl,93,0,6,0,21,0,9,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JdkCompiler,208,0,14,0,33,0,9,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,AdaptiveCompiler,31,0,4,0,9,0,5,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,JdkCompiler.JavaFileObjectImpl,61,0,2,0,15,0,8,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.compiler.support,CtClassBuilder,251,0,16,0,56,0,25,0,17,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension.support,ActivateComparator.ActivateInfo,24,0,4,0,3,0,5,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension.support,ActivateComparator,206,0,44,0,51,0,27,0,5,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.status.support,StatusUtils,78,0,12,0,20,0,8,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.status.support,LoadStatusChecker,79,0,8,0,13,0,6,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.status.support,MemoryStatusChecker,81,0,4,0,8,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.eager,EagerThreadPool,62,0,2,0,10,0,3,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.eager,TaskQueue,55,0,8,0,15,0,8,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.eager,EagerThreadPoolExecutor,80,0,4,0,24,0,6,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,UnsafeByteArrayOutputStream,165,0,18,0,33,0,21,0,12,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,StreamUtils,31,0,4,0,8,0,6,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,UnsafeByteArrayInputStream,187,0,22,0,41,0,25,0,14,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,StreamUtils.new InputStream() {...},197,0,22,0,50,0,18,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,StreamUtils.new InputStream() {...},168,0,20,0,36,0,19,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,Bytes,2135,0,130,0,296,0,119,0,54,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,UnsafeStringWriter,134,0,18,0,33,0,22,0,13,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.io,UnsafeStringReader,173,0,22,0,43,0,21,0,10,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension.factory,AdaptiveExtensionFactory,56,0,6,0,14,0,5,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.extension.factory,SpiExtensionFactory,22,0,6,0,6,0,5,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.limited,LimitedThreadPool,57,0,4,0,9,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,NamedThreadFactory,87,0,2,0,17,0,7,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ClassHelper,56,0,0,0,16,0,16,0,16,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,Stack,199,0,20,0,31,0,20,0,10,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,LogUtil,199,0,32,0,58,0,28,0,12,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,StringUtils,1161,0,223,0,252,0,149,0,37,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ClassUtils,442,0,96,0,97,0,63,0,15,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,LogHelper,155,0,60,0,75,0,45,0,15,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,CollectionUtils.new Comparator() {...},45,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,PojoUtils,1552,0,228,0,330,0,131,0,17,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,UrlUtils,1456,0,286,0,293,0,165,0,22,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,DubboAppender,60,0,2,0,22,0,8,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,JVMUtil,314,0,32,0,53,0,20,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ConfigUtils,580,0,92,0,135,0,63,0,17,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ConcurrentHashSet,64,0,4,0,15,0,12,0,10,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,Log,174,0,38,0,48,0,30,0,11,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,AtomicPositiveInteger,247,0,18,0,49,0,32,0,23,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,LRUCache,103,0,2,0,29,0,12,0,11,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,Holder,10,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,CompatibleTypeUtils,464,0,120,0,102,0,61,0,1,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,MethodUtils,74,0,28,0,13,0,17,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ReflectUtils,2238,0,406,0,508,0,257,0,45,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,CIDRUtils,246,0,20,0,52,0,16,0,6,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,CollectionUtils,412,0,82,0,92,0,57,0,16,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,NetUtils,1012,0,194,0,249,0,131,0,34,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ExecutorUtil,154,0,24,0,52,0,20,0,8,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ExecutorUtil.new Runnable() {...},36,0,4,0,11,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,IOUtils,204,0,20,0,46,0,21,0,11,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,ArrayUtils,16,0,6,0,2,0,5,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,PojoUtils.PojoInvocationHandler,113,0,14,0,15,0,9,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.utils,Assert,25,0,6,0,11,0,7,0,4,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.cached,CachedThreadPool,63,0,4,0,10,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.threadpool.support.fixed,FixedThreadPool,52,0,4,0,8,0,4,0,2,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.jdk,JdkLoggerAdapter,174,0,36,0,52,0,27,0,9,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.jdk,JdkLogger,136,0,0,0,38,0,21,0,21,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.slf4j,Slf4jLoggerAdapter,29,0,0,0,9,0,7,0,7,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.logger.slf4j,Slf4jLogger,331,0,32,0,87,0,38,0,22,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.store.support,SimpleDataStore,84,0,8,0,19,0,9,0,5,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.beanutil,JavaBeanAccessor,58,0,8,0,6,0,7,0,3,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.beanutil,JavaBeanSerializeUtil,1269,0,186,0,290,0,111,0,18,0
+dubbo-all/dubbo-common,org.apache.dubbo.common.beanutil,JavaBeanDescriptor,297,0,48,0,63,0,52,0,28,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.invoker,DelegateProviderMetaDataInvoker,33,0,0,0,11,0,7,0,7,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ApplicationConfig,249,0,14,0,83,0,49,0,42,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ProtocolConfig,363,0,14,0,140,0,81,0,74,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ArgumentConfig,49,0,0,0,17,0,8,0,8,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,AbstractMethodConfig,135,0,12,0,50,0,32,0,26,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,MethodConfig,274,0,22,0,82,0,49,0,38,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ServiceConfig,2163,0,276,0,466,0,204,0,66,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,AbstractServiceConfig,202,0,6,0,72,0,43,0,40,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ConfigCenterConfig,195,0,10,0,67,0,39,0,34,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,RegistryConfig,275,0,18,0,106,0,63,0,54,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,AbstractConfig,1680,0,262,0,333,0,171,0,40,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,MetadataReportConfig,112,0,2,0,39,0,26,0,25,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ProviderConfig,246,0,0,0,93,0,59,0,59,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,DubboShutdownHook,108,0,16,0,32,0,16,0,8,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ReferenceConfig.new Object() {...},27,0,2,0,5,0,3,0,2,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,AbstractReferenceConfig,135,0,10,0,50,0,32,0,27,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,MonitorConfig,78,0,0,0,34,0,21,0,21,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,AbstractInterfaceConfig,1336,0,142,0,350,0,152,0,81,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,MetricsConfig,17,0,0,0,8,0,5,0,5,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ReferenceConfig,1277,0,168,0,268,0,119,0,35,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ModuleConfig,106,0,4,0,38,0,21,0,19,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config,ConsumerConfig,75,0,6,0,29,0,20,0,17,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,MethodBuilder,210,0,4,0,62,0,23,0,21,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,RegistryBuilder,263,0,0,0,78,0,28,0,28,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ConsumerBuilder,84,0,0,0,26,0,10,0,10,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ConfigCenterBuilder,188,0,0,0,55,0,18,0,18,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ProtocolBuilder,359,0,0,0,107,0,38,0,38,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ApplicationBuilder,249,0,6,0,71,0,27,0,24,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,AbstractReferenceBuilder,151,0,20,0,43,0,22,0,12,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,MonitorBuilder,117,0,0,0,34,0,13,0,13,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ProviderBuilder,244,0,0,0,74,0,26,0,26,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,AbstractInterfaceBuilder,379,0,50,0,103,0,52,0,27,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ArgumentBuilder,40,0,0,0,13,0,5,0,5,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ServiceBuilder,130,0,4,0,37,0,16,0,14,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,AbstractBuilder,56,0,8,0,18,0,10,0,6,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ReferenceBuilder,113,0,6,0,33,0,14,0,11,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,ModuleBuilder,110,0,4,0,32,0,13,0,11,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,DubboBuilders,51,0,0,0,13,0,13,0,13,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,MetadataReportBuilder,127,0,0,0,37,0,14,0,14,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,AbstractMethodBuilder,208,0,26,0,57,0,29,0,16,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.builders,AbstractServiceBuilder,293,0,40,0,81,0,41,0,21,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.context,ConfigManager,578,0,84,0,126,0,76,0,34,0
+dubbo-all/dubbo-config-api,org.apache.dubbo.config.utils,ReferenceConfigCache,210,0,18,0,50,0,21,0,12,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigBindingsRegistrar,50,0,2,0,12,0,4,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboComponentScanRegistrar,99,0,4,0,25,0,7,0,5,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigConfiguration.Single,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigConfiguration.Multiple,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigConfiguration,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigBindingRegistrar,267,0,20,0,58,0,20,0,10,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboClassPathBeanDefinitionScanner,29,0,0,0,9,0,4,0,4,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.annotation,DubboConfigConfigurationRegistrar,32,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.config,NamePropertyDefaultValueDubboConfigBeanCustomizer,52,0,10,0,15,0,8,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.status,DataSourceStatusChecker,143,0,14,0,37,0,10,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.status,SpringStatusChecker,139,0,28,0,39,0,17,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationInjectedBeanPostProcessor,556,0,50,0,119,0,50,0,25,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,ReferenceBeanBuilder.new PropertyEditorSupport() {...},31,0,2,0,9,0,3,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationPropertyValuesAdapter,65,0,0,0,16,0,10,0,10,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationBeanNameBuilder,139,0,6,0,33,0,14,0,11,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,ServiceAnnotationBeanPostProcessor,629,0,58,0,137,0,49,0,20,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,DubboConfigBindingBeanPostProcessor,189,0,12,0,56,0,22,0,16,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement,43,0,0,0,10,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AbstractAnnotationConfigBeanBuilder,152,0,2,0,45,0,11,0,10,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,ReferenceAnnotationBeanPostProcessor.ReferenceBeanInvocationHandler,30,0,2,0,12,0,4,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,ReferenceBeanBuilder,183,0,10,0,43,0,18,0,13,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement,37,0,0,0,10,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata,30,0,0,0,7,0,3,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.beans.factory.annotation,ReferenceAnnotationBeanPostProcessor,262,0,16,0,63,0,26,0,18,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.extension,SpringExtensionFactory,162,0,18,0,37,0,16,0,7,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.extension,SpringExtensionFactory.ShutdownHookListener,8,0,2,0,4,0,2,0,1,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.event,ServiceBeanExportedEvent,8,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.properties,DefaultDubboConfigBinder,30,0,0,0,8,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.context.properties,AbstractDubboConfigBinder,35,0,2,0,13,0,8,0,7,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring,ServiceBean,833,0,220,0,168,0,125,0,15,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring,ReferenceBean,602,0,164,0,113,0,91,0,9,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring,ConfigCenterBean,220,0,36,0,51,0,30,0,12,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.schema,AnnotationBeanDefinitionParser,33,0,0,0,11,0,5,0,5,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.schema,DubboBeanDefinitionParser,1166,0,242,0,220,0,131,0,10,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.schema,DubboNamespaceHandler,109,0,0,0,17,0,3,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,ClassUtils,15,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,BeanRegistrar,20,0,2,0,6,0,3,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,PropertySourcesUtils.new AbstractEnvironment() {...},3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,PropertySourcesUtils,122,0,18,0,23,0,13,0,4,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,BeanFactoryUtils,119,0,10,0,24,0,9,0,4,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,ObjectUtils,5,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,AnnotatedBeanDefinitionRegistryUtils,42,0,4,0,10,0,5,0,3,0
+dubbo-all/dubbo-config-spring,org.apache.dubbo.config.spring.util,AnnotationUtils,350,0,56,0,77,0,37,0,8,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.expiring,ExpiringMap.ExpireThread,163,0,14,0,41,0,19,0,12,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.expiring,ExpiringCacheFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.expiring,ExpiringCache,37,0,0,0,10,0,3,0,3,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.expiring,ExpiringMap,226,0,10,0,58,0,30,0,25,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.expiring,ExpiringMap.ExpiryObject,71,0,2,0,15,0,9,0,8,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.threadlocal,ThreadLocalCacheFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.threadlocal,ThreadLocalCache,23,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.jcache,JCacheFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.jcache,JCache,96,0,4,0,23,0,5,0,3,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support,AbstractCacheFactory,41,0,2,0,9,0,3,0,2,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.filter,CacheFilter,73,0,12,0,17,0,9,0,3,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.filter,CacheFilter.ValueWrapper,9,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.lru,LruCache,26,0,0,0,7,0,3,0,3,0
+dubbo-all/dubbo-filter-cache,org.apache.dubbo.cache.support.lru,LruCacheFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-filter-validation,org.apache.dubbo.validation.support,AbstractValidation,35,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-filter-validation,org.apache.dubbo.validation.support.jvalidation,JValidator,855,0,106,0,154,0,65,0,12,0
+dubbo-all/dubbo-filter-validation,org.apache.dubbo.validation.support.jvalidation,JValidation,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-filter-validation,org.apache.dubbo.validation.filter,ValidationFilter,53,0,8,0,14,0,7,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.execution,ExecutionDispatcher,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.execution,ExecutionChannelHandler,94,0,6,0,20,0,5,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.all,AllChannelHandler,279,0,18,0,52,0,14,0,5,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.all,AllDispatcher,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.direct,DirectDispatcher,5,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,ReplierDispatcher,94,0,10,0,22,0,12,0,7,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,ExchangeHandlerDispatcher,146,0,0,0,40,0,15,0,15,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,SimpleFuture,19,0,0,0,8,0,5,0,5,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,DefaultFuture.TimeoutCheckTask,42,0,6,0,10,0,5,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,MultiMessage,67,0,0,0,20,0,12,0,12,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,DefaultFuture,696,0,70,0,137,0,60,0,25,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,ExchangeServerDelegate,91,0,0,0,31,0,20,0,20,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,ExchangeHandlerAdapter,5,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support,DefaultExchangeChannelManager,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,Codec,5,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,RemotingException,86,0,12,0,20,0,14,0,8,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,Transporters,92,0,16,0,22,0,14,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,ExecutionException,56,0,0,0,19,0,7,0,7,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,IdleSensible,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,Codec2.DecodeResult,24,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting,TimeoutException,43,0,8,0,9,0,9,0,5,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeaderExchangeClient,255,0,12,0,68,0,37,0,31,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeartbeatHandler,174,0,22,0,43,0,23,0,12,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeaderExchanger,40,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,AbstractTimerTask,96,0,18,0,29,0,16,0,7,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,CloseTimerTask,78,0,8,0,15,0,7,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeartbeatTimerTask,94,0,10,0,19,0,8,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,ReconnectTimerTask,107,0,6,0,22,0,6,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeaderExchangeServer,398,0,36,0,106,0,44,0,26,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeaderExchangeChannel,351,0,44,0,96,0,47,0,25,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.support.header,HeaderExchangeHandler,455,0,58,0,127,0,42,0,13,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support.command,HelpTelnetHandler,226,0,16,0,28,0,10,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support.command,ExitTelnetHandler,7,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support.command,LogTelnetHandler,191,0,14,0,35,0,9,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support.command,StatusTelnetHandler,218,0,18,0,44,0,11,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support.command,ClearTelnetHandler,43,0,6,0,10,0,5,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,ChannelBuffers,194,0,28,0,57,0,25,0,11,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,ChannelBufferInputStream,134,0,12,0,36,0,17,0,11,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,DirectChannelBufferFactory,111,0,16,0,27,0,14,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,DynamicChannelBuffer,241,0,10,0,65,0,31,0,26,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,HeapChannelBufferFactory,41,0,2,0,13,0,7,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,AbstractChannelBuffer,575,0,44,0,135,0,69,0,47,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,ByteBufferBackedChannelBuffer,442,0,36,0,110,0,38,0,20,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,HeapChannelBuffer,253,0,26,0,68,0,36,0,23,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.buffer,ChannelBufferOutputStream,48,0,4,0,16,0,8,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.codec,TransportCodec,86,0,4,0,22,0,9,0,7,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.codec,CodecAdapter,62,0,2,0,16,0,5,0,4,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange.codec,ExchangeCodec,884,0,78,0,218,0,71,0,32,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,MultiMessageHandler,32,0,4,0,10,0,4,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ServerDelegate,82,0,0,0,29,0,18,0,18,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ChannelHandlerAdapter,8,0,0,0,6,0,6,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractCodec,116,0,20,0,26,0,16,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,DecodeHandler,75,0,12,0,20,0,10,0,4,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractClient,554,0,40,0,134,0,38,0,18,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ClientDelegate,109,0,2,0,38,0,23,0,22,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractPeer,132,0,20,0,46,0,27,0,17,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,RequestLimitException,4,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractEndpoint,145,0,14,0,39,0,15,0,8,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ExceedPayloadLimitException,4,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ThreadPollExhaustedException,4,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ChannelHandlerDispatcher,172,0,14,0,50,0,19,0,12,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractServer,418,0,50,0,96,0,37,0,12,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,ChannelDelegate,92,0,2,0,32,0,20,0,19,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,CodecSupport,146,0,14,0,27,0,12,0,5,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractChannelHandlerDelegate,49,0,2,0,17,0,8,0,7,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport,AbstractChannel,55,0,4,0,8,0,5,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.connection,ConnectionOrderedDispatcher,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.connection,ConnectionOrderedChannelHandler,249,0,8,0,42,0,10,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support,TelnetHandlerAdapter,175,0,24,0,44,0,15,0,3,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.support,TelnetUtils,496,0,58,0,90,0,33,0,4,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.message,MessageOnlyDispatcher,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher.message,MessageOnlyChannelHandler,37,0,0,0,8,0,2,0,2,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher,ChannelHandlers,32,0,0,0,9,0,6,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher,ChannelEventRunnable.ChannelState,54,0,0,0,6,0,1,0,1,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher,ChannelEventRunnable,223,0,7,0,42,0,11,0,6,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.transport.dispatcher,WrappedChannelHandler,131,0,10,0,37,0,17,0,12,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.telnet.codec,TelnetCodec,889,0,140,0,162,0,79,0,9,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange,Request,175,0,10,0,45,0,25,0,20,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange,Exchangers,153,0,8,0,29,0,21,0,17,0
+dubbo-all/dubbo-remoting-api,org.apache.dubbo.remoting.exchange,Response,157,0,8,0,40,0,24,0,20,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyClient.new ChannelPipelineFactory() {...},40,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyHelper.DubboLoggerFactory,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyChannel,325,0,38,0,85,0,35,0,16,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyHelper,15,0,4,0,5,0,4,0,2,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyCodecAdapter.InternalEncoder,31,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyCodecAdapter,48,0,4,0,11,0,5,0,3,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyHelper.DubboLogger,70,0,0,0,24,0,14,0,14,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyTransporter,15,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyServer.new ChannelPipelineFactory() {...},40,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyServer,197,0,14,0,50,0,14,0,7,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyCodecAdapter.InternalDecoder,156,0,20,0,46,0,13,0,3,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyClient,257,0,20,0,53,0,17,0,7,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyBackedChannelBufferFactory,35,0,0,0,8,0,6,0,6,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyHandler,142,0,6,0,34,0,10,0,7,0
+dubbo-all/dubbo-remoting-netty,org.apache.dubbo.remoting.transport.netty,NettyBackedChannelBuffer,451,0,10,0,127,0,68,0,63,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyClient.new ChannelInitializer() {...},81,0,2,0,14,0,3,0,2,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyCodecAdapter.InternalDecoder,60,0,8,0,15,0,6,0,2,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyTransporter,15,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyChannel,339,0,44,0,88,0,38,0,16,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyCodecAdapter.InternalEncoder,33,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyServer,223,0,16,0,56,0,16,0,8,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyBackedChannelBuffer,478,0,10,0,126,0,67,0,62,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyServerHandler,175,0,8,0,42,0,13,0,9,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyClient,267,0,22,0,55,0,19,0,8,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyChannelManager,56,0,0,0,11,0,5,0,5,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyServer.new ChannelInitializer() {...},52,0,0,0,9,0,2,0,2,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyCodecAdapter,32,0,0,0,9,0,3,0,3,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,DirectServiceUtil,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4,NettyClientHandler,217,0,14,0,57,0,17,0,10,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4.logging,FormattingTuple,64,0,4,0,19,0,9,0,7,0
+dubbo-all/dubbo-remoting-netty4,org.apache.dubbo.remoting.transport.netty4.logging,MessageFormatter,685,0,86,0,153,0,61,0,18,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaCodecAdapter.InternalEncoder,37,0,0,0,9,0,3,0,3,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaClient.new IoFutureListener() {...},90,0,10,0,21,0,7,0,2,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaClient,216,0,10,0,45,0,12,0,7,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaTransporter,15,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaChannel,306,0,34,0,76,0,33,0,16,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaCodecAdapter.InternalDecoder,137,0,18,0,39,0,13,0,4,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaServer,150,0,10,0,30,0,12,0,7,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaCodecAdapter,48,0,4,0,11,0,5,0,3,0
+dubbo-all/dubbo-remoting-mina,org.apache.dubbo.remoting.transport.mina,MinaHandler,96,0,4,0,28,0,8,0,6,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyTransporter,15,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyServer,191,0,6,0,43,0,12,0,9,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyHandler,151,0,0,0,40,0,7,0,7,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyClient,133,0,4,0,38,0,9,0,7,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyChannel,306,0,32,0,73,0,32,0,16,0
+dubbo-all/dubbo-remoting-grizzly,org.apache.dubbo.remoting.transport.grizzly,GrizzlyCodecAdapter,216,0,18,0,54,0,12,0,3,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,FileGroup.new Runnable() {...},24,0,0,0,6,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,MulticastGroup,187,0,14,0,40,0,13,0,6,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,MulticastNetworker,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,AbstractGroup,179,0,16,0,44,0,16,0,8,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,ServerPeer,169,0,22,0,47,0,19,0,8,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,FileNetworker,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,MulticastGroup.new Runnable() {...},41,0,0,0,8,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.support,FileGroup,232,0,12,0,48,0,12,0,6,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,MulticastExchangeGroup,187,0,14,0,40,0,13,0,6,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,MulticastExchangeGroup.new Runnable() {...},41,0,0,0,8,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,FileExchangeGroup.new Runnable() {...},24,0,0,0,6,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,MulticastExchangeNetworker,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,FileExchangeGroup,258,0,14,0,50,0,13,0,6,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,AbstractExchangeGroup,175,0,16,0,45,0,17,0,9,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,ExchangeServerPeer,176,0,22,0,49,0,21,0,10,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange.support,FileExchangeNetworker,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p.exchange,ExchangeNetworkers,31,0,0,0,6,0,5,0,5,0
+dubbo-all/dubbo-remoting-p2p,org.apache.dubbo.remoting.p2p,Networkers,31,0,0,0,6,0,5,0,5,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.servlet,DispatcherServlet,44,0,2,0,14,0,7,0,6,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.servlet,ServletHttpBinder,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.servlet,ServletHttpServer,11,0,0,0,3,0,1,0,1,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.servlet,BootstrapListener,13,0,0,0,5,0,3,0,3,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.servlet,ServletManager,37,0,0,0,9,0,6,0,6,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.support,AbstractHttpServer,46,0,4,0,18,0,11,0,9,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.jetty,JettyHttpServer,170,0,6,0,38,0,6,0,3,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.jetty,JettyHttpBinder,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.tomcat,TomcatHttpBinder,9,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-remoting-http,org.apache.dubbo.remoting.http.tomcat,TomcatHttpServer,149,0,0,0,33,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcException,99,0,12,0,29,0,22,0,16,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,SimpleAsyncRpcResult,13,0,0,0,5,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,Filter,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcResult,109,0,10,0,34,0,18,0,13,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcContext.new CompletableFuture() {...},25,0,0,0,6,0,6,0,6,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcContext.new InternalThreadLocal() {...},7,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcContext.new InternalThreadLocal() {...},7,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcStatus,367,0,28,0,91,0,40,0,26,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcInvocation,357,0,46,0,86,0,48,0,25,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,AbstractResult,63,0,8,0,18,0,11,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,AsyncContextImpl,87,0,8,0,24,0,12,0,8,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,AsyncRpcResult,197,0,10,0,58,0,28,0,23,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc,RpcContext,681,0,68,0,173,0,104,0,70,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,GenericFilter,305,0,40,0,60,0,22,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ExecuteLimitFilter,75,0,4,0,15,0,4,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,TimeoutFilter,96,0,12,0,21,0,10,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,AccessLogFilter,308,0,24,0,72,0,23,0,11,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,TokenFilter,61,0,6,0,9,0,5,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,GenericImplFilter,423,0,50,0,83,0,29,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ConsumerContextFilter,42,0,2,0,14,0,4,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,CompatibleFilter,92,0,16,0,24,0,11,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,EchoFilter,28,0,6,0,4,0,5,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ClassLoaderFilter,20,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ActiveLimitFilter,145,0,8,0,34,0,6,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ContextFilter,106,0,8,0,30,0,7,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,DeprecatedFilter,125,0,12,0,21,0,10,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,ExceptionFilter,230,0,24,0,42,0,16,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter,TpsLimitFilter,40,0,2,0,7,0,3,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.support,RpcUtils,413,0,80,0,97,0,55,0,15,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.support,MockProtocol,15,0,0,0,4,0,4,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.support,ProtocolUtils,122,0,32,0,25,0,23,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.support,AccessLogData,302,0,24,0,71,0,31,0,19,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.support,MockInvoker,535,0,82,0,108,0,54,0,13,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy,InvokerInvocationHandler,93,0,16,0,20,0,12,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy,AbstractProxyInvoker,159,0,16,0,30,0,15,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy,AbstractProxyFactory,107,0,16,0,21,0,11,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy.wrapper,StubProxyFactoryWrapper,220,0,12,0,39,0,13,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy.jdk,JdkProxyFactory,20,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy.jdk,JdkProxyFactory.new AbstractProxyInvoker() {...},20,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-rpc-api,com.alibaba.dubbo.rpc.service,GenericException,12,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.listener,ExporterListenerAdapter,5,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.listener,InvokerListenerAdapter,5,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.listener,ListenerInvokerWrapper,115,0,16,0,30,0,16,0,8,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.listener,ListenerExporterWrapper,98,0,18,0,34,0,13,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.listener,DeprecatedInvokerListener,31,0,2,0,5,0,4,0,3,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.service,GenericException,41,0,0,0,16,0,7,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,ProtocolFilterWrapper.new Invoker() {...},69,0,2,0,13,0,9,0,8,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractProxyProtocol.new AbstractExporter() {...},37,0,2,0,9,0,3,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractProxyProtocol.new AbstractInvoker() {...},81,0,8,0,15,0,6,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractProtocol,138,0,12,0,29,0,10,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractInvoker,257,0,32,0,62,0,28,0,12,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,InvokerWrapper,29,0,0,0,10,0,6,0,6,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractExporter,55,0,8,0,18,0,8,0,4,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,AbstractProxyProtocol,185,0,8,0,34,0,14,0,10,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,ProtocolFilterWrapper,98,0,10,0,22,0,11,0,6,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.protocol,ProtocolListenerWrapper,73,0,6,0,19,0,8,0,5,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter.tps,DefaultTPSLimiter,93,0,10,0,18,0,7,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.filter.tps,StatItem,104,0,4,0,27,0,10,0,8,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ProviderModel,152,0,14,0,34,0,14,0,7,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ConsumerModel,100,0,2,0,19,0,9,0,8,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ConsumerMethodModel,105,0,14,0,24,0,16,0,9,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ProviderMethodModel,68,0,4,0,18,0,8,0,6,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ApplicationModel,73,0,4,0,20,0,13,0,11,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.model,ConsumerMethodModel.AsyncMethodInfo,45,0,0,0,19,0,13,0,13,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy.javassist,JavassistProxyFactory.new AbstractProxyInvoker() {...},20,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-rpc-api,org.apache.dubbo.rpc.proxy.javassist,JavassistProxyFactory,32,0,2,0,4,0,4,0,3,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,ReferenceCountExchangeClient,180,0,8,0,54,0,28,0,24,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboCodec,397,0,44,0,98,0,30,0,8,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,CallbackServiceCodec,742,0,58,0,136,0,46,0,15,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,ChannelWrappedInvoker.ChannelWrapper,92,0,8,0,24,0,20,0,16,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,FutureAdapter,56,0,0,0,20,0,8,0,8,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,ChannelWrappedInvoker,128,0,4,0,24,0,5,0,3,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboProtocol,1043,0,114,0,212,0,80,0,23,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DecodeableRpcInvocation,229,0,24,0,56,0,17,0,5,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboExporter,19,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DecodeableRpcResult,234,0,23,0,68,0,23,0,9,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,FutureAdapter.new ResponseCallback() {...},52,0,0,0,15,0,3,0,3,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,LazyConnectExchangeClient,287,0,30,0,85,0,41,0,26,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboProtocol.new ExchangeHandlerAdapter() {...},310,0,30,0,55,0,23,0,8,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboCountCodec,93,0,12,0,32,0,10,0,4,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo,DubboInvoker,315,0,24,0,60,0,17,0,5,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.filter,FutureFilter,497,0,70,0,110,0,46,0,11,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.filter,TraceFilter,280,0,32,0,56,0,21,0,5,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,ListTelnetHandler,353,0,54,0,76,0,38,0,11,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,CurrentTelnetHandler,43,0,6,0,9,0,5,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,SelectTelnetHandler,72,0,12,0,14,0,8,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,CountTelnetHandler.new Runnable() {...},79,0,4,0,16,0,4,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,LogTelnetHandler,191,0,14,0,35,0,9,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,TraceTelnetHandler,207,0,44,0,37,0,24,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,ShutdownTelnetHandler,85,0,10,0,22,0,7,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,PortTelnetHandler,194,0,30,0,39,0,17,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,CountTelnetHandler,433,0,52,0,77,0,29,0,3,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,InvokeTelnetHandler,560,0,86,0,129,0,51,0,8,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.telnet,ChangeTelnetHandler,116,0,18,0,22,0,11,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.status,ThreadPoolStatusChecker,125,0,12,0,25,0,8,0,2,0
+dubbo-all/dubbo-rpc-dubbo,org.apache.dubbo.rpc.protocol.dubbo.status,ServerStatusChecker,80,0,10,0,20,0,7,0,2,0
+dubbo-all/dubbo-rpc-injvm,org.apache.dubbo.rpc.protocol.injvm,InjvmExporter,24,0,0,0,8,0,2,0,2,0
+dubbo-all/dubbo-rpc-injvm,org.apache.dubbo.rpc.protocol.injvm,InjvmProtocol,126,0,24,0,34,0,19,0,7,0
+dubbo-all/dubbo-rpc-injvm,org.apache.dubbo.rpc.protocol.injvm,InjvmInvoker,58,0,4,0,13,0,5,0,3,0
+dubbo-all/dubbo-rpc-jsonrpc,org.apache.dubbo.rpc.protocol.jsonrpc,JsonRpcProtocol.InternalHandler,73,0,6,0,19,0,5,0,2,0
+dubbo-all/dubbo-rpc-jsonrpc,org.apache.dubbo.rpc.protocol.jsonrpc,JsonRpcProtocol,198,0,18,0,44,0,17,0,8,0
+dubbo-all/dubbo-rpc-rmi,org.apache.dubbo.rpc.protocol.rmi,RmiProtocol.new Runnable() {...},28,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-rpc-rmi,org.apache.dubbo.rpc.protocol.rmi,RmiProtocol,226,0,32,0,54,0,24,0,8,0
+dubbo-all/dubbo-rpc-rmi,org.apache.dubbo.rpc.protocol.rmi,RmiRemoteInvocation,44,0,2,0,10,0,3,0,2,0
+dubbo-all/dubbo-rpc-rmi,com.alibaba.dubbo.rpc.protocol.rmi,RmiRemoteInvocation,4,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,HttpClientConnectionFactory,58,0,2,0,13,0,4,0,3,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,HessianProtocol,308,0,30,0,63,0,22,0,7,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,HessianProtocol.new Runnable() {...},27,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,HttpClientConnection,118,0,20,0,20,0,20,0,10,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,HessianProtocol.HessianHandler,71,0,6,0,18,0,5,0,2,0
+dubbo-all/dubbo-rpc-hessian,org.apache.dubbo.rpc.protocol.hessian,DubboHessianURLConnectionFactory,37,0,2,0,7,0,3,0,2,0
+dubbo-all/dubbo-rpc-http,com.alibaba.dubbo.rpc.protocol.http,HttpRemoteInvocation,4,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpProtocol.InternalHandler,44,0,2,0,11,0,3,0,2,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpProtocol.new SimpleHttpInvokerRequestExecutor() {...},28,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpRemoteInvocation,44,0,2,0,10,0,3,0,2,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpProtocol.new Runnable() {...},27,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpProtocol.new RemoteInvocationFactory() {...},54,0,6,0,9,0,5,0,2,0
+dubbo-all/dubbo-rpc-http,org.apache.dubbo.rpc.protocol.http,HttpProtocol,262,0,24,0,58,0,19,0,7,0
+dubbo-all/dubbo-rpc-webservice,org.apache.dubbo.rpc.protocol.webservice,WebServiceProtocol.WebServiceHandler,53,0,6,0,13,0,5,0,2,0
+dubbo-all/dubbo-rpc-webservice,org.apache.dubbo.rpc.protocol.webservice,WebServiceProtocol.new Runnable() {...},27,0,4,0,6,0,4,0,2,0
+dubbo-all/dubbo-rpc-webservice,org.apache.dubbo.rpc.protocol.webservice,WebServiceProtocol,166,0,8,0,41,0,10,0,6,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftProtocol.new ExchangeHandlerAdapter() {...},124,0,6,0,21,0,6,0,3,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftType,111,0,2,0,14,0,4,0,3,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftClassNameGenerator,11,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,DubboClassNameGenerator,11,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftCodec.RequestData,18,0,0,0,6,0,2,0,2,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftUtils,185,0,8,0,61,0,11,0,7,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftCodec,1241,0,59,0,325,0,39,0,9,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftNativeCodec,137,0,8,0,27,0,10,0,6,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftInvoker,208,0,18,0,44,0,14,0,5,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift,ThriftProtocol,283,0,24,0,54,0,20,0,8,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift.ext,MultiServiceProcessor,182,0,10,0,47,0,10,0,5,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift.io,InputStreamWrapper,77,0,8,0,23,0,14,0,10,0
+dubbo-all/dubbo-rpc-thrift,org.apache.dubbo.rpc.protocol.thrift.io,RandomAccessByteArrayOutputStream,169,0,18,0,35,0,22,0,13,0
+dubbo-all/dubbo-rpc-memcached,org.apache.dubbo.rpc.protocol.memcached,MemcachedProtocol.new AbstractInvoker() {...},260,0,20,0,29,0,13,0,3,0
+dubbo-all/dubbo-rpc-memcached,org.apache.dubbo.rpc.protocol.memcached,MemcachedProtocol,120,0,8,0,16,0,8,0,4,0
+dubbo-all/dubbo-rpc-redis,org.apache.dubbo.rpc.protocol.redis,RedisProtocol,236,0,22,0,35,0,16,0,5,0
+dubbo-all/dubbo-rpc-redis,org.apache.dubbo.rpc.protocol.redis,RedisProtocol.new AbstractInvoker() {...},351,0,28,0,48,0,17,0,3,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,DubboHttpServer.SimpleServletConfig.new Enumeration() {...},10,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RestServerFactory,45,0,8,0,8,0,7,0,3,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,BaseRestServer,100,0,6,0,18,0,8,0,5,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,ViolationReport,24,0,2,0,8,0,5,0,4,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,DubboHttpServer.RestHandler,20,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,DubboHttpServer.SimpleServletConfig,18,0,0,0,7,0,5,0,5,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,NettyServer,82,0,4,0,17,0,6,0,4,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RestProtocol.ConnectionMonitor,71,0,4,0,22,0,6,0,4,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,DubboResourceFactory,18,0,0,0,9,0,6,0,6,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,DubboHttpServer,83,0,4,0,21,0,6,0,4,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RestProtocol,477,0,42,0,106,0,32,0,11,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RestConstraintViolation,36,0,0,0,16,0,8,0,8,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RpcExceptionMapper,71,0,6,0,12,0,6,0,3,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest,RpcContextFilter,185,0,28,0,33,0,18,0,4,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest.integration.swagger,DubboSwaggerApiListingResource,34,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest.support,LoggingFilter.OutputStreamWrapper,54,0,0,0,18,0,7,0,7,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest.support,LoggingFilter,151,0,6,0,30,0,12,0,9,0
+dubbo-all/dubbo-rpc-rest,org.apache.dubbo.rpc.protocol.rest.support,ContentType,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.ServiceConfigurationListener,32,0,0,0,8,0,3,0,3,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryDirectory,1338,0,188,0,306,0,127,0,33,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,AbstractConfiguratorListener,94,0,6,0,26,0,9,0,6,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.ProviderConfigurationListener,32,0,0,0,6,0,4,0,4,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryDirectory.InvokerDelegate,11,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.InvokerDelegate,20,0,2,0,6,0,3,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.ExporterChangeableWrapper,143,0,2,0,39,0,9,0,8,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryDirectory.ConsumerConfigurationListener,33,0,0,0,8,0,4,0,4,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryDirectory.ReferenceConfigurationListener,25,0,0,0,7,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.OverrideListener,200,0,16,0,40,0,12,0,4,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol,790,0,48,0,153,0,57,0,33,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.integration,RegistryProtocol.DestroyableExporter,14,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.status,RegistryStatusChecker,64,0,8,0,16,0,6,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,FailedRegisteredTask,13,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,FailedUnsubscribedTask,26,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,AbstractRetryTask,183,0,22,0,36,0,16,0,5,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,FailedUnregisteredTask,13,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,FailedSubscribedTask,26,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.retry,FailedNotifiedTask,54,0,6,0,17,0,7,0,4,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,AbstractRegistryFactory,126,0,8,0,33,0,9,0,5,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,AbstractRegistry,1282,0,164,0,256,0,109,0,27,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,FailbackRegistry.Holder,49,0,10,0,11,0,8,0,3,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,ProviderConsumerRegTable,168,0,14,0,41,0,17,0,10,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,ConsumerInvokerWrapper,59,0,0,0,18,0,11,0,11,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,FailbackRegistry,949,0,92,0,199,0,75,0,29,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,AbstractRegistry.SaveProperties,15,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,SkipFailbackWrapperException,6,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-registry-api,org.apache.dubbo.registry.support,ProviderInvokerWrapper,76,0,4,0,23,0,15,0,13,0
+dubbo-all/dubbo-registry-default,org.apache.dubbo.registry.dubbo,DubboRegistryFactory,172,0,6,0,39,0,9,0,6,0
+dubbo-all/dubbo-registry-default,org.apache.dubbo.registry.dubbo,DubboRegistry,201,0,12,0,51,0,17,0,11,0
+dubbo-all/dubbo-registry-multicast,org.apache.dubbo.registry.multicast,MulticastRegistry.new Runnable() {...},69,0,6,0,16,0,5,0,2,0
+dubbo-all/dubbo-registry-multicast,org.apache.dubbo.registry.multicast,MulticastRegistry.new Runnable() {...},24,0,0,0,6,0,2,0,2,0
+dubbo-all/dubbo-registry-multicast,org.apache.dubbo.registry.multicast,MulticastRegistry,959,0,112,0,201,0,81,0,25,0
+dubbo-all/dubbo-registry-multicast,org.apache.dubbo.registry.multicast,MulticastRegistryFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-registry-zookeeper,org.apache.dubbo.registry.zookeeper,ZookeeperRegistryFactory,14,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-registry-zookeeper,org.apache.dubbo.registry.zookeeper,ZookeeperRegistry,793,0,64,0,141,0,52,0,20,0
+dubbo-all/dubbo-registry-redis,org.apache.dubbo.registry.redis,RedisRegistryFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-registry-redis,org.apache.dubbo.registry.redis,RedisRegistry,1355,0,158,0,270,0,98,0,19,0
+dubbo-all/dubbo-registry-redis,org.apache.dubbo.registry.redis,RedisRegistry.NotifySub,62,0,6,0,20,0,10,0,7,0
+dubbo-all/dubbo-registry-redis,org.apache.dubbo.registry.redis,RedisRegistry.Notifier,269,0,22,0,63,0,16,0,5,0
+dubbo-all/dubbo-registry-consul,org.apache.dubbo.registry.consul,ConsulRegistry,559,0,30,0,118,0,46,0,31,0
+dubbo-all/dubbo-registry-consul,org.apache.dubbo.registry.consul,ConsulRegistry.ConsulNotifier,163,0,16,0,33,0,13,0,5,0
+dubbo-all/dubbo-registry-consul,org.apache.dubbo.registry.consul,ConsulRegistryFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-registry-etcd3,org.apache.dubbo.registry.etcd,EtcdRegistry,854,0,74,0,156,0,62,0,25,0
+dubbo-all/dubbo-registry-etcd3,org.apache.dubbo.registry.etcd,EtcdRegistryFactory,14,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-registry-sofa,org.apache.dubbo.registry.sofa,SofaRegistry,451,0,40,0,111,0,36,0,16,0
+dubbo-all/dubbo-registry-sofa,org.apache.dubbo.registry.sofa,SofaRegistryConstants,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-registry-sofa,org.apache.dubbo.registry.sofa,SofaRegistryFactory,12,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-monitor-api,org.apache.dubbo.monitor.support,AbstractMonitorFactory.MonitorListener,45,0,0,0,13,0,2,0,2,0
+dubbo-all/dubbo-monitor-api,org.apache.dubbo.monitor.support,MonitorFilter,345,0,16,0,58,0,15,0,7,0
+dubbo-all/dubbo-monitor-api,org.apache.dubbo.monitor.support,AbstractMonitorFactory,118,0,8,0,24,0,9,0,5,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,MetricsFilter.new HashMap() {...},25,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,MetricsFilter.new HashMap() {...},25,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,Statistics,340,0,62,0,88,0,51,0,20,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,MetricsFilter.new Invoker() {...},110,0,2,0,20,0,7,0,6,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,DubboMonitorFactory,97,0,4,0,17,0,6,0,4,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,MetricsFilter,408,0,36,0,83,0,27,0,9,0
+dubbo-all/dubbo-monitor-default,org.apache.dubbo.monitor.dubbo,DubboMonitor,629,0,20,0,107,0,19,0,9,0
+dubbo-all/dubbo-container-spring,org.apache.dubbo.container.spring,SpringContainer,46,0,4,0,18,0,7,0,5,0
+dubbo-all/dubbo-container-log4j,org.apache.dubbo.container.log4j,Log4jContainer,167,0,26,0,41,0,16,0,3,0
+dubbo-all/dubbo-container-logback,org.apache.dubbo.container.logback,LogbackContainer,111,0,6,0,35,0,7,0,4,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.protocol,QosProtocolWrapper,130,0,12,0,39,0,14,0,8,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.util,CommandHelper,65,0,6,0,17,0,7,0,4,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TKv,134,0,6,0,24,0,8,0,5,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTree,172,0,14,0,34,0,16,0,9,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTable,721,0,105,0,140,0,69,0,16,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTable.Border,62,0,6,0,13,0,9,0,6,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTree.new TTree.Callback() {...},136,0,16,0,26,0,10,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTable.ColumnDefine,70,0,4,0,22,0,9,0,7,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTree.Node,55,0,2,0,16,0,7,0,6,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TTable.Align,34,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.textui,TLadder,60,0,4,0,19,0,5,0,3,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server,DubboLogo,25,0,0,0,6,0,2,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server,Server,164,0,6,0,41,0,15,0,12,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server,Server.new ChannelInitializer() {...},25,0,0,0,3,0,2,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Online,86,0,12,0,24,0,8,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Quit,5,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Help,196,0,14,0,26,0,12,0,5,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Ls,195,0,6,0,25,0,7,0,4,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Help.new Comparator() {...},24,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.impl,Offline,88,0,14,0,24,0,9,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.decoder,TelnetCommandDecoder,44,0,4,0,11,0,4,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command.decoder,HttpCommandDecoder,139,0,18,0,34,0,11,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server.handler,HttpProcessHandler,178,0,2,0,40,0,7,0,6,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server.handler,QosProcessHandler.new Runnable() {...},30,0,2,0,5,0,3,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server.handler,LocalHostPermitHandler,27,0,4,0,9,0,4,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server.handler,QosProcessHandler,188,0,14,0,30,0,12,0,5,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.server.handler,TelnetProcessHandler,117,0,4,0,22,0,6,0,4,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command,NoSuchCommandException,11,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command,DefaultCommandExecutor,28,0,2,0,8,0,3,0,2,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command,CommandContext,53,0,0,0,23,0,12,0,12,0
+dubbo-all/dubbo-qos,org.apache.dubbo.qos.command,CommandContextFactory,15,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-serialization-api,org.apache.dubbo.common.serialize.support,SerializableClassRegistry,27,0,2,0,9,0,6,0,5,0
+dubbo-all/dubbo-serialization-fastjson,org.apache.dubbo.common.serialize.fastjson,FastJsonObjectInput,109,0,4,0,25,0,18,0,16,0
+dubbo-all/dubbo-serialization-fastjson,org.apache.dubbo.common.serialize.fastjson,FastJsonObjectOutput,106,0,0,0,36,0,14,0,14,0
+dubbo-all/dubbo-serialization-fastjson,org.apache.dubbo.common.serialize.fastjson,FastJsonSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-fst,org.apache.dubbo.common.serialize.fst,FstObjectInput,98,0,4,0,26,0,15,0,13,0
+dubbo-all/dubbo-serialization-fst,org.apache.dubbo.common.serialize.fst,FstObjectOutput,89,0,4,0,32,0,15,0,13,0
+dubbo-all/dubbo-serialization-fst,org.apache.dubbo.common.serialize.fst,FstFactory,41,0,0,0,8,0,6,0,6,0
+dubbo-all/dubbo-serialization-fst,org.apache.dubbo.common.serialize.fst,FstSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-hessian2,org.apache.dubbo.common.serialize.hessian2,Hessian2Serialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-hessian2,org.apache.dubbo.common.serialize.hessian2,Hessian2SerializerFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-serialization-hessian2,org.apache.dubbo.common.serialize.hessian2,Hessian2ObjectOutput,75,0,0,0,28,0,13,0,13,0
+dubbo-all/dubbo-serialization-hessian2,org.apache.dubbo.common.serialize.hessian2,Hessian2ObjectInput,65,0,0,0,16,0,13,0,13,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,JavaSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,CompactedObjectOutputStream,28,0,4,0,9,0,4,0,2,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,CompactedObjectInputStream,56,0,7,0,14,0,8,0,4,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,JavaObjectOutput,58,0,6,0,16,0,8,0,5,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,CompactedJavaSerialization,19,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.java,JavaObjectInput,88,0,12,0,24,0,13,0,7,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.nativejava,NativeJavaObjectInput,83,0,4,0,26,0,17,0,15,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.nativejava,NativeJavaSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-jdk,org.apache.dubbo.common.serialize.nativejava,NativeJavaObjectOutput,100,0,4,0,36,0,17,0,15,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo,KryoSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo,CompatibleKryo,47,0,12,0,9,0,9,0,3,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo,KryoObjectInput,142,0,4,0,44,0,16,0,14,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo,KryoObjectOutput,102,0,4,0,36,0,16,0,14,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,AbstractKryoFactory,242,0,8,0,56,0,9,0,5,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,ThreadLocalKryoFactory,15,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,PooledKryoFactory,20,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,ReflectionUtils,27,0,4,0,6,0,5,0,3,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,KryoUtils,23,0,0,0,9,0,6,0,6,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,ThreadLocalKryoFactory.new ThreadLocal() {...},10,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-serialization-kryo,org.apache.dubbo.common.serialize.kryo.utils,PrototypeKryoFactory,7,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-serialization-avro,org.apache.dubbo.common.serialize.avro,AvroObjectInput,106,0,2,0,26,0,15,0,14,0
+dubbo-all/dubbo-serialization-avro,org.apache.dubbo.common.serialize.avro,AvroObjectOutput,107,0,2,0,33,0,15,0,14,0
+dubbo-all/dubbo-serialization-avro,org.apache.dubbo.common.serialize.avro,AvroSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff.utils,WrapperUtils,135,0,8,0,31,0,8,0,4,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff,ProtostuffSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff,ProtostuffObjectInput,151,0,6,0,40,0,16,0,13,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff,Wrapper,9,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff,ProtostuffObjectOutput,154,0,4,0,47,0,15,0,13,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff.delegate,TimestampDelegate,27,0,0,0,8,0,6,0,6,0
+dubbo-all/dubbo-serialization-protostuff,org.apache.dubbo.common.serialize.protostuff.delegate,TimeDelegate,27,0,0,0,8,0,6,0,6,0
+dubbo-all/dubbo-serialization-gson,org.apache.dubbo.common.serialize.gson,GsonJsonObjectInput,119,0,4,0,25,0,18,0,16,0
+dubbo-all/dubbo-serialization-gson,org.apache.dubbo.common.serialize.gson,GsonSerialization,17,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-serialization-gson,org.apache.dubbo.common.serialize.gson,GsonJsonObjectOutput,107,0,0,0,35,0,14,0,14,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter.support.nop,NopDynamicConfigurationFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter.support.nop,NopDynamicConfiguration,9,0,0,0,6,0,5,0,5,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter,AbstractDynamicConfigurationFactory,24,0,4,0,7,0,4,0,2,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter,ConfigChangeType,34,0,0,0,4,0,1,0,1,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter,ConfigChangeEvent,53,0,0,0,11,0,6,0,6,0
+dubbo-all/dubbo-configcenter-api,org.apache.dubbo.configcenter,DynamicConfiguration,39,0,0,0,10,0,6,0,6,0
+dubbo-all/dubbo-configcenter-zookeeper,org.apache.dubbo.configcenter.support.zookeeper,ZookeeperDynamicConfigurationFactory,14,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-configcenter-zookeeper,org.apache.dubbo.configcenter.support.zookeeper,CacheListener,133,0,22,0,37,0,19,0,7,0
+dubbo-all/dubbo-configcenter-zookeeper,org.apache.dubbo.configcenter.support.zookeeper,ZookeeperDynamicConfiguration,149,0,2,0,24,0,7,0,6,0
+dubbo-all/dubbo-configcenter-apollo,org.apache.dubbo.configcenter.support.apollo,ApolloDynamicConfiguration.ApolloListener,101,0,10,0,21,0,12,0,7,0
+dubbo-all/dubbo-configcenter-apollo,org.apache.dubbo.configcenter.support.apollo,ApolloDynamicConfiguration,232,0,28,0,47,0,24,0,10,0
+dubbo-all/dubbo-configcenter-apollo,org.apache.dubbo.configcenter.support.apollo,ApolloDynamicConfigurationFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-configcenter-consul,org.apache.dubbo.configcenter.consul,ConsulDynamicConfigurationFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-configcenter-consul,org.apache.dubbo.configcenter.consul,ConsulDynamicConfiguration.ConsulKVWatcher,228,0,20,0,46,0,17,0,7,0
+dubbo-all/dubbo-configcenter-consul,org.apache.dubbo.configcenter.consul,ConsulDynamicConfiguration,280,0,12,0,43,0,15,0,9,0
+dubbo-all/dubbo-configcenter-etcd,org.apache.dubbo.configcenter.support.etcd,EtcdDynamicConfiguration.EtcdConfigWatcher,111,0,4,0,32,0,9,0,7,0
+dubbo-all/dubbo-configcenter-etcd,org.apache.dubbo.configcenter.support.etcd,EtcdDynamicConfiguration,176,0,8,0,32,0,12,0,8,0
+dubbo-all/dubbo-configcenter-etcd,org.apache.dubbo.configcenter.support.etcd,EtcdDynamicConfigurationFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,RpcContext,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Result.CompatibleResult,60,0,0,0,18,0,13,0,13,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,InvokerListener,14,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Invocation.CompatibleInvocation,43,0,0,0,11,0,9,0,9,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Invocation,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Invoker.CompatibleInvoker,37,0,0,0,10,0,7,0,7,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Invoker,4,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Filter,15,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Protocol,15,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,ProxyFactory,24,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,RpcException,36,0,0,0,16,0,8,0,8,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc,Exporter.CompatibleExporter,17,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.monitor,Monitor,23,0,0,0,3,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.monitor,MonitorFactory,7,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.context.annotation,CompatibleDubboComponentScanRegistrar,99,0,4,0,25,0,7,0,5,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.remoting,Dispatcher,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.remoting,ChannelHandler,5,0,0,0,5,0,5,0,5,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.remoting,RemotingException,35,0,0,0,12,0,6,0,6,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.common.serialize,Serialization,16,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.schema,CompatibleAnnotationBeanDefinitionParser,33,0,0,0,11,0,5,0,5,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.common.status,Status,15,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.registry,RegistryFactory,7,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.registry,Registry,52,0,0,0,10,0,6,0,6,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.registry,NotifyListener.CompatibleNotifyListener,23,0,2,0,6,0,4,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.cache.support,AbstractCacheFactory,52,0,2,0,10,0,4,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.qos.command,CommandContext,27,0,0,0,8,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.qos.command,BaseCommand,8,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.common,Constants,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.common,URL,771,0,10,0,151,0,122,0,117,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.protocol.rest.support,ContentType,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor,441,0,32,0,100,0,34,0,18,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor.new ReflectionUtils.MethodCallback() {...},95,0,14,0,16,0,9,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor.new ReflectionUtils.FieldCallback() {...},50,0,6,0,9,0,5,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor.ReferenceMethodElement,43,0,0,0,10,0,2,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceBeanBuilder,166,0,8,0,37,0,16,0,12,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor.ReferenceInjectionMetadata,53,0,2,0,10,0,5,0,4,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceBeanBuilder.new PropertyEditorSupport() {...},31,0,2,0,9,0,3,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleReferenceAnnotationBeanPostProcessor.ReferenceFieldElement,37,0,0,0,10,0,2,0,2,0
+dubbo-all/dubbo-compatible,org.apache.dubbo.config.spring.beans.factory.annotation,CompatibleServiceAnnotationBeanPostProcessor,661,0,62,0,145,0,51,0,20,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,LoadBalance,25,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,RuleConverter,17,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,Cluster,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,RouterFactory,7,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,Router,52,0,2,0,10,0,8,0,7,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster,Directory,18,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.rpc.cluster.loadbalance,AbstractLoadBalance,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,MonitorConfig,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ConsumerConfig,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ProviderConfig,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ArgumentConfig,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,RegistryConfig,12,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ReferenceConfig,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ServiceConfig,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ProtocolConfig,12,0,0,0,6,0,3,0,3,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ModuleConfig,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,MethodConfig,3,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.config,ApplicationConfig,7,0,0,0,4,0,2,0,2,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.remoting.telnet,TelnetHandler,2,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-compatible,com.alibaba.dubbo.common.threadpool,ThreadPool,7,0,0,0,1,0,1,0,1,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.SaveProperties,15,0,0,0,5,0,2,0,2,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport,746,0,64,0,141,0,50,0,18,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry.new Runnable() {...},61,0,6,0,11,0,5,0,2,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReportFactory,73,0,4,0,16,0,5,0,3,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry,73,0,4,0,17,0,5,0,3,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier,223,0,12,0,41,0,24,0,18,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier.KeyTypeEnum,24,0,0,0,2,0,1,0,1,0
+dubbo-all/dubbo-metadata-report-api,org.apache.dubbo.metadata.integration,MetadataReportService,209,0,10,0,41,0,10,0,5,0
+dubbo-all/dubbo-metadata-report-zookeeper,org.apache.dubbo.metadata.store.zookeeper,ZookeeperMetadataReportFactory,14,0,0,0,4,0,3,0,3,0
+dubbo-all/dubbo-metadata-report-zookeeper,org.apache.dubbo.metadata.store.zookeeper,ZookeeperMetadataReport,91,0,6,0,20,0,10,0,7,0
+dubbo-all/dubbo-metadata-report-redis,org.apache.dubbo.metadata.store.redis,RedisMetadataReport,94,0,0,0,16,0,5,0,5,0
+dubbo-all/dubbo-metadata-report-redis,org.apache.dubbo.metadata.store.redis,RedisMetadataReportFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-metadata-report-consul,org.apache.dubbo.metadata.store.consul,ConsulMetadataReport,89,0,2,0,16,0,6,0,5,0
+dubbo-all/dubbo-metadata-report-consul,org.apache.dubbo.metadata.store.consul,ConsulMetadataReportFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-metadata-report-etcd,org.apache.dubbo.metadata.store.etcd,EtcdMetadataReportFactory,8,0,0,0,2,0,2,0,2,0
+dubbo-all/dubbo-metadata-report-etcd,org.apache.dubbo.metadata.store.etcd,EtcdMetadataReport,108,0,8,0,22,0,11,0,7,0

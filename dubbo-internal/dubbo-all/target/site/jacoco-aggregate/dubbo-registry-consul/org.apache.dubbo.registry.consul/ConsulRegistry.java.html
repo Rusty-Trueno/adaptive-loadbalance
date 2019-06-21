@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConsulRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-consul</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.consul</a> &gt; <span class="el_source">ConsulRegistry.java</span></div><h1>ConsulRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.registry.consul;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+
+import com.ecwid.consul.v1.ConsulClient;
+import com.ecwid.consul.v1.QueryParams;
+import com.ecwid.consul.v1.Response;
+import com.ecwid.consul.v1.agent.model.NewService;
+import com.ecwid.consul.v1.catalog.CatalogServicesRequest;
+import com.ecwid.consul.v1.health.HealthServicesRequest;
+import com.ecwid.consul.v1.health.model.HealthService;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static org.apache.dubbo.common.Constants.ANY_VALUE;
+
+/**
+ * registry center implementation for consul
+ */
+public class ConsulRegistry extends FailbackRegistry {
+<span class="nc" id="L58">    private static final Logger logger = LoggerFactory.getLogger(ConsulRegistry.class);</span>
+
+    private static final String SERVICE_TAG = &quot;dubbo&quot;;
+    private static final String URL_META_KEY = &quot;url&quot;;
+    private static final String WATCH_TIMEOUT = &quot;consul-watch-timeout&quot;;
+    private static final String CHECK_PASS_INTERVAL = &quot;consul-check-pass-interval&quot;;
+    private static final String DEREGISTER_AFTER = &quot;consul-deregister-critical-service-after&quot;;
+
+    private static final int DEFAULT_PORT = 8500;
+    // default watch timeout in millisecond
+    private static final int DEFAULT_WATCH_TIMEOUT = 60 * 1000;
+    // default time-to-live in millisecond
+    private static final long DEFAULT_CHECK_PASS_INTERVAL = 16000L;
+    // default deregister critical server after
+    private static final String DEFAULT_DEREGISTER_TIME = &quot;20s&quot;;
+
+    private ConsulClient client;
+    private long checkPassInterval;
+<span class="nc" id="L76">    private ExecutorService notifierExecutor = newCachedThreadPool(</span>
+            new NamedThreadFactory(&quot;dubbo-consul-notifier&quot;, true));
+<span class="nc" id="L78">    private ConcurrentMap&lt;URL, ConsulNotifier&gt; notifiers = new ConcurrentHashMap&lt;&gt;();</span>
+    private ScheduledExecutorService ttlConsulCheckExecutor;
+
+
+    public ConsulRegistry(URL url) {
+<span class="nc" id="L83">        super(url);</span>
+<span class="nc" id="L84">        String host = url.getHost();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        int port = url.getPort() != 0 ? url.getPort() : DEFAULT_PORT;</span>
+<span class="nc" id="L86">        client = new ConsulClient(host, port);</span>
+<span class="nc" id="L87">        checkPassInterval = url.getParameter(CHECK_PASS_INTERVAL, DEFAULT_CHECK_PASS_INTERVAL);</span>
+<span class="nc" id="L88">        ttlConsulCheckExecutor = Executors.newSingleThreadScheduledExecutor();</span>
+<span class="nc" id="L89">        ttlConsulCheckExecutor.scheduleAtFixedRate(this::checkPass, checkPassInterval / 8,</span>
+                checkPassInterval / 8, TimeUnit.MILLISECONDS);
+<span class="nc" id="L91">    }</span>
+
+    @Override
+    public void register(URL url) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (isConsumerSide(url)) {</span>
+<span class="nc" id="L96">            return;</span>
+        }
+
+<span class="nc" id="L99">        super.register(url);</span>
+<span class="nc" id="L100">    }</span>
+
+    @Override
+    public void doRegister(URL url) {
+<span class="nc" id="L104">        client.agentServiceRegister(buildService(url));</span>
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void unregister(URL url) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (isConsumerSide(url)) {</span>
+<span class="nc" id="L110">            return;</span>
+        }
+
+<span class="nc" id="L113">        super.unregister(url);</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+<span class="nc" id="L118">        client.agentServiceDeregister(buildId(url));</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public void subscribe(URL url, NotifyListener listener) {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (isProviderSide(url)) {</span>
+<span class="nc" id="L124">            return;</span>
+        }
+
+<span class="nc" id="L127">        super.subscribe(url, listener);</span>
+<span class="nc" id="L128">    }</span>
+
+    @Override
+    public void doSubscribe(URL url, NotifyListener listener) {
+        Long index;
+        List&lt;URL&gt; urls;
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L135">            Response&lt;Map&lt;String, List&lt;String&gt;&gt;&gt; response = getAllServices(-1, buildWatchTimeout(url));</span>
+<span class="nc" id="L136">            index = response.getConsulIndex();</span>
+<span class="nc" id="L137">            List&lt;HealthService&gt; services = getHealthServices(response.getValue());</span>
+<span class="nc" id="L138">            urls = convert(services);</span>
+<span class="nc" id="L139">        } else {</span>
+<span class="nc" id="L140">            String service = url.getServiceKey();</span>
+<span class="nc" id="L141">            Response&lt;List&lt;HealthService&gt;&gt; response = getHealthServices(service, -1, buildWatchTimeout(url));</span>
+<span class="nc" id="L142">            index = response.getConsulIndex();</span>
+<span class="nc" id="L143">            urls = convert(response.getValue());</span>
+        }
+
+<span class="nc" id="L146">        notify(url, listener, urls);</span>
+<span class="nc" id="L147">        ConsulNotifier notifier = notifiers.computeIfAbsent(url, k -&gt; new ConsulNotifier(url, index));</span>
+<span class="nc" id="L148">        notifierExecutor.submit(notifier);</span>
+<span class="nc" id="L149">    }</span>
+
+    @Override
+    public void unsubscribe(URL url, NotifyListener listener) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (isProviderSide(url)) {</span>
+<span class="nc" id="L154">            return;</span>
+        }
+
+<span class="nc" id="L157">        super.unsubscribe(url, listener);</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L162">        ConsulNotifier notifier = notifiers.remove(url);</span>
+<span class="nc" id="L163">        notifier.stop();</span>
+<span class="nc" id="L164">    }</span>
+
+    @Override
+    public List&lt;URL&gt; lookup(URL url) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(&quot;lookup url == null&quot;);</span>
+        }
+        try {
+<span class="nc" id="L172">            String service = url.getServiceKey();</span>
+<span class="nc" id="L173">            Response&lt;List&lt;HealthService&gt;&gt; result = getHealthServices(service, -1, buildWatchTimeout(url));</span>
+<span class="nc bnc" id="L174" title="All 6 branches missed.">            if (result == null || result.getValue() == null || result.getValue().isEmpty()) {</span>
+<span class="nc" id="L175">                return new ArrayList&lt;&gt;();</span>
+            } else {
+<span class="nc" id="L177">                return  convert(result.getValue());</span>
+            }
+<span class="nc" id="L179">        } catch (Throwable e) {</span>
+<span class="nc" id="L180">            throw new RpcException(&quot;Failed to lookup &quot; + url + &quot; from consul &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        return client.getAgentSelf() != null;</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L191">        super.destroy();</span>
+<span class="nc" id="L192">        notifierExecutor.shutdown();</span>
+<span class="nc" id="L193">        ttlConsulCheckExecutor.shutdown();</span>
+<span class="nc" id="L194">    }</span>
+
+    private void checkPass() {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        for (URL url : getRegistered()) {</span>
+<span class="nc" id="L198">            String checkId = buildId(url);</span>
+            try {
+<span class="nc" id="L200">                client.agentCheckPass(&quot;service:&quot; + checkId);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L202">                    logger.debug(&quot;check pass for url: &quot; + url + &quot; with check id: &quot; + checkId);</span>
+                }
+<span class="nc" id="L204">            } catch (Throwable t) {</span>
+<span class="nc" id="L205">                logger.warn(&quot;fail to check pass for url: &quot; + url + &quot;, check id is: &quot; + checkId);</span>
+<span class="nc" id="L206">            }</span>
+<span class="nc" id="L207">        }</span>
+<span class="nc" id="L208">    }</span>
+
+    private Response&lt;List&lt;HealthService&gt;&gt; getHealthServices(String service, long index, int watchTimeout) {
+<span class="nc" id="L211">        HealthServicesRequest request = HealthServicesRequest.newBuilder()</span>
+<span class="nc" id="L212">                .setTag(SERVICE_TAG)</span>
+<span class="nc" id="L213">                .setQueryParams(new QueryParams(watchTimeout, index))</span>
+<span class="nc" id="L214">                .setPassing(true)</span>
+<span class="nc" id="L215">                .build();</span>
+<span class="nc" id="L216">        return client.getHealthServices(service, request);</span>
+    }
+
+    private Response&lt;Map&lt;String, List&lt;String&gt;&gt;&gt; getAllServices(long index, int watchTimeout) {
+<span class="nc" id="L220">        CatalogServicesRequest request = CatalogServicesRequest.newBuilder()</span>
+<span class="nc" id="L221">                .setQueryParams(new QueryParams(watchTimeout, index))</span>
+<span class="nc" id="L222">                .build();</span>
+<span class="nc" id="L223">        return client.getCatalogServices(request);</span>
+    }
+
+    private List&lt;HealthService&gt; getHealthServices(Map&lt;String, List&lt;String&gt;&gt; services) {
+<span class="nc" id="L227">        return services.keySet().stream()</span>
+<span class="nc" id="L228">                .filter(s -&gt; services.get(s).contains(SERVICE_TAG))</span>
+<span class="nc" id="L229">                .map(s -&gt; getHealthServices(s, -1, -1).getValue())</span>
+<span class="nc" id="L230">                .flatMap(Collection::stream)</span>
+<span class="nc" id="L231">                .collect(Collectors.toList());</span>
+    }
+
+
+    private boolean isConsumerSide(URL url) {
+<span class="nc" id="L236">        return url.getProtocol().equals(Constants.CONSUMER_PROTOCOL);</span>
+    }
+
+    private boolean isProviderSide(URL url) {
+<span class="nc" id="L240">        return url.getProtocol().equals(Constants.PROVIDER_PROTOCOL);</span>
+    }
+
+    private List&lt;URL&gt; convert(List&lt;HealthService&gt; services) {
+<span class="nc" id="L244">        return services.stream()</span>
+<span class="nc" id="L245">                .map(HealthService::getService)</span>
+<span class="nc" id="L246">                .filter(Objects::nonNull)</span>
+<span class="nc" id="L247">                .map(HealthService.Service::getMeta)</span>
+<span class="nc bnc" id="L248" title="All 4 branches missed.">                .filter(m -&gt; m != null &amp;&amp; m.containsKey(URL_META_KEY))</span>
+<span class="nc" id="L249">                .map(m -&gt; m.get(URL_META_KEY))</span>
+<span class="nc" id="L250">                .map(URL::valueOf)</span>
+<span class="nc" id="L251">                .collect(Collectors.toList());</span>
+    }
+
+    private NewService buildService(URL url) {
+<span class="nc" id="L255">        NewService service = new NewService();</span>
+<span class="nc" id="L256">        service.setAddress(url.getHost());</span>
+<span class="nc" id="L257">        service.setPort(url.getPort());</span>
+<span class="nc" id="L258">        service.setId(buildId(url));</span>
+<span class="nc" id="L259">        service.setName(url.getServiceInterface());</span>
+<span class="nc" id="L260">        service.setCheck(buildCheck(url));</span>
+<span class="nc" id="L261">        service.setTags(buildTags(url));</span>
+<span class="nc" id="L262">        service.setMeta(Collections.singletonMap(URL_META_KEY, url.toFullString()));</span>
+<span class="nc" id="L263">        return service;</span>
+    }
+
+    private List&lt;String&gt; buildTags(URL url) {
+<span class="nc" id="L267">        Map&lt;String, String&gt; params = url.getParameters();</span>
+<span class="nc" id="L268">        List&lt;String&gt; tags = params.keySet().stream()</span>
+<span class="nc" id="L269">                .map(k -&gt; k + &quot;=&quot; + params.get(k))</span>
+<span class="nc" id="L270">                .collect(Collectors.toList());</span>
+<span class="nc" id="L271">        tags.add(SERVICE_TAG);</span>
+<span class="nc" id="L272">        return tags;</span>
+    }
+
+    private String buildId(URL url) {
+        // let's simply use url's hashcode to generate unique service id for now
+<span class="nc" id="L277">        return Integer.toHexString(url.hashCode());</span>
+    }
+
+    private NewService.Check buildCheck(URL url) {
+<span class="nc" id="L281">        NewService.Check check = new NewService.Check();</span>
+<span class="nc" id="L282">        check.setTtl((checkPassInterval / 1000) + &quot;s&quot;);</span>
+<span class="nc" id="L283">        check.setDeregisterCriticalServiceAfter(url.getParameter(DEREGISTER_AFTER, DEFAULT_DEREGISTER_TIME));</span>
+<span class="nc" id="L284">        return check;</span>
+    }
+
+    private int buildWatchTimeout(URL url) {
+<span class="nc" id="L288">        return url.getParameter(WATCH_TIMEOUT, DEFAULT_WATCH_TIMEOUT) / 1000;</span>
+    }
+
+    private class ConsulNotifier implements Runnable {
+        private URL url;
+        private long consulIndex;
+        private boolean running;
+
+<span class="nc" id="L296">        ConsulNotifier(URL url, long consulIndex) {</span>
+<span class="nc" id="L297">            this.url = url;</span>
+<span class="nc" id="L298">            this.consulIndex = consulIndex;</span>
+<span class="nc" id="L299">            this.running = true;</span>
+<span class="nc" id="L300">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            while (this.running) {</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                if (ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L306">                    processServices();</span>
+                } else {
+<span class="nc" id="L308">                    processService();</span>
+                }
+            }
+<span class="nc" id="L311">        }</span>
+
+        private void processService() {
+<span class="nc" id="L314">            String service = url.getServiceKey();</span>
+<span class="nc" id="L315">            Response&lt;List&lt;HealthService&gt;&gt; response = getHealthServices(service, consulIndex, buildWatchTimeout(url));</span>
+<span class="nc" id="L316">            Long currentIndex = response.getConsulIndex();</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">            if (currentIndex != null &amp;&amp; currentIndex &gt; consulIndex) {</span>
+<span class="nc" id="L318">                consulIndex = currentIndex;</span>
+<span class="nc" id="L319">                List&lt;HealthService&gt; services = response.getValue();</span>
+<span class="nc" id="L320">                List&lt;URL&gt; urls = convert(services);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                for (NotifyListener listener : getSubscribed().get(url)) {</span>
+<span class="nc" id="L322">                    doNotify(url, listener, urls);</span>
+<span class="nc" id="L323">                }</span>
+            }
+<span class="nc" id="L325">        }</span>
+
+        private void processServices() {
+<span class="nc" id="L328">            Response&lt;Map&lt;String, List&lt;String&gt;&gt;&gt; response = getAllServices(consulIndex, buildWatchTimeout(url));</span>
+<span class="nc" id="L329">            Long currentIndex = response.getConsulIndex();</span>
+<span class="nc bnc" id="L330" title="All 4 branches missed.">            if (currentIndex != null &amp;&amp; currentIndex &gt; consulIndex) {</span>
+<span class="nc" id="L331">                consulIndex = currentIndex;</span>
+<span class="nc" id="L332">                List&lt;HealthService&gt; services = getHealthServices(response.getValue());</span>
+<span class="nc" id="L333">                List&lt;URL&gt; urls = convert(services);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                for (NotifyListener listener : getSubscribed().get(url)) {</span>
+<span class="nc" id="L335">                    doNotify(url, listener, urls);</span>
+<span class="nc" id="L336">                }</span>
+            }
+<span class="nc" id="L338">        }</span>
+
+        void stop() {
+<span class="nc" id="L341">            this.running = false;</span>
+<span class="nc" id="L342">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

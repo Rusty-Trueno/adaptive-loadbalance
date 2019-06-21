@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OptionUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.etcd.option</a> &gt; <span class="el_source">OptionUtil.java</span></div><h1>OptionUtil.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.etcd.option;
+
+import io.etcd.jetcd.ByteSequence;
+import io.grpc.Status;
+import io.netty.handler.codec.http2.Http2Exception;
+
+import java.util.Arrays;
+
+<span class="nc" id="L25">public class OptionUtil {</span>
+
+<span class="nc" id="L27">    public static final byte[] NO_PREFIX_END = {0};</span>
+
+    public static final ByteSequence prefixEndOf(ByteSequence prefix) {
+<span class="nc" id="L30">        byte[] endKey = prefix.getBytes().clone();</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        for (int i = endKey.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (endKey[i] &lt; 0xff) {</span>
+<span class="nc" id="L33">                endKey[i] = (byte) (endKey[i] + 1);</span>
+<span class="nc" id="L34">                return ByteSequence.from(Arrays.copyOf(endKey, i + 1));</span>
+            }
+        }
+
+<span class="nc" id="L38">        return ByteSequence.from(NO_PREFIX_END);</span>
+    }
+
+    public static boolean isRecoverable(Status status) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        return isHaltError(status)</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                || isNoLeaderError(status)</span>
+                // ephemeral is expired
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                || status.getCode() == Status.Code.NOT_FOUND;</span>
+    }
+
+    public static boolean isHaltError(Status status) {
+        // Unavailable codes mean the system will be right back.
+        // (e.g., can't connect, lost leader)
+        // Treat Internal codes as if something failed, leaving the
+        // system in an inconsistent state, but retrying could make progress.
+        // (e.g., failed in middle of send, corrupted frame)
+<span class="nc bnc" id="L54" title="All 4 branches missed.">        return status.getCode() != Status.Code.UNAVAILABLE &amp;&amp; status.getCode() != Status.Code.INTERNAL;</span>
+    }
+
+    public static boolean isNoLeaderError(Status status) {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        return status.getCode() == Status.Code.UNAVAILABLE</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                &amp;&amp; &quot;etcdserver: no leader&quot;.equals(status.getDescription());</span>
+    }
+
+    public static boolean isProtocolError(Throwable e) {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (e == null) {</span>
+<span class="nc" id="L64">            return false;</span>
+        }
+<span class="nc" id="L66">        Throwable cause = e.getCause();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        while (cause != null) {</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (cause instanceof Http2Exception) {</span>
+<span class="nc" id="L69">                Http2Exception t = (Http2Exception) cause;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (&quot;PROTOCOL_ERROR&quot;.equals(t.error().name())) {</span>
+<span class="nc" id="L71">                    return true;</span>
+                }
+            }
+<span class="nc" id="L74">            cause = cause.getCause();</span>
+        }
+<span class="nc" id="L76">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProtocolFilterWrapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol</a> &gt; <span class="el_source">ProtocolFilterWrapper.java</span></div><h1>ProtocolFilterWrapper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.List;
+
+/**
+ * ListenerProtocol
+ */
+public class ProtocolFilterWrapper implements Protocol {
+
+    private final Protocol protocol;
+
+<span class="nc" id="L40">    public ProtocolFilterWrapper(Protocol protocol) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (protocol == null) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;protocol == null&quot;);</span>
+        }
+<span class="nc" id="L44">        this.protocol = protocol;</span>
+<span class="nc" id="L45">    }</span>
+
+    private static &lt;T&gt; Invoker&lt;T&gt; buildInvokerChain(final Invoker&lt;T&gt; invoker, String key, String group) {
+<span class="nc" id="L48">        Invoker&lt;T&gt; last = invoker;</span>
+<span class="nc" id="L49">        List&lt;Filter&gt; filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (!filters.isEmpty()) {</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            for (int i = filters.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L52">                final Filter filter = filters.get(i);</span>
+<span class="nc" id="L53">                final Invoker&lt;T&gt; next = last;</span>
+<span class="nc" id="L54">                last = new Invoker&lt;T&gt;() {</span>
+
+                    @Override
+                    public Class&lt;T&gt; getInterface() {
+<span class="nc" id="L58">                        return invoker.getInterface();</span>
+                    }
+
+                    @Override
+                    public URL getUrl() {
+<span class="nc" id="L63">                        return invoker.getUrl();</span>
+                    }
+
+                    @Override
+                    public boolean isAvailable() {
+<span class="nc" id="L68">                        return invoker.isAvailable();</span>
+                    }
+
+                    @Override
+                    public Result invoke(Invocation invocation) throws RpcException {
+<span class="nc" id="L73">                        Result result = filter.invoke(next, invocation);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                        if (result instanceof AsyncRpcResult) {</span>
+<span class="nc" id="L75">                            AsyncRpcResult asyncResult = (AsyncRpcResult) result;</span>
+<span class="nc" id="L76">                            asyncResult.thenApplyWithContext(r -&gt; filter.onResponse(r, invoker, invocation));</span>
+<span class="nc" id="L77">                            return asyncResult;</span>
+                        } else {
+<span class="nc" id="L79">                            return filter.onResponse(result, invoker, invocation);</span>
+                        }
+                    }
+
+                    @Override
+                    public void destroy() {
+<span class="nc" id="L85">                        invoker.destroy();</span>
+<span class="nc" id="L86">                    }</span>
+
+                    @Override
+                    public String toString() {
+<span class="nc" id="L90">                        return invoker.toString();</span>
+                    }
+                };
+            }
+        }
+<span class="nc" id="L95">        return last;</span>
+    }
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L100">        return protocol.getDefaultPort();</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {</span>
+<span class="nc" id="L106">            return protocol.export(invoker);</span>
+        }
+<span class="nc" id="L108">        return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));</span>
+    }
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(Class&lt;T&gt; type, URL url) throws RpcException {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L114">            return protocol.refer(type, url);</span>
+        }
+<span class="nc" id="L116">        return buildInvokerChain(protocol.refer(type, url), Constants.REFERENCE_FILTER_KEY, Constants.CONSUMER);</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L121">        protocol.destroy();</span>
+<span class="nc" id="L122">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

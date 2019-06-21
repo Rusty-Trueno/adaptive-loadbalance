@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeJavaObjectInput.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-jdk</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.nativejava</a> &gt; <span class="el_source">NativeJavaObjectInput.java</span></div><h1>NativeJavaObjectInput.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.common.serialize.nativejava;
+
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.utils.Assert;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.lang.reflect.Type;
+
+/**
+ * Native java object input implementation
+ */
+public class NativeJavaObjectInput implements ObjectInput {
+
+    private final ObjectInputStream inputStream;
+
+    public NativeJavaObjectInput(InputStream is) throws IOException {
+<span class="nc" id="L36">        this(new ObjectInputStream(is));</span>
+<span class="nc" id="L37">    }</span>
+
+<span class="nc" id="L39">    protected NativeJavaObjectInput(ObjectInputStream is) {</span>
+<span class="nc" id="L40">        Assert.notNull(is, &quot;input == null&quot;);</span>
+<span class="nc" id="L41">        inputStream = is;</span>
+<span class="nc" id="L42">    }</span>
+
+    protected ObjectInputStream getObjectInputStream() {
+<span class="nc" id="L45">        return inputStream;</span>
+    }
+
+    @Override
+    public Object readObject() throws IOException, ClassNotFoundException {
+<span class="nc" id="L50">        return inputStream.readObject();</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T readObject(Class&lt;T&gt; cls) throws IOException, ClassNotFoundException {
+<span class="nc" id="L56">        return (T) readObject();</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T readObject(Class&lt;T&gt; cls, Type type) throws IOException, ClassNotFoundException {
+<span class="nc" id="L62">        return (T) readObject();</span>
+    }
+
+    @Override
+    public boolean readBool() throws IOException {
+<span class="nc" id="L67">        return inputStream.readBoolean();</span>
+    }
+
+    @Override
+    public byte readByte() throws IOException {
+<span class="nc" id="L72">        return inputStream.readByte();</span>
+    }
+
+    @Override
+    public short readShort() throws IOException {
+<span class="nc" id="L77">        return inputStream.readShort();</span>
+    }
+
+    @Override
+    public int readInt() throws IOException {
+<span class="nc" id="L82">        return inputStream.readInt();</span>
+    }
+
+    @Override
+    public long readLong() throws IOException {
+<span class="nc" id="L87">        return inputStream.readLong();</span>
+    }
+
+    @Override
+    public float readFloat() throws IOException {
+<span class="nc" id="L92">        return inputStream.readFloat();</span>
+    }
+
+    @Override
+    public double readDouble() throws IOException {
+<span class="nc" id="L97">        return inputStream.readDouble();</span>
+    }
+
+    @Override
+    public String readUTF() throws IOException {
+<span class="nc" id="L102">        return inputStream.readUTF();</span>
+    }
+
+    @Override
+    public byte[] readBytes() throws IOException {
+<span class="nc" id="L107">        int len = inputStream.readInt();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (len &lt; 0) {</span>
+<span class="nc" id="L109">            return null;</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        } else if (len == 0) {</span>
+<span class="nc" id="L111">            return new byte[]{};</span>
+        } else {
+<span class="nc" id="L113">            byte[] result = new byte[len];</span>
+<span class="nc" id="L114">            inputStream.readFully(result);</span>
+<span class="nc" id="L115">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

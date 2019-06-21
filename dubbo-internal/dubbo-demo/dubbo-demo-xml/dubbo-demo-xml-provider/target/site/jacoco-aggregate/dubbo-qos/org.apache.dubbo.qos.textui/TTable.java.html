@@ -1,0 +1,567 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TTable.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.textui</a> &gt; <span class="el_source">TTable.java</span></div><h1>TTable.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.textui;
+
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+import static java.lang.Math.abs;
+import static java.lang.Math.max;
+import static java.lang.String.format;
+import static org.apache.dubbo.common.utils.StringUtils.EMPTY;
+import static org.apache.dubbo.common.utils.StringUtils.length;
+import static org.apache.dubbo.common.utils.StringUtils.repeat;
+import static org.apache.dubbo.common.utils.StringUtils.replace;
+
+/**
+ * Table
+ */
+public class TTable implements TComponent {
+
+    // column definition
+    private final ColumnDefine[] columnDefineArray;
+
+    // border
+<span class="nc" id="L41">    private final Border border = new Border();</span>
+
+    // padding
+    private int padding;
+
+<span class="nc" id="L46">    public TTable(ColumnDefine[] columnDefineArray) {</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        this.columnDefineArray = null == columnDefineArray</span>
+<span class="nc" id="L48">                ? new ColumnDefine[0]</span>
+<span class="nc" id="L49">                : columnDefineArray;</span>
+<span class="nc" id="L50">    }</span>
+
+<span class="nc" id="L52">    public TTable(int columnNum) {</span>
+<span class="nc" id="L53">        this.columnDefineArray = new ColumnDefine[columnNum];</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        for (int index = 0; index &lt; this.columnDefineArray.length; index++) {</span>
+<span class="nc" id="L55">            columnDefineArray[index] = new ColumnDefine();</span>
+        }
+<span class="nc" id="L57">    }</span>
+
+
+    @Override
+    public String rendering() {
+<span class="nc" id="L62">        final StringBuilder tableSB = new StringBuilder();</span>
+
+        // process width cache
+<span class="nc" id="L65">        final int[] widthCacheArray = new int[getColumnCount()];</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (int index = 0; index &lt; widthCacheArray.length; index++) {</span>
+<span class="nc" id="L67">            widthCacheArray[index] = abs(columnDefineArray[index].getWidth());</span>
+        }
+
+<span class="nc" id="L70">        final int rowCount = getRowCount();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (int rowIndex = 0; rowIndex &lt; rowCount; rowIndex++) {</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            final boolean isFirstRow = rowIndex == 0;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            final boolean isLastRow = rowIndex == rowCount - 1;</span>
+
+            // print first separation line
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (isFirstRow</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_OUTER_TOP)) {</span>
+<span class="nc" id="L79">                tableSB.append(drawSeparationLine(widthCacheArray)).append(System.lineSeparator());</span>
+            }
+
+            // print inner separation lines
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (!isFirstRow</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_INNER_H)) {</span>
+<span class="nc" id="L85">                tableSB.append(drawSeparationLine(widthCacheArray)).append(System.lineSeparator());</span>
+            }
+
+            // draw one line
+<span class="nc" id="L89">            tableSB.append(drawRow(widthCacheArray, rowIndex));</span>
+
+
+            // print ending separation line
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (isLastRow</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_OUTER_BOTTOM)) {</span>
+<span class="nc" id="L95">                tableSB.append(drawSeparationLine(widthCacheArray)).append(System.lineSeparator());</span>
+            }
+
+        }
+
+
+<span class="nc" id="L101">        return tableSB.toString();</span>
+    }
+
+
+    private String drawRow(int[] widthCacheArray, int rowIndex) {
+
+<span class="nc" id="L107">        final StringBuilder rowSB = new StringBuilder();</span>
+<span class="nc" id="L108">        final Scanner[] scannerArray = new Scanner[getColumnCount()];</span>
+        try {
+            boolean hasNextLine;
+            do {
+
+<span class="nc" id="L113">                hasNextLine = false;</span>
+<span class="nc" id="L114">                final StringBuilder segmentSB = new StringBuilder();</span>
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                for (int colIndex = 0; colIndex &lt; getColumnCount(); colIndex++) {</span>
+
+
+<span class="nc" id="L119">                    final int width = widthCacheArray[colIndex];</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                    final boolean isFirstColOfRow = colIndex == 0;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                    final boolean isLastColOfRow = colIndex == widthCacheArray.length - 1;</span>
+
+                    final String borderChar;
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (isFirstColOfRow</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                            &amp;&amp; border.has(Border.BORDER_OUTER_LEFT)) {</span>
+<span class="nc" id="L126">                        borderChar = &quot;|&quot;;</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                    } else if (!isFirstColOfRow</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                            &amp;&amp; border.has(Border.BORDER_INNER_V)) {</span>
+<span class="nc" id="L129">                        borderChar = &quot;|&quot;;</span>
+                    } else {
+<span class="nc" id="L131">                        borderChar = EMPTY;</span>
+                    }
+
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                    if (null == scannerArray[colIndex]) {</span>
+<span class="nc" id="L136">                        scannerArray[colIndex] = new Scanner(</span>
+<span class="nc" id="L137">                                new StringReader(wrap(getData(rowIndex, columnDefineArray[colIndex]), width)));</span>
+                    }
+<span class="nc" id="L139">                    final Scanner scanner = scannerArray[colIndex];</span>
+
+                    final String data;
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                    if (scanner.hasNextLine()) {</span>
+<span class="nc" id="L143">                        data = scanner.nextLine();</span>
+<span class="nc" id="L144">                        hasNextLine = true;</span>
+                    } else {
+<span class="nc" id="L146">                        data = EMPTY;</span>
+                    }
+
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                    if (width &gt; 0) {</span>
+<span class="nc" id="L150">                        final ColumnDefine columnDefine = columnDefineArray[colIndex];</span>
+<span class="nc" id="L151">                        final String dataFormat = getDataFormat(columnDefine, width, data);</span>
+<span class="nc" id="L152">                        final String paddingChar = repeat(&quot; &quot;, padding);</span>
+<span class="nc" id="L153">                        segmentSB.append(format(borderChar + paddingChar + dataFormat + paddingChar, data));</span>
+                    }
+
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    if (isLastColOfRow) {</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                        if (border.has(Border.BORDER_OUTER_RIGHT)) {</span>
+<span class="nc" id="L158">                            segmentSB.append(&quot;|&quot;);</span>
+                        }
+<span class="nc" id="L160">                        segmentSB.append(System.lineSeparator());</span>
+                    }
+
+                }
+
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                if (hasNextLine) {</span>
+<span class="nc" id="L166">                    rowSB.append(segmentSB);</span>
+                }
+
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            } while (hasNextLine);</span>
+
+<span class="nc" id="L171">            return rowSB.toString();</span>
+        } finally {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            for (Scanner scanner : scannerArray) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                if (null != scanner) {</span>
+<span class="nc" id="L175">                    scanner.close();</span>
+                }
+            }
+        }
+
+    }
+
+    private String getData(int rowIndex, ColumnDefine columnDefine) {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        return columnDefine.getRowCount() &lt;= rowIndex</span>
+<span class="nc" id="L184">                ? EMPTY</span>
+<span class="nc" id="L185">                : columnDefine.rows.get(rowIndex);</span>
+    }
+
+    private String getDataFormat(ColumnDefine columnDefine, int width, String data) {
+<span class="nc bnc" id="L189" title="All 3 branches missed.">        switch (columnDefine.align) {</span>
+            case MIDDLE: {
+<span class="nc" id="L191">                final int length = length(data);</span>
+<span class="nc" id="L192">                final int diff = width - length;</span>
+<span class="nc" id="L193">                final int left = diff / 2;</span>
+<span class="nc" id="L194">                return repeat(&quot; &quot;, diff - left) + &quot;%s&quot; + repeat(&quot; &quot;, left);</span>
+            }
+            case RIGHT: {
+<span class="nc" id="L197">                return &quot;%&quot; + width + &quot;s&quot;;</span>
+            }
+            case LEFT:
+            default: {
+<span class="nc" id="L201">                return &quot;%-&quot; + width + &quot;s&quot;;</span>
+            }
+        }
+    }
+
+    /**
+     * get row count
+     */
+    private int getRowCount() {
+<span class="nc" id="L210">        int rowCount = 0;</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        for (ColumnDefine columnDefine : columnDefineArray) {</span>
+<span class="nc" id="L212">            rowCount = max(rowCount, columnDefine.getRowCount());</span>
+        }
+<span class="nc" id="L214">        return rowCount;</span>
+    }
+
+    /**
+     * position to last column
+     */
+    private int indexLastCol(final int[] widthCacheArray) {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        for (int colIndex = widthCacheArray.length - 1; colIndex &gt;= 0; colIndex--) {</span>
+<span class="nc" id="L222">            final int width = widthCacheArray[colIndex];</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (width &lt;= 0) {</span>
+<span class="nc" id="L224">                continue;</span>
+            }
+<span class="nc" id="L226">            return colIndex;</span>
+        }
+<span class="nc" id="L228">        return 0;</span>
+    }
+
+    /**
+     * draw separation line
+     */
+    private String drawSeparationLine(final int[] widthCacheArray) {
+<span class="nc" id="L235">        final StringBuilder separationLineSB = new StringBuilder();</span>
+
+<span class="nc" id="L237">        final int lastCol = indexLastCol(widthCacheArray);</span>
+<span class="nc" id="L238">        final int colCount = widthCacheArray.length;</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        for (int colIndex = 0; colIndex &lt; colCount; colIndex++) {</span>
+<span class="nc" id="L240">            final int width = widthCacheArray[colIndex];</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (width &lt;= 0) {</span>
+<span class="nc" id="L242">                continue;</span>
+            }
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            final boolean isFirstCol = colIndex == 0;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            final boolean isLastCol = colIndex == lastCol;</span>
+
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            if (isFirstCol</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_OUTER_LEFT)) {</span>
+<span class="nc" id="L250">                separationLineSB.append(&quot;+&quot;);</span>
+            }
+
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            if (!isFirstCol</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_INNER_V)) {</span>
+<span class="nc" id="L255">                separationLineSB.append(&quot;+&quot;);</span>
+            }
+
+<span class="nc" id="L258">            separationLineSB.append(repeat(&quot;-&quot;, width + 2 * padding));</span>
+
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (isLastCol</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                    &amp;&amp; border.has(Border.BORDER_OUTER_RIGHT)) {</span>
+<span class="nc" id="L262">                separationLineSB.append(&quot;+&quot;);</span>
+            }
+
+        }
+<span class="nc" id="L266">        return separationLineSB.toString();</span>
+    }
+
+    /**
+     * Add a row
+     */
+    public TTable addRow(Object... columnDataArray) {
+
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (null != columnDataArray) {</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            for (int index = 0; index &lt; columnDefineArray.length; index++) {</span>
+<span class="nc" id="L276">                final ColumnDefine columnDefine = columnDefineArray[index];</span>
+<span class="nc bnc" id="L277" title="All 4 branches missed.">                if (index &lt; columnDataArray.length</span>
+                        &amp;&amp; null != columnDataArray[index]) {
+<span class="nc" id="L279">                    columnDefine.rows.add(replaceTab(columnDataArray[index].toString()));</span>
+                } else {
+<span class="nc" id="L281">                    columnDefine.rows.add(EMPTY);</span>
+                }
+            }
+        }
+
+<span class="nc" id="L286">        return this;</span>
+    }
+
+
+    /**
+     * alignment
+     */
+<span class="nc" id="L293">    public enum Align {</span>
+
+        /**
+         * left-alignment
+         */
+<span class="nc" id="L298">        LEFT,</span>
+
+        /**
+         * right-alignment
+         */
+<span class="nc" id="L303">        RIGHT,</span>
+
+        /**
+         * middle-alignment
+         */
+<span class="nc" id="L308">        MIDDLE</span>
+    }
+
+    /**
+     * column definition
+     */
+    public static class ColumnDefine {
+
+        // column width
+        private final int width;
+
+        // whether to auto resize
+        private final boolean isAutoResize;
+
+        // alignment
+        private final Align align;
+
+        // data rows
+<span class="nc" id="L326">        private final List&lt;String&gt; rows = new ArrayList&lt;String&gt;();</span>
+
+<span class="nc" id="L328">        public ColumnDefine(int width, boolean isAutoResize, Align align) {</span>
+<span class="nc" id="L329">            this.width = width;</span>
+<span class="nc" id="L330">            this.isAutoResize = isAutoResize;</span>
+<span class="nc" id="L331">            this.align = align;</span>
+<span class="nc" id="L332">        }</span>
+
+        public ColumnDefine(Align align) {
+<span class="nc" id="L335">            this(0, true, align);</span>
+<span class="nc" id="L336">        }</span>
+
+        public ColumnDefine(int width) {
+<span class="nc" id="L339">            this(width, false, Align.LEFT);</span>
+<span class="nc" id="L340">        }</span>
+
+        public ColumnDefine(int width, Align align) {
+<span class="nc" id="L343">            this(width, false, align);</span>
+<span class="nc" id="L344">        }</span>
+
+        public ColumnDefine() {
+<span class="nc" id="L347">            this(Align.LEFT);</span>
+<span class="nc" id="L348">        }</span>
+
+        /**
+         * get current width
+         *
+         * @return width
+         */
+        public int getWidth() {
+
+            // if not auto resize, return preset width
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (!isAutoResize) {</span>
+<span class="nc" id="L359">                return width;</span>
+            }
+
+            // if it's auto resize, then calculate the possible max width
+<span class="nc" id="L363">            int maxWidth = 0;</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            for (String data : rows) {</span>
+<span class="nc" id="L365">                maxWidth = max(width(data), maxWidth);</span>
+<span class="nc" id="L366">            }</span>
+
+<span class="nc" id="L368">            return maxWidth;</span>
+        }
+
+        /**
+         * get rows for the current column
+         *
+         * @return current column's rows
+         */
+        public int getRowCount() {
+<span class="nc" id="L377">            return rows.size();</span>
+        }
+
+    }
+
+    /**
+     * set padding
+     *
+     * @param padding padding
+     */
+    public TTable padding(int padding) {
+<span class="nc" id="L388">        this.padding = padding;</span>
+<span class="nc" id="L389">        return this;</span>
+    }
+
+    /**
+     * get column count
+     *
+     * @return column count
+     */
+    public int getColumnCount() {
+<span class="nc" id="L398">        return columnDefineArray.length;</span>
+    }
+
+
+    /**
+     * replace tab to four spaces
+     *
+     * @param string the original string
+     * @return the replaced string
+     */
+    private static String replaceTab(String string) {
+<span class="nc" id="L409">        return replace(string, &quot;\t&quot;, &quot;    &quot;);</span>
+    }
+
+    /**
+     * visible width for the given string.
+     *
+     * for example: &quot;abc\n1234&quot;'s width is 4.
+     *
+     * @param string the given string
+     * @return visible width
+     */
+    private static int width(String string) {
+<span class="nc" id="L421">        int maxWidth = 0;</span>
+<span class="nc" id="L422">        try (Scanner scanner = new Scanner(new StringReader(string))) {</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            while (scanner.hasNextLine()) {</span>
+<span class="nc" id="L424">                maxWidth = max(length(scanner.nextLine()), maxWidth);</span>
+            }
+        }
+<span class="nc" id="L427">        return maxWidth;</span>
+    }
+
+    /**
+     * get border
+     *
+     * @return table border
+     */
+    public Border getBorder() {
+<span class="nc" id="L436">        return border;</span>
+    }
+
+    /**
+     * border style
+     */
+<span class="nc" id="L442">    public class Border {</span>
+
+<span class="nc" id="L444">        private int borders = BORDER_OUTER | BORDER_INNER;</span>
+
+        /**
+         * border outer top
+         */
+        public static final int BORDER_OUTER_TOP = 1 &lt;&lt; 0;
+
+        /**
+         * border outer right
+         */
+        public static final int BORDER_OUTER_RIGHT = 1 &lt;&lt; 1;
+
+        /**
+         * border outer bottom
+         */
+        public static final int BORDER_OUTER_BOTTOM = 1 &lt;&lt; 2;
+
+        /**
+         * border outer left
+         */
+        public static final int BORDER_OUTER_LEFT = 1 &lt;&lt; 3;
+
+        /**
+         * inner border: horizon
+         */
+        public static final int BORDER_INNER_H = 1 &lt;&lt; 4;
+
+        /**
+         * inner border: vertical
+         */
+        public static final int BORDER_INNER_V = 1 &lt;&lt; 5;
+
+        /**
+         * outer border
+         */
+        public static final int BORDER_OUTER = BORDER_OUTER_TOP | BORDER_OUTER_BOTTOM | BORDER_OUTER_LEFT | BORDER_OUTER_RIGHT;
+
+        /**
+         * inner border
+         */
+        public static final int BORDER_INNER = BORDER_INNER_H | BORDER_INNER_V;
+
+        /**
+         * no border
+         */
+        public static final int BORDER_NON = 0;
+
+        /**
+         * whether has one of the specified border styles
+         *
+         * @param borderArray border styles
+         * @return whether has one of the specified border styles
+         */
+        public boolean has(int... borderArray) {
+<span class="nc bnc" id="L498" title="All 2 branches missed.">            if (null == borderArray) {</span>
+<span class="nc" id="L499">                return false;</span>
+            }
+<span class="nc bnc" id="L501" title="All 2 branches missed.">            for (int b : borderArray) {</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                if ((this.borders &amp; b) == b) {</span>
+<span class="nc" id="L503">                    return true;</span>
+                }
+            }
+<span class="nc" id="L506">            return false;</span>
+        }
+
+        /**
+         * get border style
+         *
+         * @return border style
+         */
+        public int get() {
+<span class="nc" id="L515">            return borders;</span>
+        }
+
+        /**
+         * set border style
+         *
+         * @param border border style
+         * @return this
+         */
+        public Border set(int border) {
+<span class="nc" id="L525">            this.borders = border;</span>
+<span class="nc" id="L526">            return this;</span>
+        }
+
+        public Border add(int border) {
+<span class="nc" id="L530">            return set(get() | border);</span>
+        }
+
+        public Border remove(int border) {
+<span class="nc" id="L534">            return set(get() ^ border);</span>
+        }
+
+    }
+
+
+    public static String wrap(String string, int width) {
+<span class="nc" id="L541">        final StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L542">        final char[] buffer = string.toCharArray();</span>
+<span class="nc" id="L543">        int count = 0;</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        for (char c : buffer) {</span>
+
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            if (count == width) {</span>
+<span class="nc" id="L547">                count = 0;</span>
+<span class="nc" id="L548">                sb.append('\n');</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">                if (c == '\n') {</span>
+<span class="nc" id="L550">                    continue;</span>
+                }
+            }
+
+<span class="nc bnc" id="L554" title="All 2 branches missed.">            if (c == '\n') {</span>
+<span class="nc" id="L555">                count = 0;</span>
+            } else {
+<span class="nc" id="L557">                count++;</span>
+            }
+
+<span class="nc" id="L560">            sb.append(c);</span>
+
+        }
+<span class="nc" id="L563">        return sb.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

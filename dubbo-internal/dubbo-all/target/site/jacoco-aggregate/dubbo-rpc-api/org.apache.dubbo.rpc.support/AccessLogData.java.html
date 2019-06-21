@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AccessLogData.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.support</a> &gt; <span class="el_source">AccessLogData.java</span></div><h1>AccessLogData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.support;
+
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.RpcContext;
+
+import com.alibaba.fastjson.JSON;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * AccessLogData is a container for log event data. In internally uses map and store each filed of log as value. It
+ * does not generate any dynamic value e.g. time stamp, local jmv machine host address etc. It does not allow any null
+ * or empty key.
+ *
+ * Note: since its date formatter is a singleton, make sure to run it in single thread only.
+ */
+public final class AccessLogData {
+
+    private static final String MESSAGE_DATE_FORMAT = &quot;yyyy-MM-dd HH:mm:ss&quot;;
+<span class="nc" id="L41">    private static final DateFormat MESSAGE_DATE_FORMATTER = new SimpleDateFormat(MESSAGE_DATE_FORMAT);</span>
+
+    private static final String VERSION = &quot;version&quot;;
+    private static final String GROUP = &quot;group&quot;;
+    private static final String SERVICE = &quot;service&quot;;
+    private static final String METHOD_NAME = &quot;method-name&quot;;
+    private static final String INVOCATION_TIME = &quot;invocation-time&quot;;
+    private static final String TYPES = &quot;types&quot;;
+    private static final String ARGUMENTS = &quot;arguments&quot;;
+    private static final String REMOTE_HOST = &quot;remote-host&quot;;
+    private static final String REMOTE_PORT = &quot;remote-port&quot;;
+    private static final String LOCAL_HOST = &quot;localhost&quot;;
+    private static final String LOCAL_PORT = &quot;local-port&quot;;
+
+    /**
+     * This is used to store log data in key val format.
+     */
+    private Map&lt;String, Object&gt; data;
+
+    /**
+     * Default constructor.
+     */
+<span class="nc" id="L63">    private AccessLogData() {</span>
+<span class="nc" id="L64">        RpcContext context = RpcContext.getContext();</span>
+<span class="nc" id="L65">        data = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L66">        setLocalHost(context.getLocalHost());</span>
+<span class="nc" id="L67">        setLocalPort(context.getLocalPort());</span>
+<span class="nc" id="L68">        setRemoteHost(context.getRemoteHost());</span>
+<span class="nc" id="L69">        setRemotePort(context.getRemotePort());</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Get new instance of log data.
+     *
+     * @return instance of AccessLogData
+     */
+    public static AccessLogData newLogData() {
+<span class="nc" id="L78">        return new AccessLogData();</span>
+    }
+
+
+    /**
+     * Add version information.
+     *
+     * @param version
+     */
+    public void setVersion(String version) {
+<span class="nc" id="L88">        set(VERSION, version);</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Add service name.
+     *
+     * @param serviceName
+     */
+    public void setServiceName(String serviceName) {
+<span class="nc" id="L97">        set(SERVICE, serviceName);</span>
+<span class="nc" id="L98">    }</span>
+
+    /**
+     * Add group name
+     *
+     * @param group
+     */
+    public void setGroup(String group) {
+<span class="nc" id="L106">        set(GROUP, group);</span>
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * Set the invocation date. As an argument it accept date string.
+     *
+     * @param invocationTime
+     */
+    public void setInvocationTime(Date invocationTime) {
+<span class="nc" id="L115">        set(INVOCATION_TIME, invocationTime);</span>
+<span class="nc" id="L116">    }</span>
+
+    /**
+     * Set caller remote host
+     *
+     * @param remoteHost
+     */
+    private void setRemoteHost(String remoteHost) {
+<span class="nc" id="L124">        set(REMOTE_HOST, remoteHost);</span>
+<span class="nc" id="L125">    }</span>
+
+    /**
+     * Set caller remote port.
+     *
+     * @param remotePort
+     */
+    private void setRemotePort(Integer remotePort) {
+<span class="nc" id="L133">        set(REMOTE_PORT, remotePort);</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Set local host
+     *
+     * @param localHost
+     */
+    private void setLocalHost(String localHost) {
+<span class="nc" id="L142">        set(LOCAL_HOST, localHost);</span>
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * Set local port of exported service
+     *
+     * @param localPort
+     */
+    private void setLocalPort(Integer localPort) {
+<span class="nc" id="L151">        set(LOCAL_PORT, localPort);</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Set target method name.
+     *
+     * @param methodName
+     */
+    public void setMethodName(String methodName) {
+<span class="nc" id="L160">        set(METHOD_NAME, methodName);</span>
+<span class="nc" id="L161">    }</span>
+
+    /**
+     * Set invocation's method's input parameter's types
+     *
+     * @param types
+     */
+    public void setTypes(Class[] types) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        set(TYPES, types != null ? Arrays.copyOf(types, types.length) : null);</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Sets invocation arguments
+     *
+     * @param arguments
+     */
+    public void setArguments(Object[] arguments) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        set(ARGUMENTS, arguments != null ? Arrays.copyOf(arguments, arguments.length) : null);</span>
+<span class="nc" id="L179">    }</span>
+
+    /**
+     * Return gthe service of access log entry
+     *
+     * @return
+     */
+    public String getServiceName() {
+<span class="nc" id="L187">        return get(SERVICE).toString();</span>
+    }
+
+
+    public String getLogMessage() {
+<span class="nc" id="L192">        StringBuilder sn = new StringBuilder();</span>
+
+<span class="nc" id="L194">        sn.append(&quot;[&quot;)</span>
+<span class="nc" id="L195">                .append(MESSAGE_DATE_FORMATTER.format(getInvocationTime()))</span>
+<span class="nc" id="L196">                .append(&quot;] &quot;)</span>
+<span class="nc" id="L197">                .append(get(REMOTE_HOST))</span>
+<span class="nc" id="L198">                .append(&quot;:&quot;)</span>
+<span class="nc" id="L199">                .append(get(REMOTE_PORT))</span>
+<span class="nc" id="L200">                .append(&quot; -&gt; &quot;)</span>
+<span class="nc" id="L201">                .append(get(LOCAL_HOST))</span>
+<span class="nc" id="L202">                .append(&quot;:&quot;)</span>
+<span class="nc" id="L203">                .append(get(LOCAL_PORT))</span>
+<span class="nc" id="L204">                .append(&quot; - &quot;);</span>
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        String group = get(GROUP) != null ? get(GROUP).toString() : &quot;&quot;;</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(group.toString())) {</span>
+<span class="nc" id="L208">            sn.append(group).append(&quot;/&quot;);</span>
+        }
+
+<span class="nc" id="L211">        sn.append(get(SERVICE));</span>
+
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        String version = get(VERSION) != null ? get(VERSION).toString() : &quot;&quot;;</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(version.toString())) {</span>
+<span class="nc" id="L215">            sn.append(&quot;:&quot;).append(version);</span>
+        }
+
+<span class="nc" id="L218">        sn.append(&quot; &quot;);</span>
+<span class="nc" id="L219">        sn.append(get(METHOD_NAME));</span>
+
+<span class="nc" id="L221">        sn.append(&quot;(&quot;);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        Class&lt;?&gt;[] types = get(TYPES) != null ? (Class&lt;?&gt;[]) get(TYPES) : new Class[0];</span>
+<span class="nc" id="L223">        boolean first = true;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        for (Class&lt;?&gt; type : types) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            if (first) {</span>
+<span class="nc" id="L226">                first = false;</span>
+            } else {
+<span class="nc" id="L228">                sn.append(&quot;,&quot;);</span>
+            }
+<span class="nc" id="L230">            sn.append(type.getName());</span>
+        }
+<span class="nc" id="L232">        sn.append(&quot;) &quot;);</span>
+
+
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        Object[] args = get(ARGUMENTS) != null ? (Object[]) get(ARGUMENTS) : null;</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">        if (args != null &amp;&amp; args.length &gt; 0) {</span>
+<span class="nc" id="L237">            sn.append(JSON.toJSONString(args));</span>
+        }
+
+<span class="nc" id="L240">        return sn.toString();</span>
+    }
+
+    private Date getInvocationTime() {
+<span class="nc" id="L244">        return (Date)get(INVOCATION_TIME);</span>
+    }
+    /**
+     * Return value of key
+     *
+     * @param key
+     * @return
+     */
+    private Object get(String key) {
+<span class="nc" id="L253">        return data.get(key);</span>
+    }
+
+    /**
+     * Add log key along with his value.
+     *
+     * @param key   Any not null or non empty string
+     * @param value Any object including null.
+     */
+    private void set(String key, Object value) {
+<span class="nc" id="L263">        data.put(key, value);</span>
+<span class="nc" id="L264">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

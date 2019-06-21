@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Statistics.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-monitor-default</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.monitor.dubbo</a> &gt; <span class="el_source">Statistics.java</span></div><h1>Statistics.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.monitor.dubbo;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.monitor.MonitorService;
+
+import java.io.Serializable;
+
+/**
+ * Statistics. (SPI, Prototype, ThreadSafe)
+ */
+public class Statistics implements Serializable {
+
+    private static final long serialVersionUID = -6921183057683641441L;
+
+    private URL url;
+
+    private String application;
+
+    private String service;
+
+    private String method;
+
+    private String group;
+
+    private String version;
+
+    private String client;
+
+    private String server;
+
+<span class="nc" id="L47">    public Statistics(URL url) {</span>
+<span class="nc" id="L48">        this.url = url;</span>
+<span class="nc" id="L49">        this.application = url.getParameter(MonitorService.APPLICATION);</span>
+<span class="nc" id="L50">        this.service = url.getParameter(MonitorService.INTERFACE);</span>
+<span class="nc" id="L51">        this.method = url.getParameter(MonitorService.METHOD);</span>
+<span class="nc" id="L52">        this.group = url.getParameter(MonitorService.GROUP);</span>
+<span class="nc" id="L53">        this.version = url.getParameter(MonitorService.VERSION);</span>
+<span class="nc" id="L54">        this.client = url.getParameter(MonitorService.CONSUMER, url.getAddress());</span>
+<span class="nc" id="L55">        this.server = url.getParameter(MonitorService.PROVIDER, url.getAddress());</span>
+<span class="nc" id="L56">    }</span>
+
+    public URL getUrl() {
+<span class="nc" id="L59">        return url;</span>
+    }
+
+    public void setUrl(URL url) {
+<span class="nc" id="L63">        this.url = url;</span>
+<span class="nc" id="L64">    }</span>
+
+    public String getApplication() {
+<span class="nc" id="L67">        return application;</span>
+    }
+
+    public Statistics setApplication(String application) {
+<span class="nc" id="L71">        this.application = application;</span>
+<span class="nc" id="L72">        return this;</span>
+    }
+
+    public String getService() {
+<span class="nc" id="L76">        return service;</span>
+    }
+
+    public Statistics setService(String service) {
+<span class="nc" id="L80">        this.service = service;</span>
+<span class="nc" id="L81">        return this;</span>
+    }
+
+    public String getGroup() {
+<span class="nc" id="L85">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L89">        this.group = group;</span>
+<span class="nc" id="L90">    }</span>
+
+    public String getVersion() {
+<span class="nc" id="L93">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L97">        this.version = version;</span>
+<span class="nc" id="L98">    }</span>
+
+    public String getMethod() {
+<span class="nc" id="L101">        return method;</span>
+    }
+
+    public Statistics setMethod(String method) {
+<span class="nc" id="L105">        this.method = method;</span>
+<span class="nc" id="L106">        return this;</span>
+    }
+
+    public String getClient() {
+<span class="nc" id="L110">        return client;</span>
+    }
+
+    public Statistics setClient(String client) {
+<span class="nc" id="L114">        this.client = client;</span>
+<span class="nc" id="L115">        return this;</span>
+    }
+
+    public String getServer() {
+<span class="nc" id="L119">        return server;</span>
+    }
+
+    public Statistics setServer(String server) {
+<span class="nc" id="L123">        this.server = server;</span>
+<span class="nc" id="L124">        return this;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L129">        final int prime = 31;</span>
+<span class="nc" id="L130">        int result = 1;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        result = prime * result + ((application == null) ? 0 : application.hashCode());</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        result = prime * result + ((client == null) ? 0 : client.hashCode());</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        result = prime * result + ((group == null) ? 0 : group.hashCode());</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        result = prime * result + ((method == null) ? 0 : method.hashCode());</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        result = prime * result + ((server == null) ? 0 : server.hashCode());</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        result = prime * result + ((service == null) ? 0 : service.hashCode());</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        result = prime * result + ((version == null) ? 0 : version.hashCode());</span>
+<span class="nc" id="L138">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L144">            return true;</span>
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L147">            return false;</span>
+        }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L150">            return false;</span>
+        }
+<span class="nc" id="L152">        Statistics other = (Statistics) obj;</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (application == null) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (other.application != null) {</span>
+<span class="nc" id="L155">                return false;</span>
+            }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        } else if (!application.equals(other.application)) {</span>
+<span class="nc" id="L158">            return false;</span>
+        }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (other.client != null) {</span>
+<span class="nc" id="L162">                return false;</span>
+            }
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        } else if (!client.equals(other.client)) {</span>
+<span class="nc" id="L165">            return false;</span>
+        }
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (group == null) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (other.group != null) {</span>
+<span class="nc" id="L169">                return false;</span>
+            }
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        } else if (!group.equals(other.group)) {</span>
+<span class="nc" id="L172">            return false;</span>
+        }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (method == null) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (other.method != null) {</span>
+<span class="nc" id="L176">                return false;</span>
+            }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        } else if (!method.equals(other.method)) {</span>
+<span class="nc" id="L179">            return false;</span>
+        }
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (server == null) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (other.server != null) {</span>
+<span class="nc" id="L183">                return false;</span>
+            }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        } else if (!server.equals(other.server)) {</span>
+<span class="nc" id="L186">            return false;</span>
+        }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (service == null) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (other.service != null) {</span>
+<span class="nc" id="L190">                return false;</span>
+            }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        } else if (!service.equals(other.service)) {</span>
+<span class="nc" id="L193">            return false;</span>
+        }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (version == null) {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (other.version != null) {</span>
+<span class="nc" id="L197">                return false;</span>
+            }
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        } else if (!version.equals(other.version)) {</span>
+<span class="nc" id="L200">            return false;</span>
+        }
+<span class="nc" id="L202">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L207">        return url.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

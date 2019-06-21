@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MockClusterInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.support.wrapper</a> &gt; <span class="el_source">MockClusterInvoker.java</span></div><h1>MockClusterInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.support.wrapper;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.cluster.Directory;
+import org.apache.dubbo.rpc.support.MockInvoker;
+
+import java.util.List;
+
+public class MockClusterInvoker&lt;T&gt; implements Invoker&lt;T&gt; {
+
+<span class="nc" id="L38">    private static final Logger logger = LoggerFactory.getLogger(MockClusterInvoker.class);</span>
+
+    private final Directory&lt;T&gt; directory;
+
+    private final Invoker&lt;T&gt; invoker;
+
+<span class="nc" id="L44">    public MockClusterInvoker(Directory&lt;T&gt; directory, Invoker&lt;T&gt; invoker) {</span>
+<span class="nc" id="L45">        this.directory = directory;</span>
+<span class="nc" id="L46">        this.invoker = invoker;</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L51">        return directory.getUrl();</span>
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L56">        return directory.isAvailable();</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L61">        this.invoker.destroy();</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    public Class&lt;T&gt; getInterface() {
+<span class="nc" id="L66">        return directory.getInterface();</span>
+    }
+
+    @Override
+    public Result invoke(Invocation invocation) throws RpcException {
+<span class="nc" id="L71">        Result result = null;</span>
+
+<span class="nc" id="L73">        String value = directory.getUrl().getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY, Boolean.FALSE.toString()).trim();</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (value.length() == 0 || value.equalsIgnoreCase(&quot;false&quot;)) {</span>
+            //no mock
+<span class="nc" id="L76">            result = this.invoker.invoke(invocation);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        } else if (value.startsWith(&quot;force&quot;)) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L79">                logger.warn(&quot;force-mock: &quot; + invocation.getMethodName() + &quot; force-mock enabled , url : &quot; + directory.getUrl());</span>
+            }
+            //force:direct mock
+<span class="nc" id="L82">            result = doMockInvoke(invocation, null);</span>
+        } else {
+            //fail-mock
+            try {
+<span class="nc" id="L86">                result = this.invoker.invoke(invocation);</span>
+<span class="nc" id="L87">            } catch (RpcException e) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                if (e.isBiz()) {</span>
+<span class="nc" id="L89">                    throw e;</span>
+                }
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L93">                    logger.warn(&quot;fail-mock: &quot; + invocation.getMethodName() + &quot; fail-mock enabled , url : &quot; + directory.getUrl(), e);</span>
+                }
+<span class="nc" id="L95">                result = doMockInvoke(invocation, e);</span>
+<span class="nc" id="L96">            }</span>
+        }
+<span class="nc" id="L98">        return result;</span>
+    }
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    private Result doMockInvoke(Invocation invocation, RpcException e) {
+<span class="nc" id="L103">        Result result = null;</span>
+        Invoker&lt;T&gt; minvoker;
+
+<span class="nc" id="L106">        List&lt;Invoker&lt;T&gt;&gt; mockInvokers = selectMockInvoker(invocation);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(mockInvokers)) {</span>
+<span class="nc" id="L108">            minvoker = (Invoker&lt;T&gt;) new MockInvoker(directory.getUrl(), directory.getInterface());</span>
+        } else {
+<span class="nc" id="L110">            minvoker = mockInvokers.get(0);</span>
+        }
+        try {
+<span class="nc" id="L113">            result = minvoker.invoke(invocation);</span>
+<span class="nc" id="L114">        } catch (RpcException me) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (me.isBiz()) {</span>
+<span class="nc" id="L116">                result = new RpcResult(me.getCause());</span>
+            } else {
+<span class="nc" id="L118">                throw new RpcException(me.getCode(), getMockExceptionMessage(e, me), me.getCause());</span>
+            }
+<span class="nc" id="L120">        } catch (Throwable me) {</span>
+<span class="nc" id="L121">            throw new RpcException(getMockExceptionMessage(e, me), me.getCause());</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc" id="L123">        return result;</span>
+    }
+
+    private String getMockExceptionMessage(Throwable t, Throwable mt) {
+<span class="nc" id="L127">        String msg = &quot;mock error : &quot; + mt.getMessage();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (t != null) {</span>
+<span class="nc" id="L129">            msg = msg + &quot;, invoke error is :&quot; + StringUtils.toString(t);</span>
+        }
+<span class="nc" id="L131">        return msg;</span>
+    }
+
+    /**
+     * Return MockInvoker
+     * Contract：
+     * directory.list() will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK is present in invocation, otherwise, a list of mock invokers will return.
+     * if directory.list() returns more than one mock invoker, only one of them will be used.
+     *
+     * @param invocation
+     * @return
+     */
+    private List&lt;Invoker&lt;T&gt;&gt; selectMockInvoker(Invocation invocation) {
+<span class="nc" id="L144">        List&lt;Invoker&lt;T&gt;&gt; invokers = null;</span>
+        //TODO generic invoker？
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (invocation instanceof RpcInvocation) {</span>
+            //Note the implicit contract (although the description is added to the interface declaration, but extensibility is a problem. The practice placed in the attachment needs to be improved)
+<span class="nc" id="L148">            ((RpcInvocation) invocation).setAttachment(Constants.INVOCATION_NEED_MOCK, Boolean.TRUE.toString());</span>
+            //directory will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK is present in invocation, otherwise, a list of mock invokers will return.
+            try {
+<span class="nc" id="L151">                invokers = directory.list(invocation);</span>
+<span class="nc" id="L152">            } catch (RpcException e) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L154">                    logger.info(&quot;Exception when try to invoke mock. Get mock invokers error for service:&quot;</span>
+<span class="nc" id="L155">                            + directory.getUrl().getServiceInterface() + &quot;, method:&quot; + invocation.getMethodName()</span>
+                            + &quot;, will contruct a new mock with 'new MockInvoker()'.&quot;, e);
+                }
+<span class="nc" id="L158">            }</span>
+        }
+<span class="nc" id="L160">        return invokers;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L165">        return &quot;invoker :&quot; + this.invoker + &quot;,directory: &quot; + this.directory;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport</a> &gt; <span class="el_source">AbstractCodec.java</span></div><h1>AbstractCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.serialize.Serialization;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Codec2;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+/**
+ * AbstractCodec
+ */
+<span class="nc" id="L34">public abstract class AbstractCodec implements Codec2 {</span>
+
+<span class="nc" id="L36">    private static final Logger logger = LoggerFactory.getLogger(AbstractCodec.class);</span>
+
+    protected static void checkPayload(Channel channel, long size) throws IOException {
+<span class="nc" id="L39">        int payload = Constants.DEFAULT_PAYLOAD;</span>
+<span class="nc bnc" id="L40" title="All 4 branches missed.">        if (channel != null &amp;&amp; channel.getUrl() != null) {</span>
+<span class="nc" id="L41">            payload = channel.getUrl().getParameter(Constants.PAYLOAD_KEY, Constants.DEFAULT_PAYLOAD);</span>
+        }
+<span class="nc bnc" id="L43" title="All 4 branches missed.">        if (payload &gt; 0 &amp;&amp; size &gt; payload) {</span>
+<span class="nc" id="L44">            ExceedPayloadLimitException e = new ExceedPayloadLimitException(&quot;Data length too large: &quot; + size + &quot;, max payload: &quot; + payload + &quot;, channel: &quot; + channel);</span>
+<span class="nc" id="L45">            logger.error(e);</span>
+<span class="nc" id="L46">            throw e;</span>
+        }
+<span class="nc" id="L48">    }</span>
+
+    protected Serialization getSerialization(Channel channel) {
+<span class="nc" id="L51">        return CodecSupport.getSerialization(channel.getUrl());</span>
+    }
+
+    protected boolean isClientSide(Channel channel) {
+<span class="nc" id="L55">        String side = (String) channel.getAttribute(Constants.SIDE_KEY);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (&quot;client&quot;.equals(side)) {</span>
+<span class="nc" id="L57">            return true;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        } else if (&quot;server&quot;.equals(side)) {</span>
+<span class="nc" id="L59">            return false;</span>
+        } else {
+<span class="nc" id="L61">            InetSocketAddress address = channel.getRemoteAddress();</span>
+<span class="nc" id="L62">            URL url = channel.getUrl();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            boolean client = url.getPort() == address.getPort()</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    &amp;&amp; NetUtils.filterLocalHost(url.getIp()).equals(</span>
+<span class="nc" id="L65">                    NetUtils.filterLocalHost(address.getAddress()</span>
+<span class="nc" id="L66">                            .getHostAddress()));</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            channel.setAttribute(Constants.SIDE_KEY, client ? &quot;client&quot;</span>
+<span class="nc" id="L68">                    : &quot;server&quot;);</span>
+<span class="nc" id="L69">            return client;</span>
+        }
+    }
+
+    protected boolean isServerSide(Channel channel) {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        return !isClientSide(channel);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

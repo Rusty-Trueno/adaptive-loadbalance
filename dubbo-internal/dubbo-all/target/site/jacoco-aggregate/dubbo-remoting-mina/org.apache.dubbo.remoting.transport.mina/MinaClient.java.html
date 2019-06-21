@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MinaClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-mina</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.mina</a> &gt; <span class="el_source">MinaClient.java</span></div><h1>MinaClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.mina;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractClient;
+
+import org.apache.mina.common.ConnectFuture;
+import org.apache.mina.common.IoFuture;
+import org.apache.mina.common.IoFutureListener;
+import org.apache.mina.common.IoSession;
+import org.apache.mina.common.ThreadModel;
+import org.apache.mina.filter.codec.ProtocolCodecFilter;
+import org.apache.mina.transport.socket.nio.SocketConnector;
+import org.apache.mina.transport.socket.nio.SocketConnectorConfig;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Mina client.
+ */
+public class MinaClient extends AbstractClient {
+
+<span class="nc" id="L52">    private static final Logger logger = LoggerFactory.getLogger(MinaClient.class);</span>
+
+<span class="nc" id="L54">    private static final Map&lt;String, SocketConnector&gt; CONNECTORS = new ConcurrentHashMap&lt;String, SocketConnector&gt;();</span>
+
+    private String connectorKey;
+
+    private SocketConnector connector;
+
+    private volatile IoSession session; // volatile, please copy reference to use
+
+    public MinaClient(final URL url, final ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L63">        super(url, wrapChannelHandler(url, handler));</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    protected void doOpen() throws Throwable {
+<span class="nc" id="L68">        connectorKey = getUrl().toFullString();</span>
+<span class="nc" id="L69">        SocketConnector c = CONNECTORS.get(connectorKey);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L71">            connector = c;</span>
+        } else {
+            // set thread pool.
+<span class="nc" id="L74">            connector = new SocketConnector(Constants.DEFAULT_IO_THREADS,</span>
+<span class="nc" id="L75">                    Executors.newCachedThreadPool(new NamedThreadFactory(&quot;MinaClientWorker&quot;, true)));</span>
+            // config
+<span class="nc" id="L77">            SocketConnectorConfig cfg = (SocketConnectorConfig) connector.getDefaultConfig();</span>
+<span class="nc" id="L78">            cfg.setThreadModel(ThreadModel.MANUAL);</span>
+<span class="nc" id="L79">            cfg.getSessionConfig().setTcpNoDelay(true);</span>
+<span class="nc" id="L80">            cfg.getSessionConfig().setKeepAlive(true);</span>
+<span class="nc" id="L81">            int timeout = getConnectTimeout();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            cfg.setConnectTimeout(timeout &lt; 1000 ? 1 : timeout / 1000);</span>
+            // set codec.
+<span class="nc" id="L84">            connector.getFilterChain().addLast(&quot;codec&quot;, new ProtocolCodecFilter(new MinaCodecAdapter(getCodec(), getUrl(), this)));</span>
+<span class="nc" id="L85">            CONNECTORS.put(connectorKey, connector);</span>
+        }
+<span class="nc" id="L87">    }</span>
+
+    @Override
+    protected void doConnect() throws Throwable {
+<span class="nc" id="L91">        ConnectFuture future = connector.connect(getConnectAddress(), new MinaHandler(getUrl(), this));</span>
+<span class="nc" id="L92">        long start = System.currentTimeMillis();</span>
+<span class="nc" id="L93">        final AtomicReference&lt;Throwable&gt; exception = new AtomicReference&lt;Throwable&gt;();</span>
+<span class="nc" id="L94">        final CountDownLatch finish = new CountDownLatch(1); // resolve future.awaitUninterruptibly() dead lock</span>
+<span class="nc" id="L95">        future.addListener(new IoFutureListener() {</span>
+            @Override
+            public void operationComplete(IoFuture future) {
+                try {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                    if (future.isReady()) {</span>
+<span class="nc" id="L100">                        IoSession newSession = future.getSession();</span>
+                        try {
+                            // Close old channel
+<span class="nc" id="L103">                            IoSession oldSession = MinaClient.this.session; // copy reference</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                            if (oldSession != null) {</span>
+                                try {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                                    if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L107">                                        logger.info(&quot;Close old mina channel &quot; + oldSession + &quot; on create new mina channel &quot; + newSession);</span>
+                                    }
+<span class="nc" id="L109">                                    oldSession.close();</span>
+                                } finally {
+<span class="nc" id="L111">                                    MinaChannel.removeChannelIfDisconnected(oldSession);</span>
+                                }
+                            }
+                        } finally {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                            if (MinaClient.this.isClosed()) {</span>
+                                try {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                                    if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L118">                                        logger.info(&quot;Close new mina channel &quot; + newSession + &quot;, because the client closed.&quot;);</span>
+                                    }
+<span class="nc" id="L120">                                    newSession.close();</span>
+                                } finally {
+<span class="nc" id="L122">                                    MinaClient.this.session = null;</span>
+<span class="nc" id="L123">                                    MinaChannel.removeChannelIfDisconnected(newSession);</span>
+<span class="nc" id="L124">                                }</span>
+                            } else {
+<span class="nc" id="L126">                                MinaClient.this.session = newSession;</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L130">                } catch (Exception e) {</span>
+<span class="nc" id="L131">                    exception.set(e);</span>
+                } finally {
+<span class="nc" id="L133">                    finish.countDown();</span>
+                }
+<span class="nc" id="L135">            }</span>
+        });
+        try {
+<span class="nc" id="L138">            finish.await(getConnectTimeout(), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L139">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L140">            throw new RemotingException(this, &quot;client(url: &quot; + getUrl() + &quot;) failed to connect to server &quot; + getRemoteAddress() + &quot; client-side timeout &quot;</span>
+<span class="nc" id="L141">                    + getConnectTimeout() + &quot;ms (elapsed: &quot; + (System.currentTimeMillis() - start)</span>
+<span class="nc" id="L142">                    + &quot;ms) from netty client &quot; + NetUtils.getLocalHost() + &quot; using dubbo version &quot;</span>
+<span class="nc" id="L143">                    + Version.getVersion() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L144">        }</span>
+<span class="nc" id="L145">        Throwable e = exception.get();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (e != null) {</span>
+<span class="nc" id="L147">            throw e;</span>
+        }
+<span class="nc" id="L149">    }</span>
+
+    @Override
+    protected void doDisConnect() throws Throwable {
+        try {
+<span class="nc" id="L154">            MinaChannel.removeChannelIfDisconnected(session);</span>
+<span class="nc" id="L155">        } catch (Throwable t) {</span>
+<span class="nc" id="L156">            logger.warn(t.getMessage());</span>
+<span class="nc" id="L157">        }</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    protected void doClose() throws Throwable {
+        //release mina resouces.
+<span class="nc" id="L163">    }</span>
+
+    @Override
+    protected Channel getChannel() {
+<span class="nc" id="L167">        IoSession s = session;</span>
+<span class="nc bnc" id="L168" title="All 4 branches missed.">        if (s == null || !s.isConnected()) {</span>
+<span class="nc" id="L169">            return null;</span>
+        }
+<span class="nc" id="L171">        return MinaChannel.getOrAddChannel(s, getUrl(), this);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

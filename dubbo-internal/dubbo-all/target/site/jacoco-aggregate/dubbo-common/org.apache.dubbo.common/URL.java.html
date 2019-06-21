@@ -1,0 +1,1538 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>URL.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common</a> &gt; <span class="el_source">URL.java</span></div><h1>URL.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common;
+
+import org.apache.dubbo.common.config.Configuration;
+import org.apache.dubbo.common.config.InmemoryConfiguration;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * URL - Uniform Resource Locator (Immutable, ThreadSafe)
+ * &lt;p&gt;
+ * url example:
+ * &lt;ul&gt;
+ * &lt;li&gt;http://www.facebook.com/friends?param1=value1&amp;amp;param2=value2
+ * &lt;li&gt;http://username:password@10.20.130.230:8080/list?version=1.0.0
+ * &lt;li&gt;ftp://username:password@192.168.1.7:21/1/read.txt
+ * &lt;li&gt;registry://192.168.1.7:9090/org.apache.dubbo.service1?param1=value1&amp;amp;param2=value2
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * Some strange example below:
+ * &lt;ul&gt;
+ * &lt;li&gt;192.168.1.3:20880&lt;br&gt;
+ * for this case, url protocol = null, url host = 192.168.1.3, port = 20880, url path = null
+ * &lt;li&gt;file:///home/user1/router.js?type=script&lt;br&gt;
+ * for this case, url protocol = file, url host = null, url path = home/user1/router.js
+ * &lt;li&gt;file://home/user1/router.js?type=script&lt;br&gt;
+ * for this case, url protocol = file, url host = home, url path = user1/router.js
+ * &lt;li&gt;file:///D:/1/router.js?type=script&lt;br&gt;
+ * for this case, url protocol = file, url host = null, url path = D:/1/router.js
+ * &lt;li&gt;file:/D:/1/router.js?type=script&lt;br&gt;
+ * same as above file:///D:/1/router.js?type=script
+ * &lt;li&gt;/home/user1/router.js?type=script &lt;br&gt;
+ * for this case, url protocol = null, url host = null, url path = home/user1/router.js
+ * &lt;li&gt;home/user1/router.js?type=script &lt;br&gt;
+ * for this case, url protocol = null, url host = home, url path = user1/router.js
+ * &lt;/ul&gt;
+ *
+ * @see java.net.URL
+ * @see java.net.URI
+ */
+public /*final**/
+class URL implements Serializable {
+
+    private static final long serialVersionUID = -1985165475234910535L;
+
+    private final String protocol;
+
+    private final String username;
+
+    private final String password;
+
+    // by default, host to registry
+    private final String host;
+
+    // by default, port to registry
+    private final int port;
+
+    private final String path;
+
+    private final Map&lt;String, String&gt; parameters;
+
+    // ==== cache ====
+
+    private volatile transient Map&lt;String, Number&gt; numbers;
+
+    private volatile transient Map&lt;String, URL&gt; urls;
+
+    private volatile transient String ip;
+
+    private volatile transient String full;
+
+    private volatile transient String identity;
+
+    private volatile transient String parameter;
+
+    private volatile transient String string;
+
+<span class="nc" id="L111">    protected URL() {</span>
+<span class="nc" id="L112">        this.protocol = null;</span>
+<span class="nc" id="L113">        this.username = null;</span>
+<span class="nc" id="L114">        this.password = null;</span>
+<span class="nc" id="L115">        this.host = null;</span>
+<span class="nc" id="L116">        this.port = 0;</span>
+<span class="nc" id="L117">        this.path = null;</span>
+<span class="nc" id="L118">        this.parameters = null;</span>
+<span class="nc" id="L119">    }</span>
+
+    public URL(String protocol, String host, int port) {
+<span class="nc" id="L122">        this(protocol, null, null, host, port, null, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L123">    }</span>
+
+    public URL(String protocol, String host, int port, String[] pairs) { // varargs ... conflict with the following path argument, use array instead.
+<span class="nc" id="L126">        this(protocol, null, null, host, port, null, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L127">    }</span>
+
+    public URL(String protocol, String host, int port, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L130">        this(protocol, null, null, host, port, null, parameters);</span>
+<span class="nc" id="L131">    }</span>
+
+    public URL(String protocol, String host, int port, String path) {
+<span class="nc" id="L134">        this(protocol, null, null, host, port, path, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L135">    }</span>
+
+    public URL(String protocol, String host, int port, String path, String... pairs) {
+<span class="nc" id="L138">        this(protocol, null, null, host, port, path, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L139">    }</span>
+
+    public URL(String protocol, String host, int port, String path, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L142">        this(protocol, null, null, host, port, path, parameters);</span>
+<span class="nc" id="L143">    }</span>
+
+    public URL(String protocol, String username, String password, String host, int port, String path) {
+<span class="nc" id="L146">        this(protocol, username, password, host, port, path, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L147">    }</span>
+
+    public URL(String protocol, String username, String password, String host, int port, String path, String... pairs) {
+<span class="nc" id="L150">        this(protocol, username, password, host, port, path, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L151">    }</span>
+
+<span class="nc" id="L153">    public URL(String protocol, String username, String password, String host, int port, String path, Map&lt;String, String&gt; parameters) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (StringUtils.isEmpty(username)</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                &amp;&amp; StringUtils.isNotEmpty(password)) {</span>
+<span class="nc" id="L156">            throw new IllegalArgumentException(&quot;Invalid url, password without username!&quot;);</span>
+        }
+<span class="nc" id="L158">        this.protocol = protocol;</span>
+<span class="nc" id="L159">        this.username = username;</span>
+<span class="nc" id="L160">        this.password = password;</span>
+<span class="nc" id="L161">        this.host = host;</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        this.port = (port &lt; 0 ? 0 : port);</span>
+        // trim the beginning &quot;/&quot;
+<span class="nc bnc" id="L164" title="All 4 branches missed.">        while (path != null &amp;&amp; path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L165">            path = path.substring(1);</span>
+        }
+<span class="nc" id="L167">        this.path = path;</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (parameters == null) {</span>
+<span class="nc" id="L169">            parameters = new HashMap&lt;&gt;();</span>
+        } else {
+<span class="nc" id="L171">            parameters = new HashMap&lt;&gt;(parameters);</span>
+        }
+<span class="nc" id="L173">        this.parameters = Collections.unmodifiableMap(parameters);</span>
+<span class="nc" id="L174">    }</span>
+
+    /**
+     * Parse url string
+     *
+     * @param url URL string
+     * @return URL instance
+     * @see URL
+     */
+    public static URL valueOf(String url) {
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (url == null || (url = url.trim()).length() == 0) {</span>
+<span class="nc" id="L185">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc" id="L187">        String protocol = null;</span>
+<span class="nc" id="L188">        String username = null;</span>
+<span class="nc" id="L189">        String password = null;</span>
+<span class="nc" id="L190">        String host = null;</span>
+<span class="nc" id="L191">        int port = 0;</span>
+<span class="nc" id="L192">        String path = null;</span>
+<span class="nc" id="L193">        Map&lt;String, String&gt; parameters = null;</span>
+<span class="nc" id="L194">        int i = url.indexOf(&quot;?&quot;); // separator between body and parameters</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L196">            String[] parts = url.substring(i + 1).split(&quot;&amp;&quot;);</span>
+<span class="nc" id="L197">            parameters = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            for (String part : parts) {</span>
+<span class="nc" id="L199">                part = part.trim();</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (part.length() &gt; 0) {</span>
+<span class="nc" id="L201">                    int j = part.indexOf('=');</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                    if (j &gt;= 0) {</span>
+<span class="nc" id="L203">                        parameters.put(part.substring(0, j), part.substring(j + 1));</span>
+                    } else {
+<span class="nc" id="L205">                        parameters.put(part, part);</span>
+                    }
+                }
+            }
+<span class="nc" id="L209">            url = url.substring(0, i);</span>
+        }
+<span class="nc" id="L211">        i = url.indexOf(&quot;://&quot;);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            if (i == 0) {</span>
+<span class="nc" id="L214">                throw new IllegalStateException(&quot;url missing protocol: \&quot;&quot; + url + &quot;\&quot;&quot;);</span>
+            }
+<span class="nc" id="L216">            protocol = url.substring(0, i);</span>
+<span class="nc" id="L217">            url = url.substring(i + 3);</span>
+        } else {
+            // case: file:/path/to/file.txt
+<span class="nc" id="L220">            i = url.indexOf(&quot;:/&quot;);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (i &gt;= 0) {</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                if (i == 0) {</span>
+<span class="nc" id="L223">                    throw new IllegalStateException(&quot;url missing protocol: \&quot;&quot; + url + &quot;\&quot;&quot;);</span>
+                }
+<span class="nc" id="L225">                protocol = url.substring(0, i);</span>
+<span class="nc" id="L226">                url = url.substring(i + 1);</span>
+            }
+        }
+
+<span class="nc" id="L230">        i = url.indexOf(&quot;/&quot;);</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L232">            path = url.substring(i + 1);</span>
+<span class="nc" id="L233">            url = url.substring(0, i);</span>
+        }
+<span class="nc" id="L235">        i = url.lastIndexOf(&quot;@&quot;);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L237">            username = url.substring(0, i);</span>
+<span class="nc" id="L238">            int j = username.indexOf(&quot;:&quot;);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if (j &gt;= 0) {</span>
+<span class="nc" id="L240">                password = username.substring(j + 1);</span>
+<span class="nc" id="L241">                username = username.substring(0, j);</span>
+            }
+<span class="nc" id="L243">            url = url.substring(i + 1);</span>
+        }
+<span class="nc" id="L245">        i = url.lastIndexOf(&quot;:&quot;);</span>
+<span class="nc bnc" id="L246" title="All 4 branches missed.">        if (i &gt;= 0 &amp;&amp; i &lt; url.length() - 1) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (url.lastIndexOf(&quot;%&quot;) &gt; i) {</span>
+                // ipv6 address with scope id
+                // e.g. fe80:0:0:0:894:aeec:f37d:23e1%en0
+                // see https://howdoesinternetwork.com/2013/ipv6-zone-id
+                // ignore
+            } else {
+<span class="nc" id="L253">                port = Integer.parseInt(url.substring(i + 1));</span>
+<span class="nc" id="L254">                url = url.substring(0, i);</span>
+            }
+        }
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (url.length() &gt; 0) {</span>
+<span class="nc" id="L258">            host = url;</span>
+        }
+<span class="nc" id="L260">        return new URL(protocol, username, password, host, port, path, parameters);</span>
+    }
+
+    public static URL valueOf(String url, String... reserveParams) {
+<span class="nc" id="L264">        URL result = valueOf(url);</span>
+<span class="nc bnc" id="L265" title="All 4 branches missed.">        if (reserveParams == null || reserveParams.length == 0) {</span>
+<span class="nc" id="L266">            return result;</span>
+        }
+<span class="nc" id="L268">        Map&lt;String, String&gt; newMap = new HashMap&lt;&gt;(reserveParams.length);</span>
+<span class="nc" id="L269">        Map&lt;String, String&gt; oldMap = result.getParameters();</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        for (String reserveParam : reserveParams) {</span>
+<span class="nc" id="L271">            String tmp = oldMap.get(reserveParam);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(tmp)) {</span>
+<span class="nc" id="L273">                newMap.put(reserveParam, tmp);</span>
+            }
+        }
+<span class="nc" id="L276">        return result.clearParameters().addParameters(newMap);</span>
+    }
+
+    public static URL valueOf(URL url, String[] reserveParams, String[] reserveParamPrefixs) {
+<span class="nc" id="L280">        Map&lt;String, String&gt; newMap = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L281">        Map&lt;String, String&gt; oldMap = url.getParameters();</span>
+<span class="nc bnc" id="L282" title="All 4 branches missed.">        if (reserveParamPrefixs != null &amp;&amp; reserveParamPrefixs.length != 0) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; entry : oldMap.entrySet()) {</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                for (String reserveParamPrefix : reserveParamPrefixs) {</span>
+<span class="nc bnc" id="L285" title="All 4 branches missed.">                    if (entry.getKey().startsWith(reserveParamPrefix) &amp;&amp; StringUtils.isNotEmpty(entry.getValue())) {</span>
+<span class="nc" id="L286">                        newMap.put(entry.getKey(), entry.getValue());</span>
+                    }
+                }
+<span class="nc" id="L289">            }</span>
+        }
+
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (reserveParams != null) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            for (String reserveParam : reserveParams) {</span>
+<span class="nc" id="L294">                String tmp = oldMap.get(reserveParam);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(tmp)) {</span>
+<span class="nc" id="L296">                    newMap.put(reserveParam, tmp);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        return newMap.isEmpty() ? new URL(url.getProtocol(), url.getUsername(), url.getPassword(), url.getHost(), url.getPort(), url.getPath())</span>
+<span class="nc" id="L301">                : new URL(url.getProtocol(), url.getUsername(), url.getPassword(), url.getHost(), url.getPort(), url.getPath(), newMap);</span>
+    }
+
+    public static String encode(String value) {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L306">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="nc" id="L309">            return URLEncoder.encode(value, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L310">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L311">            throw new RuntimeException(e.getMessage(), e);</span>
+        }
+    }
+
+    public static String decode(String value) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L317">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="nc" id="L320">            return URLDecoder.decode(value, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L321">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L322">            throw new RuntimeException(e.getMessage(), e);</span>
+        }
+    }
+
+    public String getProtocol() {
+<span class="nc" id="L327">        return protocol;</span>
+    }
+
+    public URL setProtocol(String protocol) {
+<span class="nc" id="L331">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public String getUsername() {
+<span class="nc" id="L335">        return username;</span>
+    }
+
+    public URL setUsername(String username) {
+<span class="nc" id="L339">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public String getPassword() {
+<span class="nc" id="L343">        return password;</span>
+    }
+
+    public URL setPassword(String password) {
+<span class="nc" id="L347">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public String getAuthority() {
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (StringUtils.isEmpty(username)</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                &amp;&amp; StringUtils.isEmpty(password)) {</span>
+<span class="nc" id="L353">            return null;</span>
+        }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        return (username == null ? &quot;&quot; : username)</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                + &quot;:&quot; + (password == null ? &quot;&quot; : password);</span>
+    }
+
+    public String getHost() {
+<span class="nc" id="L360">        return host;</span>
+    }
+
+    public URL setHost(String host) {
+<span class="nc" id="L364">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    /**
+     * Fetch IP address for this URL.
+     * &lt;p&gt;
+     * Pls. note that IP should be used instead of Host when to compare with socket's address or to search in a map
+     * which use address as its key.
+     *
+     * @return ip in string format
+     */
+    public String getIp() {
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (ip == null) {</span>
+<span class="nc" id="L377">            ip = NetUtils.getIpByHost(host);</span>
+        }
+<span class="nc" id="L379">        return ip;</span>
+    }
+
+    public int getPort() {
+<span class="nc" id="L383">        return port;</span>
+    }
+
+    public URL setPort(int port) {
+<span class="nc" id="L387">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public int getPort(int defaultPort) {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        return port &lt;= 0 ? defaultPort : port;</span>
+    }
+
+    public String getAddress() {
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        return port &lt;= 0 ? host : host + &quot;:&quot; + port;</span>
+    }
+
+    public URL setAddress(String address) {
+<span class="nc" id="L399">        int i = address.lastIndexOf(':');</span>
+        String host;
+<span class="nc" id="L401">        int port = this.port;</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L403">            host = address.substring(0, i);</span>
+<span class="nc" id="L404">            port = Integer.parseInt(address.substring(i + 1));</span>
+        } else {
+<span class="nc" id="L406">            host = address;</span>
+        }
+<span class="nc" id="L408">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public String getBackupAddress() {
+<span class="nc" id="L412">        return getBackupAddress(0);</span>
+    }
+
+    public String getBackupAddress(int defaultPort) {
+<span class="nc" id="L416">        StringBuilder address = new StringBuilder(appendDefaultPort(getAddress(), defaultPort));</span>
+<span class="nc" id="L417">        String[] backups = getParameter(Constants.BACKUP_KEY, new String[0]);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (ArrayUtils.isNotEmpty(backups)) {</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            for (String backup : backups) {</span>
+<span class="nc" id="L420">                address.append(&quot;,&quot;);</span>
+<span class="nc" id="L421">                address.append(appendDefaultPort(backup, defaultPort));</span>
+            }
+        }
+<span class="nc" id="L424">        return address.toString();</span>
+    }
+
+    public List&lt;URL&gt; getBackupUrls() {
+<span class="nc" id="L428">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L429">        urls.add(this);</span>
+<span class="nc" id="L430">        String[] backups = getParameter(Constants.BACKUP_KEY, new String[0]);</span>
+<span class="nc bnc" id="L431" title="All 4 branches missed.">        if (backups != null &amp;&amp; backups.length &gt; 0) {</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            for (String backup : backups) {</span>
+<span class="nc" id="L433">                urls.add(this.setAddress(backup));</span>
+            }
+        }
+<span class="nc" id="L436">        return urls;</span>
+    }
+
+    static String appendDefaultPort(String address, int defaultPort) {
+<span class="nc bnc" id="L440" title="All 6 branches missed.">        if (address != null &amp;&amp; address.length() &gt; 0 &amp;&amp; defaultPort &gt; 0) {</span>
+<span class="nc" id="L441">            int i = address.indexOf(':');</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            if (i &lt; 0) {</span>
+<span class="nc" id="L443">                return address + &quot;:&quot; + defaultPort;</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            } else if (Integer.parseInt(address.substring(i + 1)) == 0) {</span>
+<span class="nc" id="L445">                return address.substring(0, i + 1) + defaultPort;</span>
+            }
+        }
+<span class="nc" id="L448">        return address;</span>
+    }
+
+    public String getPath() {
+<span class="nc" id="L452">        return path;</span>
+    }
+
+    public URL setPath(String path) {
+<span class="nc" id="L456">        return new URL(protocol, username, password, host, port, path, getParameters());</span>
+    }
+
+    public String getAbsolutePath() {
+<span class="nc bnc" id="L460" title="All 4 branches missed.">        if (path != null &amp;&amp; !path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L461">            return &quot;/&quot; + path;</span>
+        }
+<span class="nc" id="L463">        return path;</span>
+    }
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L467">        return parameters;</span>
+    }
+
+    public String getParameterAndDecoded(String key) {
+<span class="nc" id="L471">        return getParameterAndDecoded(key, null);</span>
+    }
+
+    public String getParameterAndDecoded(String key, String defaultValue) {
+<span class="nc" id="L475">        return decode(getParameter(key, defaultValue));</span>
+    }
+
+    public String getParameter(String key) {
+<span class="nc" id="L479">        String value = parameters.get(key);</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L481">            value = parameters.get(Constants.DEFAULT_KEY_PREFIX + key);</span>
+        }
+<span class="nc" id="L483">        return value;</span>
+    }
+
+    public String getParameter(String key, String defaultValue) {
+<span class="nc" id="L487">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L489">            return defaultValue;</span>
+        }
+<span class="nc" id="L491">        return value;</span>
+    }
+
+    public String[] getParameter(String key, String[] defaultValue) {
+<span class="nc" id="L495">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L497">            return defaultValue;</span>
+        }
+<span class="nc" id="L499">        return Constants.COMMA_SPLIT_PATTERN.split(value);</span>
+    }
+
+    public List&lt;String&gt; getParameter(String key, List&lt;String&gt; defaultValue) {
+<span class="nc" id="L503">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L504" title="All 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L505">            return defaultValue;</span>
+        }
+<span class="nc" id="L507">        String[] strArray = Constants.COMMA_SPLIT_PATTERN.split(value);</span>
+<span class="nc" id="L508">        return Arrays.asList(strArray);</span>
+    }
+
+    private Map&lt;String, Number&gt; getNumbers() {
+<span class="nc bnc" id="L512" title="All 2 branches missed.">        if (numbers == null) { // concurrent initialization is tolerant</span>
+<span class="nc" id="L513">            numbers = new ConcurrentHashMap&lt;&gt;();</span>
+        }
+<span class="nc" id="L515">        return numbers;</span>
+    }
+
+    private Map&lt;String, URL&gt; getUrls() {
+<span class="nc bnc" id="L519" title="All 2 branches missed.">        if (urls == null) { // concurrent initialization is tolerant</span>
+<span class="nc" id="L520">            urls = new ConcurrentHashMap&lt;&gt;();</span>
+        }
+<span class="nc" id="L522">        return urls;</span>
+    }
+
+    public URL getUrlParameter(String key) {
+<span class="nc" id="L526">        URL u = getUrls().get(key);</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (u != null) {</span>
+<span class="nc" id="L528">            return u;</span>
+        }
+<span class="nc" id="L530">        String value = getParameterAndDecoded(key);</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L532">            return null;</span>
+        }
+<span class="nc" id="L534">        u = URL.valueOf(value);</span>
+<span class="nc" id="L535">        getUrls().put(key, u);</span>
+<span class="nc" id="L536">        return u;</span>
+    }
+
+    public double getParameter(String key, double defaultValue) {
+<span class="nc" id="L540">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L542">            return n.doubleValue();</span>
+        }
+<span class="nc" id="L544">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L545" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L546">            return defaultValue;</span>
+        }
+<span class="nc" id="L548">        double d = Double.parseDouble(value);</span>
+<span class="nc" id="L549">        getNumbers().put(key, d);</span>
+<span class="nc" id="L550">        return d;</span>
+    }
+
+    public float getParameter(String key, float defaultValue) {
+<span class="nc" id="L554">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L556">            return n.floatValue();</span>
+        }
+<span class="nc" id="L558">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L560">            return defaultValue;</span>
+        }
+<span class="nc" id="L562">        float f = Float.parseFloat(value);</span>
+<span class="nc" id="L563">        getNumbers().put(key, f);</span>
+<span class="nc" id="L564">        return f;</span>
+    }
+
+    public long getParameter(String key, long defaultValue) {
+<span class="nc" id="L568">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L570">            return n.longValue();</span>
+        }
+<span class="nc" id="L572">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L574">            return defaultValue;</span>
+        }
+<span class="nc" id="L576">        long l = Long.parseLong(value);</span>
+<span class="nc" id="L577">        getNumbers().put(key, l);</span>
+<span class="nc" id="L578">        return l;</span>
+    }
+
+    public int getParameter(String key, int defaultValue) {
+<span class="nc" id="L582">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L584">            return n.intValue();</span>
+        }
+<span class="nc" id="L586">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L587" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L588">            return defaultValue;</span>
+        }
+<span class="nc" id="L590">        int i = Integer.parseInt(value);</span>
+<span class="nc" id="L591">        getNumbers().put(key, i);</span>
+<span class="nc" id="L592">        return i;</span>
+    }
+
+    public short getParameter(String key, short defaultValue) {
+<span class="nc" id="L596">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L598">            return n.shortValue();</span>
+        }
+<span class="nc" id="L600">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L602">            return defaultValue;</span>
+        }
+<span class="nc" id="L604">        short s = Short.parseShort(value);</span>
+<span class="nc" id="L605">        getNumbers().put(key, s);</span>
+<span class="nc" id="L606">        return s;</span>
+    }
+
+    public byte getParameter(String key, byte defaultValue) {
+<span class="nc" id="L610">        Number n = getNumbers().get(key);</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L612">            return n.byteValue();</span>
+        }
+<span class="nc" id="L614">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L616">            return defaultValue;</span>
+        }
+<span class="nc" id="L618">        byte b = Byte.parseByte(value);</span>
+<span class="nc" id="L619">        getNumbers().put(key, b);</span>
+<span class="nc" id="L620">        return b;</span>
+    }
+
+    public float getPositiveParameter(String key, float defaultValue) {
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L625">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L627">        float value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L628" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L629">            return defaultValue;</span>
+        }
+<span class="nc" id="L631">        return value;</span>
+    }
+
+    public double getPositiveParameter(String key, double defaultValue) {
+<span class="nc bnc" id="L635" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L636">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L638">        double value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L640">            return defaultValue;</span>
+        }
+<span class="nc" id="L642">        return value;</span>
+    }
+
+    public long getPositiveParameter(String key, long defaultValue) {
+<span class="nc bnc" id="L646" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L647">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L649">        long value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L651">            return defaultValue;</span>
+        }
+<span class="nc" id="L653">        return value;</span>
+    }
+
+    public int getPositiveParameter(String key, int defaultValue) {
+<span class="nc bnc" id="L657" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L658">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L660">        int value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L661" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L662">            return defaultValue;</span>
+        }
+<span class="nc" id="L664">        return value;</span>
+    }
+
+    public short getPositiveParameter(String key, short defaultValue) {
+<span class="nc bnc" id="L668" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L669">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L671">        short value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L672" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L673">            return defaultValue;</span>
+        }
+<span class="nc" id="L675">        return value;</span>
+    }
+
+    public byte getPositiveParameter(String key, byte defaultValue) {
+<span class="nc bnc" id="L679" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L680">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L682">        byte value = getParameter(key, defaultValue);</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L684">            return defaultValue;</span>
+        }
+<span class="nc" id="L686">        return value;</span>
+    }
+
+    public char getParameter(String key, char defaultValue) {
+<span class="nc" id="L690">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L692">            return defaultValue;</span>
+        }
+<span class="nc" id="L694">        return value.charAt(0);</span>
+    }
+
+    public boolean getParameter(String key, boolean defaultValue) {
+<span class="nc" id="L698">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L700">            return defaultValue;</span>
+        }
+<span class="nc" id="L702">        return Boolean.parseBoolean(value);</span>
+    }
+
+    public boolean hasParameter(String key) {
+<span class="nc" id="L706">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L707" title="All 4 branches missed.">        return value != null &amp;&amp; value.length() &gt; 0;</span>
+    }
+
+    public String getMethodParameterAndDecoded(String method, String key) {
+<span class="nc" id="L711">        return URL.decode(getMethodParameter(method, key));</span>
+    }
+
+    public String getMethodParameterAndDecoded(String method, String key, String defaultValue) {
+<span class="nc" id="L715">        return URL.decode(getMethodParameter(method, key, defaultValue));</span>
+    }
+
+    public String getMethodParameter(String method, String key) {
+<span class="nc" id="L719">        String value = parameters.get(method + &quot;.&quot; + key);</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L721">            return getParameter(key);</span>
+        }
+<span class="nc" id="L723">        return value;</span>
+    }
+
+    public String getMethodParameter(String method, String key, String defaultValue) {
+<span class="nc" id="L727">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L728" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L729">            return defaultValue;</span>
+        }
+<span class="nc" id="L731">        return value;</span>
+    }
+
+    public double getMethodParameter(String method, String key, double defaultValue) {
+<span class="nc" id="L735">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L736">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L737" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L738">            return n.doubleValue();</span>
+        }
+<span class="nc" id="L740">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L742">            return defaultValue;</span>
+        }
+<span class="nc" id="L744">        double d = Double.parseDouble(value);</span>
+<span class="nc" id="L745">        getNumbers().put(methodKey, d);</span>
+<span class="nc" id="L746">        return d;</span>
+    }
+
+    public float getMethodParameter(String method, String key, float defaultValue) {
+<span class="nc" id="L750">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L751">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L753">            return n.floatValue();</span>
+        }
+<span class="nc" id="L755">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L756" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L757">            return defaultValue;</span>
+        }
+<span class="nc" id="L759">        float f = Float.parseFloat(value);</span>
+<span class="nc" id="L760">        getNumbers().put(methodKey, f);</span>
+<span class="nc" id="L761">        return f;</span>
+    }
+
+    public long getMethodParameter(String method, String key, long defaultValue) {
+<span class="nc" id="L765">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L766">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L767" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L768">            return n.longValue();</span>
+        }
+<span class="nc" id="L770">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L772">            return defaultValue;</span>
+        }
+<span class="nc" id="L774">        long l = Long.parseLong(value);</span>
+<span class="nc" id="L775">        getNumbers().put(methodKey, l);</span>
+<span class="nc" id="L776">        return l;</span>
+    }
+
+    public int getMethodParameter(String method, String key, int defaultValue) {
+<span class="nc" id="L780">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L781">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L783">            return n.intValue();</span>
+        }
+<span class="nc" id="L785">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L786" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L787">            return defaultValue;</span>
+        }
+<span class="nc" id="L789">        int i = Integer.parseInt(value);</span>
+<span class="nc" id="L790">        getNumbers().put(methodKey, i);</span>
+<span class="nc" id="L791">        return i;</span>
+    }
+
+    public short getMethodParameter(String method, String key, short defaultValue) {
+<span class="nc" id="L795">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L796">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L798">            return n.shortValue();</span>
+        }
+<span class="nc" id="L800">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L802">            return defaultValue;</span>
+        }
+<span class="nc" id="L804">        short s = Short.parseShort(value);</span>
+<span class="nc" id="L805">        getNumbers().put(methodKey, s);</span>
+<span class="nc" id="L806">        return s;</span>
+    }
+
+    public byte getMethodParameter(String method, String key, byte defaultValue) {
+<span class="nc" id="L810">        String methodKey = method + &quot;.&quot; + key;</span>
+<span class="nc" id="L811">        Number n = getNumbers().get(methodKey);</span>
+<span class="nc bnc" id="L812" title="All 2 branches missed.">        if (n != null) {</span>
+<span class="nc" id="L813">            return n.byteValue();</span>
+        }
+<span class="nc" id="L815">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L817">            return defaultValue;</span>
+        }
+<span class="nc" id="L819">        byte b = Byte.parseByte(value);</span>
+<span class="nc" id="L820">        getNumbers().put(methodKey, b);</span>
+<span class="nc" id="L821">        return b;</span>
+    }
+
+    public double getMethodPositiveParameter(String method, String key, double defaultValue) {
+<span class="nc bnc" id="L825" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L826">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L828">        double value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L830">            return defaultValue;</span>
+        }
+<span class="nc" id="L832">        return value;</span>
+    }
+
+    public float getMethodPositiveParameter(String method, String key, float defaultValue) {
+<span class="nc bnc" id="L836" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L837">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L839">        float value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L841">            return defaultValue;</span>
+        }
+<span class="nc" id="L843">        return value;</span>
+    }
+
+    public long getMethodPositiveParameter(String method, String key, long defaultValue) {
+<span class="nc bnc" id="L847" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L848">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L850">        long value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L852">            return defaultValue;</span>
+        }
+<span class="nc" id="L854">        return value;</span>
+    }
+
+    public int getMethodPositiveParameter(String method, String key, int defaultValue) {
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L859">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L861">        int value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L863">            return defaultValue;</span>
+        }
+<span class="nc" id="L865">        return value;</span>
+    }
+
+    public short getMethodPositiveParameter(String method, String key, short defaultValue) {
+<span class="nc bnc" id="L869" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L870">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L872">        short value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L873" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L874">            return defaultValue;</span>
+        }
+<span class="nc" id="L876">        return value;</span>
+    }
+
+    public byte getMethodPositiveParameter(String method, String key, byte defaultValue) {
+<span class="nc bnc" id="L880" title="All 2 branches missed.">        if (defaultValue &lt;= 0) {</span>
+<span class="nc" id="L881">            throw new IllegalArgumentException(&quot;defaultValue &lt;= 0&quot;);</span>
+        }
+<span class="nc" id="L883">        byte value = getMethodParameter(method, key, defaultValue);</span>
+<span class="nc bnc" id="L884" title="All 2 branches missed.">        if (value &lt;= 0) {</span>
+<span class="nc" id="L885">            return defaultValue;</span>
+        }
+<span class="nc" id="L887">        return value;</span>
+    }
+
+    public char getMethodParameter(String method, String key, char defaultValue) {
+<span class="nc" id="L891">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L892" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L893">            return defaultValue;</span>
+        }
+<span class="nc" id="L895">        return value.charAt(0);</span>
+    }
+
+    public boolean getMethodParameter(String method, String key, boolean defaultValue) {
+<span class="nc" id="L899">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L900" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L901">            return defaultValue;</span>
+        }
+<span class="nc" id="L903">        return Boolean.parseBoolean(value);</span>
+    }
+
+    public boolean hasMethodParameter(String method, String key) {
+<span class="nc bnc" id="L907" title="All 2 branches missed.">        if (method == null) {</span>
+<span class="nc" id="L908">            String suffix = &quot;.&quot; + key;</span>
+<span class="nc bnc" id="L909" title="All 2 branches missed.">            for (String fullKey : parameters.keySet()) {</span>
+<span class="nc bnc" id="L910" title="All 2 branches missed.">                if (fullKey.endsWith(suffix)) {</span>
+<span class="nc" id="L911">                    return true;</span>
+                }
+<span class="nc" id="L913">            }</span>
+<span class="nc" id="L914">            return false;</span>
+        }
+<span class="nc bnc" id="L916" title="All 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L917">            String prefix = method + &quot;.&quot;;</span>
+<span class="nc bnc" id="L918" title="All 2 branches missed.">            for (String fullKey : parameters.keySet()) {</span>
+<span class="nc bnc" id="L919" title="All 2 branches missed.">                if (fullKey.startsWith(prefix)) {</span>
+<span class="nc" id="L920">                    return true;</span>
+                }
+<span class="nc" id="L922">            }</span>
+<span class="nc" id="L923">            return false;</span>
+        }
+<span class="nc" id="L925">        String value = getMethodParameter(method, key);</span>
+<span class="nc bnc" id="L926" title="All 4 branches missed.">        return value != null &amp;&amp; value.length() &gt; 0;</span>
+    }
+
+    public boolean isLocalHost() {
+<span class="nc bnc" id="L930" title="All 4 branches missed.">        return NetUtils.isLocalHost(host) || getParameter(Constants.LOCALHOST_KEY, false);</span>
+    }
+
+    public boolean isAnyHost() {
+<span class="nc bnc" id="L934" title="All 4 branches missed.">        return Constants.ANYHOST_VALUE.equals(host) || getParameter(Constants.ANYHOST_KEY, false);</span>
+    }
+
+    public URL addParameterAndEncoded(String key, String value) {
+<span class="nc bnc" id="L938" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L939">            return this;</span>
+        }
+<span class="nc" id="L941">        return addParameter(key, encode(value));</span>
+    }
+
+    public URL addParameter(String key, boolean value) {
+<span class="nc" id="L945">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, char value) {
+<span class="nc" id="L949">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, byte value) {
+<span class="nc" id="L953">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, short value) {
+<span class="nc" id="L957">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, int value) {
+<span class="nc" id="L961">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, long value) {
+<span class="nc" id="L965">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, float value) {
+<span class="nc" id="L969">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, double value) {
+<span class="nc" id="L973">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, Enum&lt;?&gt; value) {
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L978">            return this;</span>
+        }
+<span class="nc" id="L980">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, Number value) {
+<span class="nc bnc" id="L984" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L985">            return this;</span>
+        }
+<span class="nc" id="L987">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, CharSequence value) {
+<span class="nc bnc" id="L991" title="All 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L992">            return this;</span>
+        }
+<span class="nc" id="L994">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URL addParameter(String key, String value) {
+<span class="nc bnc" id="L998" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)</span>
+<span class="nc bnc" id="L999" title="All 2 branches missed.">                || StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L1000">            return this;</span>
+        }
+        // if value doesn't change, return immediately
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">        if (value.equals(getParameters().get(key))) { // value != null</span>
+<span class="nc" id="L1004">            return this;</span>
+        }
+
+<span class="nc" id="L1007">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(getParameters());</span>
+<span class="nc" id="L1008">        map.put(key, value);</span>
+<span class="nc" id="L1009">        return new URL(protocol, username, password, host, port, path, map);</span>
+    }
+
+    public URL addParameterIfAbsent(String key, String value) {
+<span class="nc bnc" id="L1013" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)</span>
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">                || StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L1015">            return this;</span>
+        }
+<span class="nc bnc" id="L1017" title="All 2 branches missed.">        if (hasParameter(key)) {</span>
+<span class="nc" id="L1018">            return this;</span>
+        }
+<span class="nc" id="L1020">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(getParameters());</span>
+<span class="nc" id="L1021">        map.put(key, value);</span>
+<span class="nc" id="L1022">        return new URL(protocol, username, password, host, port, path, map);</span>
+    }
+
+    /**
+     * Add parameters to a new url.
+     *
+     * @param parameters parameters in key-value pairs
+     * @return A new URL
+     */
+    public URL addParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L1033">            return this;</span>
+        }
+
+<span class="nc" id="L1036">        boolean hasAndEqual = true;</span>
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : parameters.entrySet()) {</span>
+<span class="nc" id="L1038">            String value = getParameters().get(entry.getKey());</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">                if (entry.getValue() != null) {</span>
+<span class="nc" id="L1041">                    hasAndEqual = false;</span>
+<span class="nc" id="L1042">                    break;</span>
+                }
+            } else {
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">                if (!value.equals(entry.getValue())) {</span>
+<span class="nc" id="L1046">                    hasAndEqual = false;</span>
+<span class="nc" id="L1047">                    break;</span>
+                }
+            }
+<span class="nc" id="L1050">        }</span>
+        // return immediately if there's no change
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">        if (hasAndEqual) {</span>
+<span class="nc" id="L1053">            return this;</span>
+        }
+
+<span class="nc" id="L1056">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(getParameters());</span>
+<span class="nc" id="L1057">        map.putAll(parameters);</span>
+<span class="nc" id="L1058">        return new URL(protocol, username, password, host, port, path, map);</span>
+    }
+
+    public URL addParametersIfAbsent(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L1063">            return this;</span>
+        }
+<span class="nc" id="L1065">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(parameters);</span>
+<span class="nc" id="L1066">        map.putAll(getParameters());</span>
+<span class="nc" id="L1067">        return new URL(protocol, username, password, host, port, path, map);</span>
+    }
+
+    public URL addParameters(String... pairs) {
+<span class="nc bnc" id="L1071" title="All 4 branches missed.">        if (pairs == null || pairs.length == 0) {</span>
+<span class="nc" id="L1072">            return this;</span>
+        }
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">        if (pairs.length % 2 != 0) {</span>
+<span class="nc" id="L1075">            throw new IllegalArgumentException(&quot;Map pairs can not be odd number.&quot;);</span>
+        }
+<span class="nc" id="L1077">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L1078">        int len = pairs.length / 2;</span>
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L1080">            map.put(pairs[2 * i], pairs[2 * i + 1]);</span>
+        }
+<span class="nc" id="L1082">        return addParameters(map);</span>
+    }
+
+    public URL addParameterString(String query) {
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">        if (StringUtils.isEmpty(query)) {</span>
+<span class="nc" id="L1087">            return this;</span>
+        }
+<span class="nc" id="L1089">        return addParameters(StringUtils.parseQueryString(query));</span>
+    }
+
+    public URL removeParameter(String key) {
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L1094">            return this;</span>
+        }
+<span class="nc" id="L1096">        return removeParameters(key);</span>
+    }
+
+    public URL removeParameters(Collection&lt;String&gt; keys) {
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(keys)) {</span>
+<span class="nc" id="L1101">            return this;</span>
+        }
+<span class="nc" id="L1103">        return removeParameters(keys.toArray(new String[0]));</span>
+    }
+
+    public URL removeParameters(String... keys) {
+<span class="nc bnc" id="L1107" title="All 4 branches missed.">        if (keys == null || keys.length == 0) {</span>
+<span class="nc" id="L1108">            return this;</span>
+        }
+<span class="nc" id="L1110">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(getParameters());</span>
+<span class="nc bnc" id="L1111" title="All 2 branches missed.">        for (String key : keys) {</span>
+<span class="nc" id="L1112">            map.remove(key);</span>
+        }
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">        if (map.size() == getParameters().size()) {</span>
+<span class="nc" id="L1115">            return this;</span>
+        }
+<span class="nc" id="L1117">        return new URL(protocol, username, password, host, port, path, map);</span>
+    }
+
+    public URL clearParameters() {
+<span class="nc" id="L1121">        return new URL(protocol, username, password, host, port, path, new HashMap&lt;&gt;());</span>
+    }
+
+    public String getRawParameter(String key) {
+<span class="nc bnc" id="L1125" title="All 2 branches missed.">        if (Constants.PROTOCOL_KEY.equals(key)) {</span>
+<span class="nc" id="L1126">            return protocol;</span>
+        }
+<span class="nc bnc" id="L1128" title="All 2 branches missed.">        if (Constants.USERNAME_KEY.equals(key)) {</span>
+<span class="nc" id="L1129">            return username;</span>
+        }
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">        if (Constants.PASSWORD_KEY.equals(key)) {</span>
+<span class="nc" id="L1132">            return password;</span>
+        }
+<span class="nc bnc" id="L1134" title="All 2 branches missed.">        if (Constants.HOST_KEY.equals(key)) {</span>
+<span class="nc" id="L1135">            return host;</span>
+        }
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">        if (Constants.PORT_KEY.equals(key)) {</span>
+<span class="nc" id="L1138">            return String.valueOf(port);</span>
+        }
+<span class="nc bnc" id="L1140" title="All 2 branches missed.">        if (Constants.PATH_KEY.equals(key)) {</span>
+<span class="nc" id="L1141">            return path;</span>
+        }
+<span class="nc" id="L1143">        return getParameter(key);</span>
+    }
+
+    public Map&lt;String, String&gt; toMap() {
+<span class="nc" id="L1147">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;(parameters);</span>
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">        if (protocol != null) {</span>
+<span class="nc" id="L1149">            map.put(Constants.PROTOCOL_KEY, protocol);</span>
+        }
+<span class="nc bnc" id="L1151" title="All 2 branches missed.">        if (username != null) {</span>
+<span class="nc" id="L1152">            map.put(Constants.USERNAME_KEY, username);</span>
+        }
+<span class="nc bnc" id="L1154" title="All 2 branches missed.">        if (password != null) {</span>
+<span class="nc" id="L1155">            map.put(Constants.USERNAME_KEY, password);</span>
+        }
+<span class="nc bnc" id="L1157" title="All 2 branches missed.">        if (host != null) {</span>
+<span class="nc" id="L1158">            map.put(Constants.HOST_KEY, host);</span>
+        }
+<span class="nc bnc" id="L1160" title="All 2 branches missed.">        if (port &gt; 0) {</span>
+<span class="nc" id="L1161">            map.put(Constants.PORT_KEY, String.valueOf(port));</span>
+        }
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">        if (path != null) {</span>
+<span class="nc" id="L1164">            map.put(Constants.PATH_KEY, path);</span>
+        }
+<span class="nc" id="L1166">        return map;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L1171" title="All 2 branches missed.">        if (string != null) {</span>
+<span class="nc" id="L1172">            return string;</span>
+        }
+<span class="nc" id="L1174">        return string = buildString(false, true); // no show username and password</span>
+    }
+
+    public String toString(String... parameters) {
+<span class="nc" id="L1178">        return buildString(false, true, parameters); // no show username and password</span>
+    }
+
+    public String toIdentityString() {
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">        if (identity != null) {</span>
+<span class="nc" id="L1183">            return identity;</span>
+        }
+<span class="nc" id="L1185">        return identity = buildString(true, false); // only return identity message, see the method &quot;equals&quot; and &quot;hashCode&quot;</span>
+    }
+
+    public String toIdentityString(String... parameters) {
+<span class="nc" id="L1189">        return buildString(true, false, parameters); // only return identity message, see the method &quot;equals&quot; and &quot;hashCode&quot;</span>
+    }
+
+    public String toFullString() {
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">        if (full != null) {</span>
+<span class="nc" id="L1194">            return full;</span>
+        }
+<span class="nc" id="L1196">        return full = buildString(true, true);</span>
+    }
+
+    public String toFullString(String... parameters) {
+<span class="nc" id="L1200">        return buildString(true, true, parameters);</span>
+    }
+
+    public String toParameterString() {
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">        if (parameter != null) {</span>
+<span class="nc" id="L1205">            return parameter;</span>
+        }
+<span class="nc" id="L1207">        return parameter = toParameterString(new String[0]);</span>
+    }
+
+    public String toParameterString(String... parameters) {
+<span class="nc" id="L1211">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L1212">        buildParameters(buf, false, parameters);</span>
+<span class="nc" id="L1213">        return buf.toString();</span>
+    }
+
+    private void buildParameters(StringBuilder buf, boolean concat, String[] parameters) {
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">        if (CollectionUtils.isNotEmptyMap(getParameters())) {</span>
+<span class="nc bnc" id="L1218" title="All 2 branches missed.">            List&lt;String&gt; includes = (ArrayUtils.isEmpty(parameters) ? null : Arrays.asList(parameters));</span>
+<span class="nc" id="L1219">            boolean first = true;</span>
+<span class="nc bnc" id="L1220" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; entry : new TreeMap&lt;&gt;(getParameters()).entrySet()) {</span>
+<span class="nc bnc" id="L1221" title="All 6 branches missed.">                if (entry.getKey() != null &amp;&amp; entry.getKey().length() &gt; 0</span>
+<span class="nc bnc" id="L1222" title="All 2 branches missed.">                        &amp;&amp; (includes == null || includes.contains(entry.getKey()))) {</span>
+<span class="nc bnc" id="L1223" title="All 2 branches missed.">                    if (first) {</span>
+<span class="nc bnc" id="L1224" title="All 2 branches missed.">                        if (concat) {</span>
+<span class="nc" id="L1225">                            buf.append(&quot;?&quot;);</span>
+                        }
+<span class="nc" id="L1227">                        first = false;</span>
+                    } else {
+<span class="nc" id="L1229">                        buf.append(&quot;&amp;&quot;);</span>
+                    }
+<span class="nc" id="L1231">                    buf.append(entry.getKey());</span>
+<span class="nc" id="L1232">                    buf.append(&quot;=&quot;);</span>
+<span class="nc bnc" id="L1233" title="All 2 branches missed.">                    buf.append(entry.getValue() == null ? &quot;&quot; : entry.getValue().trim());</span>
+                }
+<span class="nc" id="L1235">            }</span>
+        }
+<span class="nc" id="L1237">    }</span>
+
+    private String buildString(boolean appendUser, boolean appendParameter, String... parameters) {
+<span class="nc" id="L1240">        return buildString(appendUser, appendParameter, false, false, parameters);</span>
+    }
+
+    private String buildString(boolean appendUser, boolean appendParameter, boolean useIP, boolean useService, String... parameters) {
+<span class="nc" id="L1244">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L1245" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(protocol)) {</span>
+<span class="nc" id="L1246">            buf.append(protocol);</span>
+<span class="nc" id="L1247">            buf.append(&quot;://&quot;);</span>
+        }
+<span class="nc bnc" id="L1249" title="All 4 branches missed.">        if (appendUser &amp;&amp; StringUtils.isNotEmpty(username)) {</span>
+<span class="nc" id="L1250">            buf.append(username);</span>
+<span class="nc bnc" id="L1251" title="All 4 branches missed.">            if (password != null &amp;&amp; password.length() &gt; 0) {</span>
+<span class="nc" id="L1252">                buf.append(&quot;:&quot;);</span>
+<span class="nc" id="L1253">                buf.append(password);</span>
+            }
+<span class="nc" id="L1255">            buf.append(&quot;@&quot;);</span>
+        }
+        String host;
+<span class="nc bnc" id="L1258" title="All 2 branches missed.">        if (useIP) {</span>
+<span class="nc" id="L1259">            host = getIp();</span>
+        } else {
+<span class="nc" id="L1261">            host = getHost();</span>
+        }
+<span class="nc bnc" id="L1263" title="All 4 branches missed.">        if (host != null &amp;&amp; host.length() &gt; 0) {</span>
+<span class="nc" id="L1264">            buf.append(host);</span>
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">            if (port &gt; 0) {</span>
+<span class="nc" id="L1266">                buf.append(&quot;:&quot;);</span>
+<span class="nc" id="L1267">                buf.append(port);</span>
+            }
+        }
+        String path;
+<span class="nc bnc" id="L1271" title="All 2 branches missed.">        if (useService) {</span>
+<span class="nc" id="L1272">            path = getServiceKey();</span>
+        } else {
+<span class="nc" id="L1274">            path = getPath();</span>
+        }
+<span class="nc bnc" id="L1276" title="All 4 branches missed.">        if (path != null &amp;&amp; path.length() &gt; 0) {</span>
+<span class="nc" id="L1277">            buf.append(&quot;/&quot;);</span>
+<span class="nc" id="L1278">            buf.append(path);</span>
+        }
+
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">        if (appendParameter) {</span>
+<span class="nc" id="L1282">            buildParameters(buf, true, parameters);</span>
+        }
+<span class="nc" id="L1284">        return buf.toString();</span>
+    }
+
+    public java.net.URL toJavaURL() {
+        try {
+<span class="nc" id="L1289">            return new java.net.URL(toString());</span>
+<span class="nc" id="L1290">        } catch (MalformedURLException e) {</span>
+<span class="nc" id="L1291">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    public InetSocketAddress toInetSocketAddress() {
+<span class="nc" id="L1296">        return new InetSocketAddress(host, port);</span>
+    }
+
+    /**
+     * The format is '{group}*{interfaceName}:{version}'
+     *
+     * @return
+     */
+    public String getEncodedServiceKey() {
+<span class="nc" id="L1305">        String serviceKey = this.getServiceKey();</span>
+<span class="nc" id="L1306">        serviceKey = serviceKey.replaceFirst(&quot;/&quot;, &quot;*&quot;);</span>
+<span class="nc" id="L1307">        return serviceKey;</span>
+    }
+
+    /**
+     * The format of return value is '{group}/{interfaceName}:{version}'
+     * @return
+     */
+    public String getServiceKey() {
+<span class="nc" id="L1315">        String inf = getServiceInterface();</span>
+<span class="nc bnc" id="L1316" title="All 2 branches missed.">        if (inf == null) {</span>
+<span class="nc" id="L1317">            return null;</span>
+        }
+<span class="nc" id="L1319">        return buildKey(inf, getParameter(Constants.GROUP_KEY), getParameter(Constants.VERSION_KEY));</span>
+    }
+
+    /**
+     * The format of return value is '{group}/{path/interfaceName}:{version}'
+     * @return
+     */
+    public String getPathKey() {
+<span class="nc bnc" id="L1327" title="All 2 branches missed.">        String inf = StringUtils.isNotEmpty(path) ? path : getServiceInterface();</span>
+<span class="nc bnc" id="L1328" title="All 2 branches missed.">        if (inf == null) {</span>
+<span class="nc" id="L1329">            return null;</span>
+        }
+<span class="nc" id="L1331">        return buildKey(inf, getParameter(Constants.GROUP_KEY), getParameter(Constants.VERSION_KEY));</span>
+    }
+
+    public static String buildKey(String path, String group, String version) {
+<span class="nc" id="L1335">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L1336" title="All 4 branches missed.">        if (group != null &amp;&amp; group.length() &gt; 0) {</span>
+<span class="nc" id="L1337">            buf.append(group).append(&quot;/&quot;);</span>
+        }
+<span class="nc" id="L1339">        buf.append(path);</span>
+<span class="nc bnc" id="L1340" title="All 4 branches missed.">        if (version != null &amp;&amp; version.length() &gt; 0) {</span>
+<span class="nc" id="L1341">            buf.append(&quot;:&quot;).append(version);</span>
+        }
+<span class="nc" id="L1343">        return buf.toString();</span>
+    }
+
+    public String toServiceStringWithoutResolving() {
+<span class="nc" id="L1347">        return buildString(true, false, false, true);</span>
+    }
+
+    public String toServiceString() {
+<span class="nc" id="L1351">        return buildString(true, false, true, true);</span>
+    }
+
+    @Deprecated
+    public String getServiceName() {
+<span class="nc" id="L1356">        return getServiceInterface();</span>
+    }
+
+    public String getServiceInterface() {
+<span class="nc" id="L1360">        return getParameter(Constants.INTERFACE_KEY, path);</span>
+    }
+
+    public URL setServiceInterface(String service) {
+<span class="nc" id="L1364">        return addParameter(Constants.INTERFACE_KEY, service);</span>
+    }
+
+    /**
+     * @see #getParameter(String, int)
+     * @deprecated Replace to &lt;code&gt;getParameter(String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getIntParameter(String key) {
+<span class="nc" id="L1373">        return getParameter(key, 0);</span>
+    }
+
+    /**
+     * @see #getParameter(String, int)
+     * @deprecated Replace to &lt;code&gt;getParameter(String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getIntParameter(String key, int defaultValue) {
+<span class="nc" id="L1382">        return getParameter(key, defaultValue);</span>
+    }
+
+    /**
+     * @see #getPositiveParameter(String, int)
+     * @deprecated Replace to &lt;code&gt;getPositiveParameter(String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getPositiveIntParameter(String key, int defaultValue) {
+<span class="nc" id="L1391">        return getPositiveParameter(key, defaultValue);</span>
+    }
+
+    /**
+     * @see #getParameter(String, boolean)
+     * @deprecated Replace to &lt;code&gt;getParameter(String, boolean)&lt;/code&gt;
+     */
+    @Deprecated
+    public boolean getBooleanParameter(String key) {
+<span class="nc" id="L1400">        return getParameter(key, false);</span>
+    }
+
+    /**
+     * @see #getParameter(String, boolean)
+     * @deprecated Replace to &lt;code&gt;getParameter(String, boolean)&lt;/code&gt;
+     */
+    @Deprecated
+    public boolean getBooleanParameter(String key, boolean defaultValue) {
+<span class="nc" id="L1409">        return getParameter(key, defaultValue);</span>
+    }
+
+    /**
+     * @see #getMethodParameter(String, String, int)
+     * @deprecated Replace to &lt;code&gt;getMethodParameter(String, String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getMethodIntParameter(String method, String key) {
+<span class="nc" id="L1418">        return getMethodParameter(method, key, 0);</span>
+    }
+
+    /**
+     * @see #getMethodParameter(String, String, int)
+     * @deprecated Replace to &lt;code&gt;getMethodParameter(String, String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getMethodIntParameter(String method, String key, int defaultValue) {
+<span class="nc" id="L1427">        return getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    /**
+     * @see #getMethodPositiveParameter(String, String, int)
+     * @deprecated Replace to &lt;code&gt;getMethodPositiveParameter(String, String, int)&lt;/code&gt;
+     */
+    @Deprecated
+    public int getMethodPositiveIntParameter(String method, String key, int defaultValue) {
+<span class="nc" id="L1436">        return getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    /**
+     * @see #getMethodParameter(String, String, boolean)
+     * @deprecated Replace to &lt;code&gt;getMethodParameter(String, String, boolean)&lt;/code&gt;
+     */
+    @Deprecated
+    public boolean getMethodBooleanParameter(String method, String key) {
+<span class="nc" id="L1445">        return getMethodParameter(method, key, false);</span>
+    }
+
+    /**
+     * @see #getMethodParameter(String, String, boolean)
+     * @deprecated Replace to &lt;code&gt;getMethodParameter(String, String, boolean)&lt;/code&gt;
+     */
+    @Deprecated
+    public boolean getMethodBooleanParameter(String method, String key, boolean defaultValue) {
+<span class="nc" id="L1454">        return getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    public Configuration toConfiguration() {
+<span class="nc" id="L1458">        InmemoryConfiguration configuration = new InmemoryConfiguration();</span>
+<span class="nc" id="L1459">        configuration.addProperties(parameters);</span>
+<span class="nc" id="L1460">        return configuration;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L1465">        final int prime = 31;</span>
+<span class="nc" id="L1466">        int result = 1;</span>
+<span class="nc bnc" id="L1467" title="All 2 branches missed.">        result = prime * result + ((host == null) ? 0 : host.hashCode());</span>
+<span class="nc bnc" id="L1468" title="All 2 branches missed.">        result = prime * result + ((parameters == null) ? 0 : parameters.hashCode());</span>
+<span class="nc bnc" id="L1469" title="All 2 branches missed.">        result = prime * result + ((password == null) ? 0 : password.hashCode());</span>
+<span class="nc bnc" id="L1470" title="All 2 branches missed.">        result = prime * result + ((path == null) ? 0 : path.hashCode());</span>
+<span class="nc" id="L1471">        result = prime * result + port;</span>
+<span class="nc bnc" id="L1472" title="All 2 branches missed.">        result = prime * result + ((protocol == null) ? 0 : protocol.hashCode());</span>
+<span class="nc bnc" id="L1473" title="All 2 branches missed.">        result = prime * result + ((username == null) ? 0 : username.hashCode());</span>
+<span class="nc" id="L1474">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L1479" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L1480">            return true;</span>
+        }
+<span class="nc bnc" id="L1482" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L1483">            return false;</span>
+        }
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L1486">            return false;</span>
+        }
+<span class="nc" id="L1488">        URL other = (URL) obj;</span>
+<span class="nc bnc" id="L1489" title="All 2 branches missed.">        if (host == null) {</span>
+<span class="nc bnc" id="L1490" title="All 2 branches missed.">            if (other.host != null) {</span>
+<span class="nc" id="L1491">                return false;</span>
+            }
+<span class="nc bnc" id="L1493" title="All 2 branches missed.">        } else if (!host.equals(other.host)) {</span>
+<span class="nc" id="L1494">            return false;</span>
+        }
+<span class="nc bnc" id="L1496" title="All 2 branches missed.">        if (parameters == null) {</span>
+<span class="nc bnc" id="L1497" title="All 2 branches missed.">            if (other.parameters != null) {</span>
+<span class="nc" id="L1498">                return false;</span>
+            }
+<span class="nc bnc" id="L1500" title="All 2 branches missed.">        } else if (!parameters.equals(other.parameters)) {</span>
+<span class="nc" id="L1501">            return false;</span>
+        }
+<span class="nc bnc" id="L1503" title="All 2 branches missed.">        if (password == null) {</span>
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (other.password != null) {</span>
+<span class="nc" id="L1505">                return false;</span>
+            }
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">        } else if (!password.equals(other.password)) {</span>
+<span class="nc" id="L1508">            return false;</span>
+        }
+<span class="nc bnc" id="L1510" title="All 2 branches missed.">        if (path == null) {</span>
+<span class="nc bnc" id="L1511" title="All 2 branches missed.">            if (other.path != null) {</span>
+<span class="nc" id="L1512">                return false;</span>
+            }
+<span class="nc bnc" id="L1514" title="All 2 branches missed.">        } else if (!path.equals(other.path)) {</span>
+<span class="nc" id="L1515">            return false;</span>
+        }
+<span class="nc bnc" id="L1517" title="All 2 branches missed.">        if (port != other.port) {</span>
+<span class="nc" id="L1518">            return false;</span>
+        }
+<span class="nc bnc" id="L1520" title="All 2 branches missed.">        if (protocol == null) {</span>
+<span class="nc bnc" id="L1521" title="All 2 branches missed.">            if (other.protocol != null) {</span>
+<span class="nc" id="L1522">                return false;</span>
+            }
+<span class="nc bnc" id="L1524" title="All 2 branches missed.">        } else if (!protocol.equals(other.protocol)) {</span>
+<span class="nc" id="L1525">            return false;</span>
+        }
+<span class="nc bnc" id="L1527" title="All 2 branches missed.">        if (username == null) {</span>
+<span class="nc bnc" id="L1528" title="All 2 branches missed.">            if (other.username != null) {</span>
+<span class="nc" id="L1529">                return false;</span>
+            }
+<span class="nc bnc" id="L1531" title="All 2 branches missed.">        } else if (!username.equals(other.username)) {</span>
+<span class="nc" id="L1532">            return false;</span>
+        }
+<span class="nc" id="L1534">        return true;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

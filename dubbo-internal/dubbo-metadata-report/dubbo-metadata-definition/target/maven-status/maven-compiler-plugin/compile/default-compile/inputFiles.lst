@@ -1,0 +1,14 @@
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/model/FullServiceDefinition.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/ArrayTypeBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/CollectionTypeBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/model/TypeDefinition.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/TypeBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/TypeDefinitionBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/model/MethodDefinition.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/util/ClassUtils.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/util/JaketConfigurationUtils.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/model/ServiceDefinition.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/EnumTypeBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/DefaultTypeBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/ServiceDefinitionBuilder.java
+/home/songof/桌面/adaptive/dubbo-internal/dubbo-metadata-report/dubbo-metadata-definition/src/main/java/org/apache/dubbo/metadata/definition/builder/MapTypeBuilder.java

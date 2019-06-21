@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ClassUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-definition</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.definition.util</a> &gt; <span class="el_source">ClassUtils.java</span></div><h1>ClassUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.definition.util;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 2015/1/27.
+ */
+public final class ClassUtils {
+
+    /**
+     * Get the code source file or class path of the Class passed in.
+     *
+     * @param clazz
+     * @return Jar file name or class path.
+     */
+    public static String getCodeSource(Class&lt;?&gt; clazz) {
+<span class="nc" id="L40">        ProtectionDomain protectionDomain = clazz.getProtectionDomain();</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        if (protectionDomain == null || protectionDomain.getCodeSource() == null) {</span>
+<span class="nc" id="L42">            return null;</span>
+        }
+
+<span class="nc" id="L45">        CodeSource codeSource = clazz.getProtectionDomain().getCodeSource();</span>
+<span class="nc" id="L46">        URL location = codeSource.getLocation();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (location == null) {</span>
+<span class="nc" id="L48">            return null;</span>
+        }
+
+<span class="nc" id="L51">        String path = codeSource.getLocation().toExternalForm();</span>
+
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        if (path.endsWith(&quot;.jar&quot;) &amp;&amp; path.contains(&quot;/&quot;)) {</span>
+<span class="nc" id="L54">            return path.substring(path.lastIndexOf('/') + 1);</span>
+        }
+<span class="nc" id="L56">        return path;</span>
+    }
+
+    /**
+     * Get all non-static fields of the Class passed in or its super classes.
+     * &lt;p&gt;
+     *
+     * @param clazz Class to parse.
+     * @return field list
+     */
+    public static List&lt;Field&gt; getNonStaticFields(final Class&lt;?&gt; clazz) {
+<span class="nc" id="L67">        List&lt;Field&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L68">        Class&lt;?&gt; target = clazz;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        while (target != null) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (JaketConfigurationUtils.isExcludedType(target)) {</span>
+<span class="nc" id="L71">                break;</span>
+            }
+
+<span class="nc" id="L74">            Field[] fields = target.getDeclaredFields();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            for (Field field : fields) {</span>
+<span class="nc" id="L76">                int modifiers = field.getModifiers();</span>
+<span class="nc bnc" id="L77" title="All 4 branches missed.">                if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {</span>
+<span class="nc" id="L78">                    continue;</span>
+                }
+
+<span class="nc" id="L81">                result.add(field);</span>
+            }
+<span class="nc" id="L83">            target = target.getSuperclass();</span>
+<span class="nc" id="L84">        }</span>
+
+<span class="nc" id="L86">        return result;</span>
+    }
+
+    /**
+     * Get all public, non-static methods of the Class passed in.
+     * &lt;p&gt;
+     *
+     * @param clazz Class to parse.
+     * @return methods list
+     */
+    public static List&lt;Method&gt; getPublicNonStaticMethods(final Class&lt;?&gt; clazz) {
+<span class="nc" id="L97">        List&lt;Method&gt; result = new ArrayList&lt;Method&gt;();</span>
+
+<span class="nc" id="L99">        Method[] methods = clazz.getMethods();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc" id="L101">            int mod = method.getModifiers();</span>
+<span class="nc bnc" id="L102" title="All 4 branches missed.">            if (Modifier.isPublic(mod) &amp;&amp; !Modifier.isStatic(mod)) {</span>
+<span class="nc" id="L103">                result.add(method);</span>
+            }
+        }
+<span class="nc" id="L106">        return result;</span>
+    }
+
+    private ClassUtils() {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

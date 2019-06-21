@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GrizzlyCodecAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-grizzly</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.grizzly</a> &gt; <span class="el_source">GrizzlyCodecAdapter.java</span></div><h1>GrizzlyCodecAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.grizzly;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBuffers;
+import org.apache.dubbo.remoting.buffer.DynamicChannelBuffer;
+
+import org.glassfish.grizzly.Buffer;
+import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
+
+import java.io.IOException;
+
+/**
+ * GrizzlyCodecAdapter
+ */
+public class GrizzlyCodecAdapter extends BaseFilter {
+
+    private final Codec2 codec;
+
+    private final URL url;
+
+    private final ChannelHandler handler;
+
+    private final int bufferSize;
+
+<span class="nc" id="L49">    private ChannelBuffer previousData = ChannelBuffers.EMPTY_BUFFER;</span>
+
+<span class="nc" id="L51">    public GrizzlyCodecAdapter(Codec2 codec, URL url, ChannelHandler handler) {</span>
+<span class="nc" id="L52">        this.codec = codec;</span>
+<span class="nc" id="L53">        this.url = url;</span>
+<span class="nc" id="L54">        this.handler = handler;</span>
+<span class="nc" id="L55">        int b = url.getPositiveParameter(Constants.BUFFER_KEY, Constants.DEFAULT_BUFFER_SIZE);</span>
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        this.bufferSize = b &gt;= Constants.MIN_BUFFER_SIZE &amp;&amp; b &lt;= Constants.MAX_BUFFER_SIZE ? b : Constants.DEFAULT_BUFFER_SIZE;</span>
+<span class="nc" id="L57">    }</span>
+
+    @Override
+    public NextAction handleWrite(FilterChainContext context) throws IOException {
+<span class="nc" id="L61">        Connection&lt;?&gt; connection = context.getConnection();</span>
+<span class="nc" id="L62">        GrizzlyChannel channel = GrizzlyChannel.getOrAddChannel(connection, url, handler);</span>
+        try {
+<span class="nc" id="L64">            ChannelBuffer channelBuffer = ChannelBuffers.dynamicBuffer(1024); // Do not need to close</span>
+
+<span class="nc" id="L66">            Object msg = context.getMessage();</span>
+<span class="nc" id="L67">            codec.encode(channel, channelBuffer, msg);</span>
+
+<span class="nc" id="L69">            GrizzlyChannel.removeChannelIfDisconnected(connection);</span>
+<span class="nc" id="L70">            Buffer buffer = connection.getTransport().getMemoryManager().allocate(channelBuffer.readableBytes());</span>
+<span class="nc" id="L71">            buffer.put(channelBuffer.toByteBuffer());</span>
+<span class="nc" id="L72">            buffer.flip();</span>
+<span class="nc" id="L73">            buffer.allowBufferDispose(true);</span>
+<span class="nc" id="L74">            context.setMessage(buffer);</span>
+        } finally {
+<span class="nc" id="L76">            GrizzlyChannel.removeChannelIfDisconnected(connection);</span>
+        }
+<span class="nc" id="L78">        return context.getInvokeAction();</span>
+    }
+
+    @Override
+    public NextAction handleRead(FilterChainContext context) throws IOException {
+<span class="nc" id="L83">        Object message = context.getMessage();</span>
+<span class="nc" id="L84">        Connection&lt;?&gt; connection = context.getConnection();</span>
+<span class="nc" id="L85">        Channel channel = GrizzlyChannel.getOrAddChannel(connection, url, handler);</span>
+        try {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (message instanceof Buffer) { // receive a new packet</span>
+<span class="nc" id="L88">                Buffer grizzlyBuffer = (Buffer) message; // buffer</span>
+
+                ChannelBuffer frame;
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                if (previousData.readable()) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                    if (previousData instanceof DynamicChannelBuffer) {</span>
+<span class="nc" id="L94">                        previousData.writeBytes(grizzlyBuffer.toByteBuffer());</span>
+<span class="nc" id="L95">                        frame = previousData;</span>
+                    } else {
+<span class="nc" id="L97">                        int size = previousData.readableBytes() + grizzlyBuffer.remaining();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                        frame = ChannelBuffers.dynamicBuffer(size &gt; bufferSize ? size : bufferSize);</span>
+<span class="nc" id="L99">                        frame.writeBytes(previousData, previousData.readableBytes());</span>
+<span class="nc" id="L100">                        frame.writeBytes(grizzlyBuffer.toByteBuffer());</span>
+<span class="nc" id="L101">                    }</span>
+                } else {
+<span class="nc" id="L103">                    frame = ChannelBuffers.wrappedBuffer(grizzlyBuffer.toByteBuffer());</span>
+                }
+
+                Object msg;
+                int savedReadIndex;
+
+                do {
+<span class="nc" id="L110">                    savedReadIndex = frame.readerIndex();</span>
+                    try {
+<span class="nc" id="L112">                        msg = codec.decode(channel, frame);</span>
+<span class="nc" id="L113">                    } catch (Exception e) {</span>
+<span class="nc" id="L114">                        previousData = ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L115">                        throw new IOException(e.getMessage(), e);</span>
+<span class="nc" id="L116">                    }</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                    if (msg == Codec2.DecodeResult.NEED_MORE_INPUT) {</span>
+<span class="nc" id="L118">                        frame.readerIndex(savedReadIndex);</span>
+<span class="nc" id="L119">                        return context.getStopAction();</span>
+                    } else {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                        if (savedReadIndex == frame.readerIndex()) {</span>
+<span class="nc" id="L122">                            previousData = ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L123">                            throw new IOException(&quot;Decode without read data.&quot;);</span>
+                        }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                        if (msg != null) {</span>
+<span class="nc" id="L126">                            context.setMessage(msg);</span>
+<span class="nc" id="L127">                            return context.getInvokeAction();</span>
+                        } else {
+<span class="nc" id="L129">                            return context.getInvokeAction();</span>
+                        }
+                    }
+                } while (frame.readable());
+            } else { // Other events are passed down directly
+<span class="nc" id="L134">                return context.getInvokeAction();</span>
+            }
+        } finally {
+<span class="nc" id="L137">            GrizzlyChannel.removeChannelIfDisconnected(connection);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

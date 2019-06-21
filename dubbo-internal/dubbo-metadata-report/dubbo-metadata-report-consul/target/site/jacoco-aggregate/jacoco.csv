@@ -1,0 +1,9 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.SaveProperties,15,0,0,0,5,0,2,0,2,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport,746,0,64,0,141,0,50,0,18,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry.new Runnable() {...},61,0,6,0,11,0,5,0,2,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReportFactory,73,0,4,0,16,0,5,0,3,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry,73,0,4,0,17,0,5,0,3,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier,223,0,12,0,41,0,24,0,18,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier.KeyTypeEnum,24,0,0,0,2,0,1,0,1,0
+dubbo-metadata-report-consul/dubbo-metadata-report-api,org.apache.dubbo.metadata.integration,MetadataReportService,209,0,10,0,41,0,10,0,5,0

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Request.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange</a> &gt; <span class="el_source">Request.java</span></div><h1>Request.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange;
+
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Request.
+ */
+public class Request {
+
+<span class="nc" id="L28">    public static final String HEARTBEAT_EVENT = null;</span>
+
+    public static final String READONLY_EVENT = &quot;R&quot;;
+
+<span class="nc" id="L32">    private static final AtomicLong INVOKE_ID = new AtomicLong(0);</span>
+
+    private final long mId;
+
+    private String mVersion;
+
+<span class="nc" id="L38">    private boolean mTwoWay = true;</span>
+
+<span class="nc" id="L40">    private boolean mEvent = false;</span>
+
+<span class="nc" id="L42">    private boolean mBroken = false;</span>
+
+    private Object mData;
+
+<span class="nc" id="L46">    public Request() {</span>
+<span class="nc" id="L47">        mId = newId();</span>
+<span class="nc" id="L48">    }</span>
+
+<span class="nc" id="L50">    public Request(long id) {</span>
+<span class="nc" id="L51">        mId = id;</span>
+<span class="nc" id="L52">    }</span>
+
+    private static long newId() {
+        // getAndIncrement() When it grows to MAX_VALUE, it will grow to MIN_VALUE, and the negative can be used as ID
+<span class="nc" id="L56">        return INVOKE_ID.getAndIncrement();</span>
+    }
+
+    private static String safeToString(Object data) {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L61">            return null;</span>
+        }
+        String dataStr;
+        try {
+<span class="nc" id="L65">            dataStr = data.toString();</span>
+<span class="nc" id="L66">        } catch (Throwable e) {</span>
+<span class="nc" id="L67">            dataStr = &quot;&lt;Fail toString of &quot; + data.getClass() + &quot;, cause: &quot; +</span>
+<span class="nc" id="L68">                    StringUtils.toString(e) + &quot;&gt;&quot;;</span>
+<span class="nc" id="L69">        }</span>
+<span class="nc" id="L70">        return dataStr;</span>
+    }
+
+    public long getId() {
+<span class="nc" id="L74">        return mId;</span>
+    }
+
+    public String getVersion() {
+<span class="nc" id="L78">        return mVersion;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L82">        mVersion = version;</span>
+<span class="nc" id="L83">    }</span>
+
+    public boolean isTwoWay() {
+<span class="nc" id="L86">        return mTwoWay;</span>
+    }
+
+    public void setTwoWay(boolean twoWay) {
+<span class="nc" id="L90">        mTwoWay = twoWay;</span>
+<span class="nc" id="L91">    }</span>
+
+    public boolean isEvent() {
+<span class="nc" id="L94">        return mEvent;</span>
+    }
+
+    public void setEvent(String event) {
+<span class="nc" id="L98">        this.mEvent = true;</span>
+<span class="nc" id="L99">        this.mData = event;</span>
+<span class="nc" id="L100">    }</span>
+
+    public void setEvent(boolean mEvent) {
+<span class="nc" id="L103">        this.mEvent = mEvent;</span>
+<span class="nc" id="L104">    }</span>
+
+    public boolean isBroken() {
+<span class="nc" id="L107">        return mBroken;</span>
+    }
+
+    public void setBroken(boolean mBroken) {
+<span class="nc" id="L111">        this.mBroken = mBroken;</span>
+<span class="nc" id="L112">    }</span>
+
+    public Object getData() {
+<span class="nc" id="L115">        return mData;</span>
+    }
+
+    public void setData(Object msg) {
+<span class="nc" id="L119">        mData = msg;</span>
+<span class="nc" id="L120">    }</span>
+
+    public boolean isHeartbeat() {
+<span class="nc bnc" id="L123" title="All 4 branches missed.">        return mEvent &amp;&amp; HEARTBEAT_EVENT == mData;</span>
+    }
+
+    public void setHeartbeat(boolean isHeartbeat) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (isHeartbeat) {</span>
+<span class="nc" id="L128">            setEvent(HEARTBEAT_EVENT);</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L134">        return &quot;Request [id=&quot; + mId + &quot;, version=&quot; + mVersion + &quot;, twoway=&quot; + mTwoWay + &quot;, event=&quot; + mEvent</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                + &quot;, broken=&quot; + mBroken + &quot;, data=&quot; + (mData == this ? &quot;this&quot; : safeToString(mData)) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,772 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RpcContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc</a> &gt; <span class="el_source">RpcContext.java</span></div><h1>RpcContext.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.threadlocal.InternalThreadLocal;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+
+/**
+ * Thread local context. (API, ThreadLocal, ThreadSafe)
+ * &lt;p&gt;
+ * Note: RpcContext is a temporary state holder. States in RpcContext changes every time when request is sent or received.
+ * For example: A invokes B, then B invokes C. On service B, RpcContext saves invocation info from A to B before B
+ * starts invoking C, and saves invocation info from B to C after B invokes C.
+ *
+ * @export
+ * @see org.apache.dubbo.rpc.filter.ContextFilter
+ */
+public class RpcContext {
+
+    /**
+     * use internal thread local to improve performance
+     */
+    // FIXME REQUEST_CONTEXT
+<span class="nc" id="L56">    private static final InternalThreadLocal&lt;RpcContext&gt; LOCAL = new InternalThreadLocal&lt;RpcContext&gt;() {</span>
+        @Override
+        protected RpcContext initialValue() {
+<span class="nc" id="L59">            return new RpcContext();</span>
+        }
+    };
+
+    // FIXME RESPONSE_CONTEXT
+<span class="nc" id="L64">    private static final InternalThreadLocal&lt;RpcContext&gt; SERVER_LOCAL = new InternalThreadLocal&lt;RpcContext&gt;() {</span>
+        @Override
+        protected RpcContext initialValue() {
+<span class="nc" id="L67">            return new RpcContext();</span>
+        }
+    };
+
+<span class="nc" id="L71">    private final Map&lt;String, String&gt; attachments = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L72">    private final Map&lt;String, Object&gt; values = new HashMap&lt;String, Object&gt;();</span>
+    private Future&lt;?&gt; future;
+
+    private List&lt;URL&gt; urls;
+
+    private URL url;
+
+    private String methodName;
+
+    private Class&lt;?&gt;[] parameterTypes;
+
+    private Object[] arguments;
+
+    private InetSocketAddress localAddress;
+
+    private InetSocketAddress remoteAddress;
+
+    private String remoteApplicationName;
+
+    @Deprecated
+    private List&lt;Invoker&lt;?&gt;&gt; invokers;
+    @Deprecated
+    private Invoker&lt;?&gt; invoker;
+    @Deprecated
+    private Invocation invocation;
+
+    // now we don't use the 'values' map to hold these objects
+    // we want these objects to be as generic as possible
+    private Object request;
+    private Object response;
+    private AsyncContext asyncContext;
+
+<span class="nc" id="L104">    protected RpcContext() {</span>
+<span class="nc" id="L105">    }</span>
+
+    /**
+     * get server side context.
+     *
+     * @return server context
+     */
+    public static RpcContext getServerContext() {
+<span class="nc" id="L113">        return SERVER_LOCAL.get();</span>
+    }
+
+    public static void restoreServerContext(RpcContext oldServerContext) {
+<span class="nc" id="L117">        SERVER_LOCAL.set(oldServerContext);</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * remove server side context.
+     *
+     * @see org.apache.dubbo.rpc.filter.ContextFilter
+     */
+    public static void removeServerContext() {
+<span class="nc" id="L126">        SERVER_LOCAL.remove();</span>
+<span class="nc" id="L127">    }</span>
+
+    /**
+     * get context.
+     *
+     * @return context
+     */
+    public static RpcContext getContext() {
+<span class="nc" id="L135">        return LOCAL.get();</span>
+    }
+
+    public static void restoreContext(RpcContext oldContext) {
+<span class="nc" id="L139">        LOCAL.set(oldContext);</span>
+<span class="nc" id="L140">    }</span>
+
+
+    public RpcContext copyOf() {
+<span class="nc" id="L144">        RpcContext copy = new RpcContext();</span>
+<span class="nc" id="L145">        copy.attachments.putAll(this.attachments);</span>
+<span class="nc" id="L146">        copy.values.putAll(this.values);</span>
+<span class="nc" id="L147">        copy.future = this.future;</span>
+<span class="nc" id="L148">        copy.urls = this.urls;</span>
+<span class="nc" id="L149">        copy.url = this.url;</span>
+<span class="nc" id="L150">        copy.methodName = this.methodName;</span>
+<span class="nc" id="L151">        copy.parameterTypes = this.parameterTypes;</span>
+<span class="nc" id="L152">        copy.arguments = this.arguments;</span>
+<span class="nc" id="L153">        copy.localAddress = this.localAddress;</span>
+<span class="nc" id="L154">        copy.remoteAddress = this.remoteAddress;</span>
+<span class="nc" id="L155">        copy.remoteApplicationName = this.remoteApplicationName;</span>
+<span class="nc" id="L156">        copy.invokers = this.invokers;</span>
+<span class="nc" id="L157">        copy.invoker = this.invoker;</span>
+<span class="nc" id="L158">        copy.invocation = this.invocation;</span>
+
+<span class="nc" id="L160">        copy.request = this.request;</span>
+<span class="nc" id="L161">        copy.response = this.response;</span>
+<span class="nc" id="L162">        copy.asyncContext = this.asyncContext;</span>
+
+<span class="nc" id="L164">        return copy;</span>
+    }
+
+
+    /**
+     * remove context.
+     *
+     * @see org.apache.dubbo.rpc.filter.ContextFilter
+     */
+    public static void removeContext() {
+<span class="nc" id="L174">        LOCAL.remove();</span>
+<span class="nc" id="L175">    }</span>
+
+    /**
+     * Get the request object of the underlying RPC protocol, e.g. HttpServletRequest
+     *
+     * @return null if the underlying protocol doesn't provide support for getting request
+     */
+    public Object getRequest() {
+<span class="nc" id="L183">        return request;</span>
+    }
+
+    public void setRequest(Object request) {
+<span class="nc" id="L187">        this.request = request;</span>
+<span class="nc" id="L188">    }</span>
+
+    /**
+     * Get the request object of the underlying RPC protocol, e.g. HttpServletRequest
+     *
+     * @return null if the underlying protocol doesn't provide support for getting request or the request is not of the specified type
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T getRequest(Class&lt;T&gt; clazz) {
+<span class="nc bnc" id="L197" title="All 4 branches missed.">        return (request != null &amp;&amp; clazz.isAssignableFrom(request.getClass())) ? (T) request : null;</span>
+    }
+
+    /**
+     * Get the response object of the underlying RPC protocol, e.g. HttpServletResponse
+     *
+     * @return null if the underlying protocol doesn't provide support for getting response
+     */
+    public Object getResponse() {
+<span class="nc" id="L206">        return response;</span>
+    }
+
+    public void setResponse(Object response) {
+<span class="nc" id="L210">        this.response = response;</span>
+<span class="nc" id="L211">    }</span>
+
+    /**
+     * Get the response object of the underlying RPC protocol, e.g. HttpServletResponse
+     *
+     * @return null if the underlying protocol doesn't provide support for getting response or the response is not of the specified type
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T getResponse(Class&lt;T&gt; clazz) {
+<span class="nc bnc" id="L220" title="All 4 branches missed.">        return (response != null &amp;&amp; clazz.isAssignableFrom(response.getClass())) ? (T) response : null;</span>
+    }
+
+    /**
+     * is provider side.
+     *
+     * @return provider side.
+     */
+    public boolean isProviderSide() {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        return !isConsumerSide();</span>
+    }
+
+    /**
+     * is consumer side.
+     *
+     * @return consumer side.
+     */
+    public boolean isConsumerSide() {
+<span class="nc" id="L238">        return getUrl().getParameter(Constants.SIDE_KEY, Constants.PROVIDER_SIDE).equals(Constants.CONSUMER_SIDE);</span>
+    }
+
+    /**
+     * get CompletableFuture.
+     *
+     * @param &lt;T&gt;
+     * @return future
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; CompletableFuture&lt;T&gt; getCompletableFuture() {
+<span class="nc" id="L249">        return (CompletableFuture&lt;T&gt;) future;</span>
+    }
+
+    /**
+     * get future.
+     *
+     * @param &lt;T&gt;
+     * @return future
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; Future&lt;T&gt; getFuture() {
+<span class="nc" id="L260">        return (Future&lt;T&gt;) future;</span>
+    }
+
+    /**
+     * set future.
+     *
+     * @param future
+     */
+    public void setFuture(Future&lt;?&gt; future) {
+<span class="nc" id="L269">        this.future = future;</span>
+<span class="nc" id="L270">    }</span>
+
+    public List&lt;URL&gt; getUrls() {
+<span class="nc bnc" id="L273" title="All 4 branches missed.">        return urls == null &amp;&amp; url != null ? (List&lt;URL&gt;) Arrays.asList(url) : urls;</span>
+    }
+
+    public void setUrls(List&lt;URL&gt; urls) {
+<span class="nc" id="L277">        this.urls = urls;</span>
+<span class="nc" id="L278">    }</span>
+
+    public URL getUrl() {
+<span class="nc" id="L281">        return url;</span>
+    }
+
+    public void setUrl(URL url) {
+<span class="nc" id="L285">        this.url = url;</span>
+<span class="nc" id="L286">    }</span>
+
+    /**
+     * get method name.
+     *
+     * @return method name.
+     */
+    public String getMethodName() {
+<span class="nc" id="L294">        return methodName;</span>
+    }
+
+    public void setMethodName(String methodName) {
+<span class="nc" id="L298">        this.methodName = methodName;</span>
+<span class="nc" id="L299">    }</span>
+
+    /**
+     * get parameter types.
+     *
+     * @serial
+     */
+    public Class&lt;?&gt;[] getParameterTypes() {
+<span class="nc" id="L307">        return parameterTypes;</span>
+    }
+
+    public void setParameterTypes(Class&lt;?&gt;[] parameterTypes) {
+<span class="nc" id="L311">        this.parameterTypes = parameterTypes;</span>
+<span class="nc" id="L312">    }</span>
+
+    /**
+     * get arguments.
+     *
+     * @return arguments.
+     */
+    public Object[] getArguments() {
+<span class="nc" id="L320">        return arguments;</span>
+    }
+
+    public void setArguments(Object[] arguments) {
+<span class="nc" id="L324">        this.arguments = arguments;</span>
+<span class="nc" id="L325">    }</span>
+
+    /**
+     * set local address.
+     *
+     * @param host
+     * @param port
+     * @return context
+     */
+    public RpcContext setLocalAddress(String host, int port) {
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (port &lt; 0) {</span>
+<span class="nc" id="L336">            port = 0;</span>
+        }
+<span class="nc" id="L338">        this.localAddress = InetSocketAddress.createUnresolved(host, port);</span>
+<span class="nc" id="L339">        return this;</span>
+    }
+
+    /**
+     * get local address.
+     *
+     * @return local address
+     */
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L348">        return localAddress;</span>
+    }
+
+    /**
+     * set local address.
+     *
+     * @param address
+     * @return context
+     */
+    public RpcContext setLocalAddress(InetSocketAddress address) {
+<span class="nc" id="L358">        this.localAddress = address;</span>
+<span class="nc" id="L359">        return this;</span>
+    }
+
+    public String getLocalAddressString() {
+<span class="nc" id="L363">        return getLocalHost() + &quot;:&quot; + getLocalPort();</span>
+    }
+
+    /**
+     * get local host name.
+     *
+     * @return local host name
+     */
+    public String getLocalHostName() {
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        String host = localAddress == null ? null : localAddress.getHostName();</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (StringUtils.isEmpty(host)) {</span>
+<span class="nc" id="L374">            return getLocalHost();</span>
+        }
+<span class="nc" id="L376">        return host;</span>
+    }
+
+    /**
+     * set remote address.
+     *
+     * @param host
+     * @param port
+     * @return context
+     */
+    public RpcContext setRemoteAddress(String host, int port) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (port &lt; 0) {</span>
+<span class="nc" id="L388">            port = 0;</span>
+        }
+<span class="nc" id="L390">        this.remoteAddress = InetSocketAddress.createUnresolved(host, port);</span>
+<span class="nc" id="L391">        return this;</span>
+    }
+
+    /**
+     * get remote address.
+     *
+     * @return remote address
+     */
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L400">        return remoteAddress;</span>
+    }
+
+    /**
+     * set remote address.
+     *
+     * @param address
+     * @return context
+     */
+    public RpcContext setRemoteAddress(InetSocketAddress address) {
+<span class="nc" id="L410">        this.remoteAddress = address;</span>
+<span class="nc" id="L411">        return this;</span>
+    }
+
+    public String getRemoteApplicationName() {
+<span class="nc" id="L415">        return remoteApplicationName;</span>
+    }
+
+    public RpcContext setRemoteApplicationName(String remoteApplicationName) {
+<span class="nc" id="L419">        this.remoteApplicationName = remoteApplicationName;</span>
+<span class="nc" id="L420">        return this;</span>
+    }
+
+    /**
+     * get remote address string.
+     *
+     * @return remote address string.
+     */
+    public String getRemoteAddressString() {
+<span class="nc" id="L429">        return getRemoteHost() + &quot;:&quot; + getRemotePort();</span>
+    }
+
+    /**
+     * get remote host name.
+     *
+     * @return remote host name
+     */
+    public String getRemoteHostName() {
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        return remoteAddress == null ? null : remoteAddress.getHostName();</span>
+    }
+
+    /**
+     * get local host.
+     *
+     * @return local host
+     */
+    public String getLocalHost() {
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        String host = localAddress == null ? null :</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                localAddress.getAddress() == null ? localAddress.getHostName()</span>
+<span class="nc" id="L449">                        : NetUtils.filterLocalHost(localAddress.getAddress().getHostAddress());</span>
+<span class="nc bnc" id="L450" title="All 4 branches missed.">        if (host == null || host.length() == 0) {</span>
+<span class="nc" id="L451">            return NetUtils.getLocalHost();</span>
+        }
+<span class="nc" id="L453">        return host;</span>
+    }
+
+    /**
+     * get local port.
+     *
+     * @return port
+     */
+    public int getLocalPort() {
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        return localAddress == null ? 0 : localAddress.getPort();</span>
+    }
+
+    /**
+     * get remote host.
+     *
+     * @return remote host
+     */
+    public String getRemoteHost() {
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        return remoteAddress == null ? null :</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                remoteAddress.getAddress() == null ? remoteAddress.getHostName()</span>
+<span class="nc" id="L473">                        : NetUtils.filterLocalHost(remoteAddress.getAddress().getHostAddress());</span>
+    }
+
+    /**
+     * get remote port.
+     *
+     * @return remote port
+     */
+    public int getRemotePort() {
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        return remoteAddress == null ? 0 : remoteAddress.getPort();</span>
+    }
+
+    /**
+     * get attachment.
+     *
+     * @param key
+     * @return attachment
+     */
+    public String getAttachment(String key) {
+<span class="nc" id="L492">        return attachments.get(key);</span>
+    }
+
+    /**
+     * set attachment.
+     *
+     * @param key
+     * @param value
+     * @return context
+     */
+    public RpcContext setAttachment(String key, String value) {
+<span class="nc bnc" id="L503" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L504">            attachments.remove(key);</span>
+        } else {
+<span class="nc" id="L506">            attachments.put(key, value);</span>
+        }
+<span class="nc" id="L508">        return this;</span>
+    }
+
+    /**
+     * remove attachment.
+     *
+     * @param key
+     * @return context
+     */
+    public RpcContext removeAttachment(String key) {
+<span class="nc" id="L518">        attachments.remove(key);</span>
+<span class="nc" id="L519">        return this;</span>
+    }
+
+    /**
+     * get attachments.
+     *
+     * @return attachments
+     */
+    public Map&lt;String, String&gt; getAttachments() {
+<span class="nc" id="L528">        return attachments;</span>
+    }
+
+    /**
+     * set attachments
+     *
+     * @param attachment
+     * @return context
+     */
+    public RpcContext setAttachments(Map&lt;String, String&gt; attachment) {
+<span class="nc" id="L538">        this.attachments.clear();</span>
+<span class="nc bnc" id="L539" title="All 4 branches missed.">        if (attachment != null &amp;&amp; attachment.size() &gt; 0) {</span>
+<span class="nc" id="L540">            this.attachments.putAll(attachment);</span>
+        }
+<span class="nc" id="L542">        return this;</span>
+    }
+
+    public void clearAttachments() {
+<span class="nc" id="L546">        this.attachments.clear();</span>
+<span class="nc" id="L547">    }</span>
+
+    /**
+     * get values.
+     *
+     * @return values
+     */
+    public Map&lt;String, Object&gt; get() {
+<span class="nc" id="L555">        return values;</span>
+    }
+
+    /**
+     * set value.
+     *
+     * @param key
+     * @param value
+     * @return context
+     */
+    public RpcContext set(String key, Object value) {
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L567">            values.remove(key);</span>
+        } else {
+<span class="nc" id="L569">            values.put(key, value);</span>
+        }
+<span class="nc" id="L571">        return this;</span>
+    }
+
+    /**
+     * remove value.
+     *
+     * @param key
+     * @return value
+     */
+    public RpcContext remove(String key) {
+<span class="nc" id="L581">        values.remove(key);</span>
+<span class="nc" id="L582">        return this;</span>
+    }
+
+    /**
+     * get value.
+     *
+     * @param key
+     * @return value
+     */
+    public Object get(String key) {
+<span class="nc" id="L592">        return values.get(key);</span>
+    }
+
+    /**
+     * @deprecated Replace to isProviderSide()
+     */
+    @Deprecated
+    public boolean isServerSide() {
+<span class="nc" id="L600">        return isProviderSide();</span>
+    }
+
+    /**
+     * @deprecated Replace to isConsumerSide()
+     */
+    @Deprecated
+    public boolean isClientSide() {
+<span class="nc" id="L608">        return isConsumerSide();</span>
+    }
+
+    /**
+     * @deprecated Replace to getUrls()
+     */
+    @Deprecated
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    public List&lt;Invoker&lt;?&gt;&gt; getInvokers() {
+<span class="nc bnc" id="L617" title="All 4 branches missed.">        return invokers == null &amp;&amp; invoker != null ? (List) Arrays.asList(invoker) : invokers;</span>
+    }
+
+    public RpcContext setInvokers(List&lt;Invoker&lt;?&gt;&gt; invokers) {
+<span class="nc" id="L621">        this.invokers = invokers;</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(invokers)) {</span>
+<span class="nc" id="L623">            List&lt;URL&gt; urls = new ArrayList&lt;URL&gt;(invokers.size());</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">            for (Invoker&lt;?&gt; invoker : invokers) {</span>
+<span class="nc" id="L625">                urls.add(invoker.getUrl());</span>
+<span class="nc" id="L626">            }</span>
+<span class="nc" id="L627">            setUrls(urls);</span>
+        }
+<span class="nc" id="L629">        return this;</span>
+    }
+
+    /**
+     * @deprecated Replace to getUrl()
+     */
+    @Deprecated
+    public Invoker&lt;?&gt; getInvoker() {
+<span class="nc" id="L637">        return invoker;</span>
+    }
+
+    public RpcContext setInvoker(Invoker&lt;?&gt; invoker) {
+<span class="nc" id="L641">        this.invoker = invoker;</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">        if (invoker != null) {</span>
+<span class="nc" id="L643">            setUrl(invoker.getUrl());</span>
+        }
+<span class="nc" id="L645">        return this;</span>
+    }
+
+    /**
+     * @deprecated Replace to getMethodName(), getParameterTypes(), getArguments()
+     */
+    @Deprecated
+    public Invocation getInvocation() {
+<span class="nc" id="L653">        return invocation;</span>
+    }
+
+    public RpcContext setInvocation(Invocation invocation) {
+<span class="nc" id="L657">        this.invocation = invocation;</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">        if (invocation != null) {</span>
+<span class="nc" id="L659">            setMethodName(invocation.getMethodName());</span>
+<span class="nc" id="L660">            setParameterTypes(invocation.getParameterTypes());</span>
+<span class="nc" id="L661">            setArguments(invocation.getArguments());</span>
+        }
+<span class="nc" id="L663">        return this;</span>
+    }
+
+    /**
+     * Async invocation. Timeout will be handled even if &lt;code&gt;Future.get()&lt;/code&gt; is not called.
+     *
+     * @param callable
+     * @return get the return result from &lt;code&gt;future.get()&lt;/code&gt;
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; CompletableFuture&lt;T&gt; asyncCall(Callable&lt;T&gt; callable) {
+        try {
+            try {
+<span class="nc" id="L676">                setAttachment(Constants.ASYNC_KEY, Boolean.TRUE.toString());</span>
+<span class="nc" id="L677">                final T o = callable.call();</span>
+                //local invoke will return directly
+<span class="nc bnc" id="L679" title="All 2 branches missed.">                if (o != null) {</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                    if (o instanceof CompletableFuture) {</span>
+<span class="nc" id="L681">                        return (CompletableFuture&lt;T&gt;) o;</span>
+                    }
+<span class="nc" id="L683">                    return CompletableFuture.completedFuture(o);</span>
+                } else {
+                    // The service has a normal sync method signature, should get future from RpcContext.
+                }
+<span class="nc" id="L687">            } catch (Exception e) {</span>
+<span class="nc" id="L688">                throw new RpcException(e);</span>
+            } finally {
+<span class="nc" id="L690">                removeAttachment(Constants.ASYNC_KEY);</span>
+            }
+<span class="nc" id="L692">        } catch (final RpcException e) {</span>
+<span class="nc" id="L693">            return new CompletableFuture&lt;T&gt;() {</span>
+                @Override
+                public boolean cancel(boolean mayInterruptIfRunning) {
+<span class="nc" id="L696">                    return false;</span>
+                }
+
+                @Override
+                public boolean isCancelled() {
+<span class="nc" id="L701">                    return false;</span>
+                }
+
+                @Override
+                public boolean isDone() {
+<span class="nc" id="L706">                    return true;</span>
+                }
+
+                @Override
+                public T get() throws InterruptedException, ExecutionException {
+<span class="nc" id="L711">                    throw new ExecutionException(e.getCause());</span>
+                }
+
+                @Override
+                public T get(long timeout, TimeUnit unit)
+                        throws InterruptedException, ExecutionException,
+                        TimeoutException {
+<span class="nc" id="L718">                    return get();</span>
+                }
+            };
+<span class="nc" id="L721">        }</span>
+<span class="nc" id="L722">        return ((CompletableFuture&lt;T&gt;) getContext().getFuture());</span>
+    }
+
+    /**
+     * one way async call, send request only, and result is not required
+     *
+     * @param runnable
+     */
+    public void asyncCall(Runnable runnable) {
+        try {
+<span class="nc" id="L732">            setAttachment(Constants.RETURN_KEY, Boolean.FALSE.toString());</span>
+<span class="nc" id="L733">            runnable.run();</span>
+<span class="nc" id="L734">        } catch (Throwable e) {</span>
+            // FIXME should put exception in future?
+<span class="nc" id="L736">            throw new RpcException(&quot;oneway call error .&quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L738">            removeAttachment(Constants.RETURN_KEY);</span>
+        }
+<span class="nc" id="L740">    }</span>
+
+    /**
+     * @return
+     * @throws IllegalStateException
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static AsyncContext startAsync() throws IllegalStateException {
+<span class="nc" id="L748">        RpcContext currentContext = getContext();</span>
+<span class="nc bnc" id="L749" title="All 2 branches missed.">        if (currentContext.asyncContext == null) {</span>
+<span class="nc" id="L750">            currentContext.asyncContext = new AsyncContextImpl();</span>
+        }
+<span class="nc" id="L752">        currentContext.asyncContext.start();</span>
+<span class="nc" id="L753">        return currentContext.asyncContext;</span>
+    }
+
+    public boolean isAsyncStarted() {
+<span class="nc bnc" id="L757" title="All 2 branches missed.">        if (this.asyncContext == null) {</span>
+<span class="nc" id="L758">            return false;</span>
+        }
+<span class="nc" id="L760">        return asyncContext.isAsyncStarted();</span>
+    }
+
+    public boolean stopAsync() {
+<span class="nc" id="L764">        return asyncContext.stop();</span>
+    }
+
+    public AsyncContext getAsyncContext() {
+<span class="nc" id="L768">        return asyncContext;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

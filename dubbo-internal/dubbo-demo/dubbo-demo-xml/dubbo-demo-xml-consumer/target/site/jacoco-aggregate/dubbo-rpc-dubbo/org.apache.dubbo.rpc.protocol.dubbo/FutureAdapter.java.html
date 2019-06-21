@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FutureAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">FutureAdapter.java</span></div><h1>FutureAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.remoting.exchange.ResponseCallback;
+import org.apache.dubbo.remoting.exchange.ResponseFuture;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * FutureAdapter
+ */
+public class FutureAdapter&lt;V&gt; extends CompletableFuture&lt;V&gt; {
+
+    private final ResponseFuture future;
+    private CompletableFuture&lt;Result&gt; resultFuture;
+
+<span class="nc" id="L38">    public FutureAdapter(ResponseFuture future) {</span>
+<span class="nc" id="L39">        this.future = future;</span>
+<span class="nc" id="L40">        this.resultFuture = new CompletableFuture&lt;&gt;();</span>
+<span class="nc" id="L41">        future.setCallback(new ResponseCallback() {</span>
+            @Override
+            public void done(Object response) {
+<span class="nc" id="L44">                Result result = (Result) response;</span>
+<span class="nc" id="L45">                FutureAdapter.this.resultFuture.complete(result);</span>
+<span class="nc" id="L46">                V value = null;</span>
+                try {
+<span class="nc" id="L48">                    value = (V) result.recreate();</span>
+<span class="nc" id="L49">                } catch (Throwable t) {</span>
+<span class="nc" id="L50">                    FutureAdapter.this.completeExceptionally(t);</span>
+<span class="nc" id="L51">                }</span>
+<span class="nc" id="L52">                FutureAdapter.this.complete(value);</span>
+<span class="nc" id="L53">            }</span>
+
+            @Override
+            public void caught(Throwable exception) {
+<span class="nc" id="L57">                RpcResult result = new RpcResult();</span>
+<span class="nc" id="L58">                result.setException(exception);</span>
+<span class="nc" id="L59">                FutureAdapter.this.resultFuture.complete(result);</span>
+<span class="nc" id="L60">                FutureAdapter.this.completeExceptionally(exception);</span>
+<span class="nc" id="L61">            }</span>
+        });
+<span class="nc" id="L63">    }</span>
+
+    public ResponseFuture getFuture() {
+<span class="nc" id="L66">        return future;</span>
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+<span class="nc" id="L71">        return false;</span>
+    }
+
+    @Override
+    public boolean isCancelled() {
+<span class="nc" id="L76">        return false;</span>
+    }
+
+    @Override
+    public boolean isDone() {
+<span class="nc" id="L81">        return super.isDone();</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public V get() throws InterruptedException, ExecutionException {
+        try {
+<span class="nc" id="L88">            return super.get();</span>
+<span class="nc" id="L89">        } catch (ExecutionException | InterruptedException e) {</span>
+<span class="nc" id="L90">            throw e;</span>
+<span class="nc" id="L91">        } catch (Throwable e) {</span>
+<span class="nc" id="L92">            throw new RpcException(e);</span>
+        }
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        try {
+<span class="nc" id="L100">            return super.get(timeout, unit);</span>
+<span class="nc" id="L101">        } catch (TimeoutException | ExecutionException | InterruptedException e) {</span>
+<span class="nc" id="L102">            throw e;</span>
+<span class="nc" id="L103">        } catch (Throwable e) {</span>
+<span class="nc" id="L104">            throw new RpcException(e);</span>
+        }
+    }
+
+    /**
+     * FIXME
+     * This method has no need open to the the end user.
+     * Mostly user use RpcContext.getFuture() to refer the instance of this class, so the user will get a CompletableFuture, this method will rarely be noticed.
+     *
+     * @return
+     */
+    public CompletableFuture&lt;Result&gt; getResultFuture() {
+<span class="nc" id="L116">        return resultFuture;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

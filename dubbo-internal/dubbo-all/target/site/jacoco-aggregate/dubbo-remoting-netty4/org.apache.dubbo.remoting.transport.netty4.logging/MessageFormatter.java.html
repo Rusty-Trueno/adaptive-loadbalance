@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MessageFormatter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4.logging</a> &gt; <span class="el_source">MessageFormatter.java</span></div><h1>MessageFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4.logging;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
+
+import java.text.MessageFormat;
+import java.util.HashMap;
+import java.util.Map;
+
+// contributors: lizongbo: proposed special treatment of array parameter values
+// Joern Huxhorn: pointed out double[] omission, suggested deep array copy
+
+/**
+ * Formats messages according to very simple substitution rules. Substitutions
+ * can be made 1, 2 or more arguments.
+ * &lt;p/&gt;
+ * &lt;p/&gt;
+ * For example,
+ * &lt;p/&gt;
+ * &lt;pre&gt;
+ * MessageFormatter.format(&amp;quot;Hi {}.&amp;quot;, &amp;quot;there&amp;quot;)
+ * &lt;/pre&gt;
+ * &lt;p/&gt;
+ * will return the string &quot;Hi there.&quot;.
+ * &lt;p/&gt;
+ * The {} pair is called the &lt;em&gt;formatting anchor&lt;/em&gt;. It serves to designate
+ * the location where arguments need to be substituted within the message
+ * pattern.
+ * &lt;p/&gt;
+ * In case your message contains the '{' or the '}' character, you do not have
+ * to do anything special unless the '}' character immediately follows '{'. For
+ * example,
+ * &lt;p/&gt;
+ * &lt;pre&gt;
+ * MessageFormatter.format(&amp;quot;Set {1,2,3} is not equal to {}.&amp;quot;, &amp;quot;1,2&amp;quot;);
+ * &lt;/pre&gt;
+ * &lt;p/&gt;
+ * will return the string &quot;Set {1,2,3} is not equal to 1,2.&quot;.
+ * &lt;p/&gt;
+ * &lt;p/&gt;
+ * If for whatever reason you need to place the string &quot;{}&quot; in the message
+ * without its &lt;em&gt;formatting anchor&lt;/em&gt; meaning, then you need to escape the
+ * '{' character with '\', that is the backslash character. Only the '{'
+ * character should be escaped. There is no need to escape the '}' character.
+ * For example,
+ * &lt;p/&gt;
+ * &lt;pre&gt;
+ * MessageFormatter.format(&amp;quot;Set \\{} is not equal to {}.&amp;quot;, &amp;quot;1,2&amp;quot;);
+ * &lt;/pre&gt;
+ * &lt;p/&gt;
+ * will return the string &quot;Set {} is not equal to 1,2.&quot;.
+ * &lt;p/&gt;
+ * &lt;p/&gt;
+ * The escaping behavior just described can be overridden by escaping the escape
+ * character '\'. Calling
+ * &lt;p/&gt;
+ * &lt;pre&gt;
+ * MessageFormatter.format(&amp;quot;File name is C:\\\\{}.&amp;quot;, &amp;quot;file.zip&amp;quot;);
+ * &lt;/pre&gt;
+ * &lt;p/&gt;
+ * will return the string &quot;File name is C:\file.zip&quot;.
+ * &lt;p/&gt;
+ * &lt;p/&gt;
+ * The formatting conventions are different than those of {@link MessageFormat}
+ * which ships with the Java platform. This is justified by the fact that
+ * SLF4J's implementation is 10 times faster than that of {@link MessageFormat}.
+ * This local performance difference is both measurable and significant in the
+ * larger context of the complete logging processing chain.
+ * &lt;p/&gt;
+ * &lt;p/&gt;
+ * See also {@link #format(String, Object)},
+ * {@link #format(String, Object, Object)} and
+ * {@link #arrayFormat(String, Object[])} methods for more details.
+ */
+final class MessageFormatter {
+<span class="nc" id="L93">    private static final Logger logger = LoggerFactory.getLogger(MessageFormatter.class);</span>
+    static final char DELIM_START = '{';
+    static final char DELIM_STOP = '}';
+    static final String DELIM_STR = &quot;{}&quot;;
+    private static final char ESCAPE_CHAR = '\\';
+
+    /**
+     * Performs single argument substitution for the 'messagePattern' passed as
+     * parameter.
+     * &lt;p/&gt;
+     * For example,
+     * &lt;p/&gt;
+     * &lt;pre&gt;
+     * MessageFormatter.format(&amp;quot;Hi {}.&amp;quot;, &amp;quot;there&amp;quot;);
+     * &lt;/pre&gt;
+     * &lt;p/&gt;
+     * will return the string &quot;Hi there.&quot;.
+     * &lt;p/&gt;
+     *
+     * @param messagePattern The message pattern which will be parsed and formatted
+     * @param arg            The argument to be substituted in place of the formatting anchor
+     * @return The formatted message
+     */
+    static FormattingTuple format(String messagePattern, Object arg) {
+<span class="nc" id="L117">        return arrayFormat(messagePattern, new Object[]{arg});</span>
+    }
+
+    /**
+     * Performs a two argument substitution for the 'messagePattern' passed as
+     * parameter.
+     * &lt;p/&gt;
+     * For example,
+     * &lt;p/&gt;
+     * &lt;pre&gt;
+     * MessageFormatter.format(&amp;quot;Hi {}. My name is {}.&amp;quot;, &amp;quot;Alice&amp;quot;, &amp;quot;Bob&amp;quot;);
+     * &lt;/pre&gt;
+     * &lt;p/&gt;
+     * will return the string &quot;Hi Alice. My name is Bob.&quot;.
+     *
+     * @param messagePattern The message pattern which will be parsed and formatted
+     * @param argA           The argument to be substituted in place of the first formatting
+     *                       anchor
+     * @param argB           The argument to be substituted in place of the second formatting
+     *                       anchor
+     * @return The formatted message
+     */
+    static FormattingTuple format(final String messagePattern,
+                                  Object argA, Object argB) {
+<span class="nc" id="L141">        return arrayFormat(messagePattern, new Object[]{argA, argB});</span>
+    }
+
+    static Throwable getThrowableCandidate(Object[] argArray) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (ArrayUtils.isEmpty(argArray)) {</span>
+<span class="nc" id="L146">            return null;</span>
+        }
+
+<span class="nc" id="L149">        final Object lastEntry = argArray[argArray.length - 1];</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (lastEntry instanceof Throwable) {</span>
+<span class="nc" id="L151">            return (Throwable) lastEntry;</span>
+        }
+<span class="nc" id="L153">        return null;</span>
+    }
+
+    /**
+     * Same principle as the {@link #format(String, Object)} and
+     * {@link #format(String, Object, Object)} methods except that any number of
+     * arguments can be passed in an array.
+     *
+     * @param messagePattern The message pattern which will be parsed and formatted
+     * @param argArray       An array of arguments to be substituted in place of formatting
+     *                       anchors
+     * @return The formatted message
+     */
+    static FormattingTuple arrayFormat(final String messagePattern,
+                                       final Object[] argArray) {
+
+<span class="nc" id="L169">        Throwable throwableCandidate = getThrowableCandidate(argArray);</span>
+
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (messagePattern == null) {</span>
+<span class="nc" id="L172">            return new FormattingTuple(null, argArray, throwableCandidate);</span>
+        }
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (argArray == null) {</span>
+<span class="nc" id="L176">            return new FormattingTuple(messagePattern);</span>
+        }
+
+<span class="nc" id="L179">        int i = 0;</span>
+        int j;
+<span class="nc" id="L181">        StringBuffer sbuf = new StringBuffer(messagePattern.length() + 50);</span>
+
+        int l;
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        for (l = 0; l &lt; argArray.length; l++) {</span>
+
+<span class="nc" id="L186">            j = messagePattern.indexOf(DELIM_STR, i);</span>
+
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            if (j == -1) {</span>
+                // no more variables
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (i == 0) { // this is a simple string</span>
+<span class="nc" id="L191">                    return new FormattingTuple(messagePattern, argArray,</span>
+                            throwableCandidate);
+                } else { // add the tail string which contains no variables and return
+                    // the result.
+<span class="nc" id="L195">                    sbuf.append(messagePattern.substring(i, messagePattern.length()));</span>
+<span class="nc" id="L196">                    return new FormattingTuple(sbuf.toString(), argArray,</span>
+                            throwableCandidate);
+                }
+            } else {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (isEscapedDelimeter(messagePattern, j)) {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                    if (!isDoubleEscaped(messagePattern, j)) {</span>
+<span class="nc" id="L202">                        l--; // DELIM_START was escaped, thus should not be incremented</span>
+<span class="nc" id="L203">                        sbuf.append(messagePattern.substring(i, j - 1));</span>
+<span class="nc" id="L204">                        sbuf.append(DELIM_START);</span>
+<span class="nc" id="L205">                        i = j + 1;</span>
+                    } else {
+                        // The escape character preceding the delimiter start is
+                        // itself escaped: &quot;abc x:\\{}&quot;
+                        // we have to consume one backward slash
+<span class="nc" id="L210">                        sbuf.append(messagePattern.substring(i, j - 1));</span>
+<span class="nc" id="L211">                        deeplyAppendParameter(sbuf, argArray[l], new HashMap&lt;Object[], Void&gt;());</span>
+<span class="nc" id="L212">                        i = j + 2;</span>
+                    }
+                } else {
+                    // normal case
+<span class="nc" id="L216">                    sbuf.append(messagePattern.substring(i, j));</span>
+<span class="nc" id="L217">                    deeplyAppendParameter(sbuf, argArray[l], new HashMap&lt;Object[], Void&gt;());</span>
+<span class="nc" id="L218">                    i = j + 2;</span>
+                }
+            }
+        }
+        // append the characters following the last {} pair.
+<span class="nc" id="L223">        sbuf.append(messagePattern.substring(i, messagePattern.length()));</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (l &lt; argArray.length - 1) {</span>
+<span class="nc" id="L225">            return new FormattingTuple(sbuf.toString(), argArray, throwableCandidate);</span>
+        } else {
+<span class="nc" id="L227">            return new FormattingTuple(sbuf.toString(), argArray, null);</span>
+        }
+    }
+
+    static boolean isEscapedDelimeter(String messagePattern,
+                                      int delimeterStartIndex) {
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (delimeterStartIndex == 0) {</span>
+<span class="nc" id="L235">            return false;</span>
+        }
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        return messagePattern.charAt(delimeterStartIndex - 1) == ESCAPE_CHAR;</span>
+    }
+
+    static boolean isDoubleEscaped(String messagePattern,
+                                   int delimeterStartIndex) {
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        return delimeterStartIndex &gt;= 2 &amp;&amp; messagePattern.charAt(delimeterStartIndex - 2) == ESCAPE_CHAR;</span>
+    }
+
+    // special treatment of array values was suggested by 'lizongbo'
+    private static void deeplyAppendParameter(StringBuffer sbuf, Object o,
+                                              Map&lt;Object[], Void&gt; seenMap) {
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L249">            sbuf.append(&quot;null&quot;);</span>
+<span class="nc" id="L250">            return;</span>
+        }
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!o.getClass().isArray()) {</span>
+<span class="nc" id="L253">            safeObjectAppend(sbuf, o);</span>
+        } else {
+            // check for primitive array types because they
+            // unfortunately cannot be cast to Object[]
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            if (o instanceof boolean[]) {</span>
+<span class="nc" id="L258">                booleanArrayAppend(sbuf, (boolean[]) o);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            } else if (o instanceof byte[]) {</span>
+<span class="nc" id="L260">                byteArrayAppend(sbuf, (byte[]) o);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            } else if (o instanceof char[]) {</span>
+<span class="nc" id="L262">                charArrayAppend(sbuf, (char[]) o);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            } else if (o instanceof short[]) {</span>
+<span class="nc" id="L264">                shortArrayAppend(sbuf, (short[]) o);</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            } else if (o instanceof int[]) {</span>
+<span class="nc" id="L266">                intArrayAppend(sbuf, (int[]) o);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            } else if (o instanceof long[]) {</span>
+<span class="nc" id="L268">                longArrayAppend(sbuf, (long[]) o);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            } else if (o instanceof float[]) {</span>
+<span class="nc" id="L270">                floatArrayAppend(sbuf, (float[]) o);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            } else if (o instanceof double[]) {</span>
+<span class="nc" id="L272">                doubleArrayAppend(sbuf, (double[]) o);</span>
+            } else {
+<span class="nc" id="L274">                objectArrayAppend(sbuf, (Object[]) o, seenMap);</span>
+            }
+        }
+<span class="nc" id="L277">    }</span>
+
+    private static void safeObjectAppend(StringBuffer sbuf, Object o) {
+        try {
+<span class="nc" id="L281">            String oAsString = o.toString();</span>
+<span class="nc" id="L282">            sbuf.append(oAsString);</span>
+<span class="nc" id="L283">        } catch (Throwable t) {</span>
+<span class="nc" id="L284">            System.err</span>
+<span class="nc" id="L285">                    .println(&quot;SLF4J: Failed toString() invocation on an object of type [&quot;</span>
+<span class="nc" id="L286">                            + o.getClass().getName() + ']');</span>
+<span class="nc" id="L287">            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L288">            sbuf.append(&quot;[FAILED toString()]&quot;);</span>
+<span class="nc" id="L289">        }</span>
+<span class="nc" id="L290">    }</span>
+
+    private static void objectArrayAppend(StringBuffer sbuf, Object[] a,
+                                          Map&lt;Object[], Void&gt; seenMap) {
+<span class="nc" id="L294">        sbuf.append('[');</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (!seenMap.containsKey(a)) {</span>
+<span class="nc" id="L296">            seenMap.put(a, null);</span>
+<span class="nc" id="L297">            final int len = a.length;</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L299">                deeplyAppendParameter(sbuf, a[i], seenMap);</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L301">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+            // allow repeats in siblings
+<span class="nc" id="L305">            seenMap.remove(a);</span>
+<span class="nc" id="L306">        } else {</span>
+<span class="nc" id="L307">            sbuf.append(&quot;...&quot;);</span>
+        }
+<span class="nc" id="L309">        sbuf.append(']');</span>
+<span class="nc" id="L310">    }</span>
+
+    private static void booleanArrayAppend(StringBuffer sbuf, boolean[] a) {
+<span class="nc" id="L313">        sbuf.append('[');</span>
+<span class="nc" id="L314">        final int len = a.length;</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L316">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L318">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L321">        sbuf.append(']');</span>
+<span class="nc" id="L322">    }</span>
+
+    private static void byteArrayAppend(StringBuffer sbuf, byte[] a) {
+<span class="nc" id="L325">        sbuf.append('[');</span>
+<span class="nc" id="L326">        final int len = a.length;</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L328">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L330">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L333">        sbuf.append(']');</span>
+<span class="nc" id="L334">    }</span>
+
+    private static void charArrayAppend(StringBuffer sbuf, char[] a) {
+<span class="nc" id="L337">        sbuf.append('[');</span>
+<span class="nc" id="L338">        final int len = a.length;</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L340">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L342">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L345">        sbuf.append(']');</span>
+<span class="nc" id="L346">    }</span>
+
+    private static void shortArrayAppend(StringBuffer sbuf, short[] a) {
+<span class="nc" id="L349">        sbuf.append('[');</span>
+<span class="nc" id="L350">        final int len = a.length;</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L352">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L354">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L357">        sbuf.append(']');</span>
+<span class="nc" id="L358">    }</span>
+
+    private static void intArrayAppend(StringBuffer sbuf, int[] a) {
+<span class="nc" id="L361">        sbuf.append('[');</span>
+<span class="nc" id="L362">        final int len = a.length;</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L364">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L366">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L369">        sbuf.append(']');</span>
+<span class="nc" id="L370">    }</span>
+
+    private static void longArrayAppend(StringBuffer sbuf, long[] a) {
+<span class="nc" id="L373">        sbuf.append('[');</span>
+<span class="nc" id="L374">        final int len = a.length;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L376">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L378">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L381">        sbuf.append(']');</span>
+<span class="nc" id="L382">    }</span>
+
+    private static void floatArrayAppend(StringBuffer sbuf, float[] a) {
+<span class="nc" id="L385">        sbuf.append('[');</span>
+<span class="nc" id="L386">        final int len = a.length;</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L388">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L390">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L393">        sbuf.append(']');</span>
+<span class="nc" id="L394">    }</span>
+
+    private static void doubleArrayAppend(StringBuffer sbuf, double[] a) {
+<span class="nc" id="L397">        sbuf.append('[');</span>
+<span class="nc" id="L398">        final int len = a.length;</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L400">            sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">            if (i != len - 1) {</span>
+<span class="nc" id="L402">                sbuf.append(&quot;, &quot;);</span>
+            }
+        }
+<span class="nc" id="L405">        sbuf.append(']');</span>
+<span class="nc" id="L406">    }</span>
+
+    private MessageFormatter() {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractReferenceBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">AbstractReferenceBuilder.java</span></div><h1>AbstractReferenceBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.AbstractReferenceConfig;
+
+/**
+ * AbstractBuilder
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L27">public abstract class AbstractReferenceBuilder&lt;T extends AbstractReferenceConfig, B extends AbstractReferenceBuilder&lt;T, B&gt;&gt;</span>
+        extends AbstractInterfaceBuilder&lt;T, B&gt; {
+
+    /**
+     * Check if service provider exists, if not exists, it will be fast fail
+     */
+    protected Boolean check;
+
+    /**
+     * Whether to eagle-init
+     */
+    protected Boolean init;
+
+    /**
+     * Whether to use generic interface
+     */
+    protected String generic;
+
+    /**
+     * Whether to find reference's instance from the current JVM
+     */
+    protected Boolean injvm;
+
+    /**
+     * Lazy create connection
+     */
+    protected Boolean lazy;
+
+    protected String reconnect;
+
+    protected Boolean sticky;
+
+    /**
+     * The remote service version the customer side will reference
+     */
+    protected String version;
+
+    /**
+     * The remote service group the customer side will reference
+     */
+    protected String group;
+
+    public B check(Boolean check) {
+<span class="nc" id="L70">        this.check = check;</span>
+<span class="nc" id="L71">        return getThis();</span>
+    }
+
+    public B init(Boolean init) {
+<span class="nc" id="L75">        this.init = init;</span>
+<span class="nc" id="L76">        return getThis();</span>
+    }
+
+    public B generic(String generic) {
+<span class="nc" id="L80">        this.generic = generic;</span>
+<span class="nc" id="L81">        return getThis();</span>
+    }
+
+    public B generic(Boolean generic) {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (generic != null) {</span>
+<span class="nc" id="L86">            this.generic = generic.toString();</span>
+        } else {
+<span class="nc" id="L88">            this.generic = null;</span>
+        }
+<span class="nc" id="L90">        return getThis();</span>
+    }
+
+    /**
+     * @param injvm
+     * @see org.apache.dubbo.config.builders.AbstractInterfaceBuilder#scope(String)
+     * @deprecated instead, use the parameter &lt;b&gt;scope&lt;/b&gt; to judge if it's in jvm, scope=local
+     */
+    @Deprecated
+    public B injvm(Boolean injvm) {
+<span class="nc" id="L100">        this.injvm = injvm;</span>
+<span class="nc" id="L101">        return getThis();</span>
+    }
+
+    public B lazy(Boolean lazy) {
+<span class="nc" id="L105">        this.lazy = lazy;</span>
+<span class="nc" id="L106">        return getThis();</span>
+    }
+
+    public B reconnect(String reconnect) {
+<span class="nc" id="L110">        this.reconnect = reconnect;</span>
+<span class="nc" id="L111">        return getThis();</span>
+    }
+
+    public B sticky(Boolean sticky) {
+<span class="nc" id="L115">        this.sticky = sticky;</span>
+<span class="nc" id="L116">        return getThis();</span>
+    }
+
+    public B version(String version) {
+<span class="nc" id="L120">        this.version = version;</span>
+<span class="nc" id="L121">        return getThis();</span>
+    }
+
+    public B group(String group) {
+<span class="nc" id="L125">        this.group = group;</span>
+<span class="nc" id="L126">        return getThis();</span>
+    }
+
+    @Override
+    public void build(T instance) {
+<span class="nc" id="L131">        super.build(instance);</span>
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (check != null) {</span>
+<span class="nc" id="L134">            instance.setCheck(check);</span>
+        }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (init != null) {</span>
+<span class="nc" id="L137">            instance.setInit(init);</span>
+        }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (!StringUtils.isEmpty(generic)) {</span>
+<span class="nc" id="L140">            instance.setGeneric(generic);</span>
+        }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (injvm != null) {</span>
+<span class="nc" id="L143">            instance.setInjvm(injvm);</span>
+        }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (lazy != null) {</span>
+<span class="nc" id="L146">            instance.setLazy(lazy);</span>
+        }
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (!StringUtils.isEmpty(reconnect)) {</span>
+<span class="nc" id="L149">            instance.setReconnect(reconnect);</span>
+        }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (sticky != null) {</span>
+<span class="nc" id="L152">            instance.setSticky(sticky);</span>
+        }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (!StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L155">            instance.setVersion(version);</span>
+        }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (!StringUtils.isEmpty(group)) {</span>
+<span class="nc" id="L158">            instance.setGroup(group);</span>
+        }
+<span class="nc" id="L160">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

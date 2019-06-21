@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboResourceFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-rest</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.rest</a> &gt; <span class="el_source">DubboResourceFactory.java</span></div><h1>DubboResourceFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.rest;
+
+import org.jboss.resteasy.spi.HttpRequest;
+import org.jboss.resteasy.spi.HttpResponse;
+import org.jboss.resteasy.spi.ResourceFactory;
+import org.jboss.resteasy.spi.ResteasyProviderFactory;
+
+/**
+ * We don't support propertyInjector here since the resource impl should be singleton in dubbo
+ *
+ */
+public class DubboResourceFactory implements ResourceFactory {
+
+    private Object resourceInstance;
+    private Class scannableClass;
+//    private PropertyInjector propertyInjector;
+//    private String context = null;
+
+<span class="nc" id="L35">    public DubboResourceFactory(Object resourceInstance, Class scannableClass) {</span>
+<span class="nc" id="L36">        this.resourceInstance = resourceInstance;</span>
+<span class="nc" id="L37">        this.scannableClass = scannableClass;</span>
+<span class="nc" id="L38">    }</span>
+
+//    public PropertyInjector getPropertyInjector() {
+//        return propertyInjector;
+//    }
+
+    @Override
+    public Object createResource(HttpRequest request, HttpResponse response,
+                                 ResteasyProviderFactory factory) {
+<span class="nc" id="L47">        return resourceInstance;</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getScannableClass() {
+<span class="nc" id="L52">        return scannableClass;</span>
+    }
+
+    @Override
+    public void registered(ResteasyProviderFactory factory) {
+//        this.propertyInjector = factory.getInjectorFactory().createPropertyInjector(getScannableClass(), factory);
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public void requestFinished(HttpRequest request, HttpResponse response,
+                                Object resource) {
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public void unregistered() {
+<span class="nc" id="L67">    }</span>
+
+//    public void setContext(String context) {
+//        this.context = context;
+//    }
+//
+//    public String getContext() {
+//        return context;
+//    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

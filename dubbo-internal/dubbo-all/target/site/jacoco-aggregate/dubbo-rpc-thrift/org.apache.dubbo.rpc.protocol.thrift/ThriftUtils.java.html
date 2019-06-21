@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ThriftUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift</a> &gt; <span class="el_source">ThriftUtils.java</span></div><h1>ThriftUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift;
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift instead
+ */
+@Deprecated
+<span class="nc" id="L22">public class ThriftUtils {</span>
+
+    /**
+     * Generate class name which represents service arguments.
+     *
+     * @param serviceName service name
+     * @param methodName method name
+     * @return method args class name or null
+     */
+    public static String generateMethodArgsClassName(String serviceName, String methodName) {
+
+<span class="nc" id="L33">        int index = serviceName.lastIndexOf(&quot;.&quot;);</span>
+
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (index &gt; 0) {</span>
+
+<span class="nc" id="L37">            return new StringBuilder(32)</span>
+<span class="nc" id="L38">                    .append(serviceName.substring(0, index + 1))</span>
+<span class="nc" id="L39">                    .append(&quot;$__&quot;)</span>
+<span class="nc" id="L40">                    .append(serviceName.substring(index + 1))</span>
+<span class="nc" id="L41">                    .append(&quot;Stub$&quot;)</span>
+<span class="nc" id="L42">                    .append(methodName)</span>
+<span class="nc" id="L43">                    .append(&quot;_args&quot;)</span>
+<span class="nc" id="L44">                    .toString();</span>
+
+        } else {
+<span class="nc" id="L47">            return new StringBuffer(32)</span>
+<span class="nc" id="L48">                    .append(&quot;$__&quot;)</span>
+<span class="nc" id="L49">                    .append(serviceName)</span>
+<span class="nc" id="L50">                    .append(&quot;Stub$&quot;)</span>
+<span class="nc" id="L51">                    .append(methodName)</span>
+<span class="nc" id="L52">                    .append(&quot;_args&quot;)</span>
+<span class="nc" id="L53">                    .toString();</span>
+        }
+
+    }
+
+    public static String generateMethodResultClassName(String serviceName, String method) {
+
+<span class="nc" id="L60">        int index = serviceName.lastIndexOf(&quot;.&quot;);</span>
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (index &gt; 0) {</span>
+
+<span class="nc" id="L64">            return new StringBuilder(32)</span>
+<span class="nc" id="L65">                    .append(serviceName.substring(0, index + 1))</span>
+<span class="nc" id="L66">                    .append(&quot;$__&quot;)</span>
+<span class="nc" id="L67">                    .append(serviceName.substring(index + 1))</span>
+<span class="nc" id="L68">                    .append(&quot;Stub$&quot;)</span>
+<span class="nc" id="L69">                    .append(method)</span>
+<span class="nc" id="L70">                    .append(&quot;_result&quot;)</span>
+<span class="nc" id="L71">                    .toString();</span>
+
+        } else {
+<span class="nc" id="L74">            return new StringBuilder(32)</span>
+<span class="nc" id="L75">                    .append(&quot;$__&quot;)</span>
+<span class="nc" id="L76">                    .append(serviceName)</span>
+<span class="nc" id="L77">                    .append(&quot;Stub$&quot;)</span>
+<span class="nc" id="L78">                    .append(method)</span>
+<span class="nc" id="L79">                    .append(&quot;_result&quot;)</span>
+<span class="nc" id="L80">                    .toString();</span>
+        }
+
+    }
+
+    public static String generateSetMethodName(String fieldName) {
+
+<span class="nc" id="L87">        return new StringBuilder(16)</span>
+<span class="nc" id="L88">                .append(&quot;set&quot;)</span>
+<span class="nc" id="L89">                .append(Character.toUpperCase(fieldName.charAt(0)))</span>
+<span class="nc" id="L90">                .append(fieldName.substring(1))</span>
+<span class="nc" id="L91">                .toString();</span>
+
+    }
+
+    public static String generateGetMethodName(String fieldName) {
+<span class="nc" id="L96">        return new StringBuffer(16)</span>
+<span class="nc" id="L97">                .append(&quot;get&quot;)</span>
+<span class="nc" id="L98">                .append(Character.toUpperCase(fieldName.charAt(0)))</span>
+<span class="nc" id="L99">                .append(fieldName.substring(1))</span>
+<span class="nc" id="L100">                .toString();</span>
+    }
+
+    public static String generateMethodArgsClassNameThrift(String serviceName, String methodName) {
+
+<span class="nc" id="L105">        int index = serviceName.indexOf(&quot;$&quot;);</span>
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (index &gt; 0) {</span>
+<span class="nc" id="L108">            return new StringBuilder(32)</span>
+<span class="nc" id="L109">                    .append(serviceName.substring(0, index + 1))</span>
+<span class="nc" id="L110">                    .append(methodName)</span>
+<span class="nc" id="L111">                    .append(&quot;_args&quot;)</span>
+<span class="nc" id="L112">                    .toString();</span>
+        }
+
+<span class="nc" id="L115">        return null;</span>
+
+    }
+
+    public static String generateMethodResultClassNameThrift(String serviceName, String methodName) {
+
+<span class="nc" id="L121">        int index = serviceName.indexOf(&quot;$&quot;);</span>
+
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (index &gt; 0) {</span>
+<span class="nc" id="L124">            return new StringBuilder(32)</span>
+<span class="nc" id="L125">                    .append(serviceName.substring(0, index + 1))</span>
+<span class="nc" id="L126">                    .append(methodName)</span>
+<span class="nc" id="L127">                    .append(&quot;_result&quot;)</span>
+<span class="nc" id="L128">                    .toString();</span>
+        }
+
+<span class="nc" id="L131">        return null;</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

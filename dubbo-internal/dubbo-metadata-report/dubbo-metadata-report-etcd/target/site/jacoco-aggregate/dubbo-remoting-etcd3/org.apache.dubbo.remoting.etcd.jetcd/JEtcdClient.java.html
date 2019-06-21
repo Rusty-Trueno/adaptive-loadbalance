@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JEtcdClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.etcd.jetcd</a> &gt; <span class="el_source">JEtcdClient.java</span></div><h1>JEtcdClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.etcd.jetcd;
+
+import io.grpc.ManagedChannel;
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.remoting.etcd.ChildListener;
+import org.apache.dubbo.remoting.etcd.StateListener;
+import org.apache.dubbo.remoting.etcd.option.OptionUtil;
+import org.apache.dubbo.remoting.etcd.support.AbstractEtcdClient;
+
+import com.google.protobuf.ByteString;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.api.Event;
+import io.etcd.jetcd.api.KeyValue;
+import io.etcd.jetcd.api.WatchCancelRequest;
+import io.etcd.jetcd.api.WatchCreateRequest;
+import io.etcd.jetcd.api.WatchGrpc;
+import io.etcd.jetcd.api.WatchRequest;
+import io.etcd.jetcd.api.WatchResponse;
+import io.etcd.jetcd.common.exception.ClosedClientException;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
+import io.netty.util.internal.ConcurrentSet;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static java.util.stream.Collectors.toList;
+import static org.apache.dubbo.remoting.etcd.jetcd.JEtcdClientWrapper.UTF_8;
+
+/**
+ * etct3 client.
+ */
+public class JEtcdClient extends AbstractEtcdClient&lt;JEtcdClient.EtcdWatcher&gt; {
+
+    private JEtcdClientWrapper clientWrapper;
+    private ScheduledExecutorService reconnectSchedule;
+
+    private ExecutorService notifyExecutor;
+
+    private int delayPeriod;
+<span class="nc" id="L76">    private Logger logger = LoggerFactory.getLogger(JEtcdClient.class);</span>
+
+    public JEtcdClient(URL url) {
+<span class="nc" id="L79">        super(url);</span>
+        try {
+<span class="nc" id="L81">            clientWrapper = new JEtcdClientWrapper(url);</span>
+<span class="nc" id="L82">            clientWrapper.setConnectionStateListener((client, state) -&gt; {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                if (state == StateListener.CONNECTED) {</span>
+<span class="nc" id="L84">                    JEtcdClient.this.stateChanged(StateListener.CONNECTED);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                } else if (state == StateListener.DISCONNECTED) {</span>
+<span class="nc" id="L86">                    JEtcdClient.this.stateChanged(StateListener.DISCONNECTED);</span>
+                }
+<span class="nc" id="L88">            });</span>
+<span class="nc" id="L89">            delayPeriod = getUrl().getParameter(Constants.REGISTRY_RETRY_PERIOD_KEY, Constants.DEFAULT_REGISTRY_RETRY_PERIOD);</span>
+<span class="nc" id="L90">            reconnectSchedule = Executors.newScheduledThreadPool(1,</span>
+                    new NamedThreadFactory(&quot;etcd3-watch-auto-reconnect&quot;));
+
+<span class="nc" id="L93">            notifyExecutor = new ThreadPoolExecutor(</span>
+                    1
+<span class="nc" id="L95">                    , url.getParameter(Constants.ETCD3_NOTIFY_MAXTHREADS_KEYS, Constants.DEFAULT_ETCD3_NOTIFY_THREADS)</span>
+                    , Constants.DEFAULT_SESSION_TIMEOUT
+                    , TimeUnit.MILLISECONDS
+<span class="nc" id="L98">                    , new LinkedBlockingQueue&lt;Runnable&gt;(url.getParameter(Constants.DEFAULT_ETCD3_NOTIFY_QUEUES_KEY, Constants.DEFAULT_GRPC_QUEUES * 3))</span>
+                    , new NamedThreadFactory(&quot;etcd3-notify&quot;, true));
+
+<span class="nc" id="L101">            clientWrapper.start();</span>
+<span class="nc" id="L102">        } catch (Exception e) {</span>
+<span class="nc" id="L103">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L104">        }</span>
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void doCreatePersistent(String path) {
+<span class="nc" id="L109">        clientWrapper.createPersistent(path);</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public long doCreateEphemeral(String path) {
+<span class="nc" id="L114">        return clientWrapper.createEphemeral(path);</span>
+    }
+
+    @Override
+    public boolean checkExists(String path) {
+<span class="nc" id="L119">        return clientWrapper.checkExists(path);</span>
+    }
+
+    @Override
+    public EtcdWatcher createChildWatcherListener(String path, ChildListener listener) {
+<span class="nc" id="L124">        return new EtcdWatcher(listener);</span>
+    }
+
+    @Override
+    public List&lt;String&gt; addChildWatcherListener(String path, EtcdWatcher etcdWatcher) {
+<span class="nc" id="L129">        return etcdWatcher.forPath(path);</span>
+    }
+
+    @Override
+    public void removeChildWatcherListener(String path, EtcdWatcher etcdWatcher) {
+<span class="nc" id="L134">        etcdWatcher.unwatch();</span>
+<span class="nc" id="L135">    }</span>
+
+    @Override
+    public List&lt;String&gt; getChildren(String path) {
+<span class="nc" id="L139">        return clientWrapper.getChildren(path);</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc" id="L144">        return clientWrapper.isConnected();</span>
+    }
+
+    @Override
+    public long createLease(long second) {
+<span class="nc" id="L149">        return clientWrapper.createLease(second);</span>
+    }
+
+    @Override
+    public long createLease(long ttl, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+<span class="nc" id="L155">        return clientWrapper.createLease(ttl, timeout, unit);</span>
+    }
+
+    @Override
+    public void delete(String path) {
+<span class="nc" id="L160">        clientWrapper.delete(path);</span>
+<span class="nc" id="L161">    }</span>
+
+    @Override
+    public void revokeLease(long lease) {
+<span class="nc" id="L165">        clientWrapper.revokeLease(lease);</span>
+<span class="nc" id="L166">    }</span>
+
+    @Override
+    public void doClose() {
+        try {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (notifyExecutor != null) {</span>
+<span class="nc" id="L172">                ExecutorUtil.shutdownNow(notifyExecutor, 100);</span>
+            }
+<span class="nc" id="L174">        } catch (Exception e) {</span>
+<span class="nc" id="L175">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L176">        }</span>
+
+        try {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (reconnectSchedule != null) {</span>
+<span class="nc" id="L180">                ExecutorUtil.shutdownNow(reconnectSchedule, 100);</span>
+            }
+<span class="nc" id="L182">        } catch (Exception e) {</span>
+<span class="nc" id="L183">            logger.warn(e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L185">            clientWrapper.doClose();</span>
+        }
+<span class="nc" id="L187">    }</span>
+
+    @Override
+    public String getKVValue(String key) {
+<span class="nc" id="L191">        return clientWrapper.getKVValue(key);</span>
+    }
+
+    @Override
+    public boolean put(String key, String value) {
+<span class="nc" id="L196">        return clientWrapper.put(key, value);</span>
+    }
+
+    public ManagedChannel getChannel() {
+<span class="nc" id="L200">        return clientWrapper.getChannel();</span>
+    }
+
+    public class EtcdWatcher implements StreamObserver&lt;WatchResponse&gt; {
+
+        protected WatchGrpc.WatchStub watchStub;
+        protected StreamObserver&lt;WatchRequest&gt; watchRequest;
+        protected long watchId;
+        protected String path;
+        protected Throwable throwable;
+<span class="nc" id="L210">        protected volatile Set&lt;String&gt; urls = new ConcurrentSet&lt;&gt;();</span>
+        private ChildListener listener;
+
+<span class="nc" id="L213">        protected ReentrantLock lock = new ReentrantLock(true);</span>
+
+<span class="nc" id="L215">        public EtcdWatcher(ChildListener listener) {</span>
+<span class="nc" id="L216">            this.listener = listener;</span>
+<span class="nc" id="L217">        }</span>
+
+        @Override
+        public void onNext(WatchResponse response) {
+
+            // prevents grpc on sending watchResponse to a closed watch client.
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (!isConnected()) {</span>
+<span class="nc" id="L224">                return;</span>
+            }
+
+<span class="nc" id="L227">            watchId = response.getWatchId();</span>
+
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (listener != null) {</span>
+<span class="nc" id="L230">                int modified = 0;</span>
+<span class="nc" id="L231">                String service = null;</span>
+<span class="nc" id="L232">                Iterator&lt;Event&gt; iterator = response.getEventsList().iterator();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                while (iterator.hasNext()) {</span>
+<span class="nc" id="L234">                    Event event = iterator.next();</span>
+<span class="nc bnc" id="L235" title="All 3 branches missed.">                    switch (event.getType()) {</span>
+                        case PUT: {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                            if (((service = find(event)) != null)</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                                    &amp;&amp; safeUpdate(service, true)) {</span>
+<span class="nc" id="L239">                                modified++;</span>
+                            }
+                            break;
+                        }
+                        case DELETE: {
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                            if (((service = find(event)) != null)</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                                    &amp;&amp; safeUpdate(service, false)) {</span>
+<span class="nc" id="L246">                                modified++;</span>
+                            }
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+<span class="nc" id="L253">                }</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                if (modified &gt; 0) {</span>
+<span class="nc" id="L255">                    notifyExecutor.execute(() -&gt; listener.childChanged(path, new ArrayList&lt;&gt;(urls)));</span>
+                }
+
+            }
+<span class="nc" id="L259">        }</span>
+
+        @Override
+        public void onError(Throwable e) {
+<span class="nc" id="L263">            tryReconnect(e);</span>
+<span class="nc" id="L264">        }</span>
+
+        public void unwatch() {
+
+            // prevents grpc on sending watchResponse to a closed watch client.
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (!isConnected()) {</span>
+<span class="nc" id="L270">                return;</span>
+            }
+
+            try {
+<span class="nc" id="L274">                this.listener = null;</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                if (watchRequest != null) {</span>
+                    WatchCancelRequest watchCancelRequest =
+<span class="nc" id="L277">                            WatchCancelRequest.newBuilder().setWatchId(watchId).build();</span>
+<span class="nc" id="L278">                    WatchRequest cancelRequest = WatchRequest.newBuilder()</span>
+<span class="nc" id="L279">                            .setCancelRequest(watchCancelRequest).build();</span>
+<span class="nc" id="L280">                    this.watchRequest.onNext(cancelRequest);</span>
+                }
+<span class="nc" id="L282">            } catch (Exception ignored) {</span>
+<span class="nc" id="L283">                logger.warn(&quot;Failed to cancel watch for path '&quot; + path + &quot;'&quot;, ignored);</span>
+<span class="nc" id="L284">            }</span>
+<span class="nc" id="L285">        }</span>
+
+        public List&lt;String&gt; forPath(String path) {
+
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            if (!isConnected()) {</span>
+<span class="nc" id="L290">                throw new ClosedClientException(&quot;watch client has been closed, path '&quot; + path + &quot;'&quot;);</span>
+            }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            if (this.path != null) {</span>
+<span class="nc" id="L293">                unwatch();</span>
+            }
+
+<span class="nc" id="L296">            this.path = path;</span>
+
+<span class="nc" id="L298">            lock.lock();</span>
+            try {
+
+<span class="nc" id="L301">                this.watchStub = WatchGrpc.newStub(clientWrapper.getChannel());</span>
+<span class="nc" id="L302">                this.watchRequest = watchStub.watch(this);</span>
+<span class="nc" id="L303">                this.watchRequest.onNext(nextRequest());</span>
+
+<span class="nc" id="L305">                List&lt;String&gt; children = clientWrapper.getChildren(path);</span>
+                /**
+                 * caching the current service
+                 */
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (!children.isEmpty()) {</span>
+<span class="nc" id="L310">                    this.urls.addAll(filterChildren(children));</span>
+                }
+
+<span class="nc" id="L313">                return new ArrayList&lt;&gt;(urls);</span>
+            } finally {
+<span class="nc" id="L315">                lock.unlock();</span>
+            }
+        }
+
+        private boolean safeUpdate(String service, boolean add) {
+<span class="nc" id="L320">            lock.lock();</span>
+            try {
+                /**
+                 * If the collection already contains the specified service, do nothing
+                 */
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                return add ? this.urls.add(service) : this.urls.remove(service);</span>
+            } finally {
+<span class="nc" id="L327">                lock.unlock();</span>
+            }
+        }
+
+        private String find(Event event) {
+<span class="nc" id="L332">            KeyValue keyValue = event.getKv();</span>
+<span class="nc" id="L333">            String key = keyValue.getKey().toStringUtf8();</span>
+
+<span class="nc" id="L335">            int len = path.length(), index = len, count = 0;</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">            if (key.length() &gt;= index) {</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                for (; (index = key.indexOf(Constants.PATH_SEPARATOR, index)) != -1; ++index) {</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                    if (count++ &gt; 1) {</span>
+<span class="nc" id="L339">                        break;</span>
+                    }
+                }
+            }
+
+            /**
+             * if children changed , we should refresh invokers
+             */
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            if (count == 1) {</span>
+                /**
+                 * remove prefix
+                 */
+<span class="nc" id="L351">                return key.substring(len + 1);</span>
+            }
+
+<span class="nc" id="L354">            return null;</span>
+        }
+
+        private List&lt;String&gt; filterChildren(List&lt;String&gt; children) {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (children == null) {</span>
+<span class="nc" id="L359">                return Collections.emptyList();</span>
+            }
+<span class="nc bnc" id="L361" title="All 2 branches missed.">            if (children.size() &lt;= 0) {</span>
+<span class="nc" id="L362">                return children;</span>
+            }
+<span class="nc" id="L364">            final int len = path.length();</span>
+<span class="nc" id="L365">            return children.stream().parallel()</span>
+<span class="nc" id="L366">                    .filter(child -&gt; {</span>
+<span class="nc" id="L367">                        int index = len, count = 0;</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                        if (child.length() &gt; len) {</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                            for (; (index = child.indexOf(Constants.PATH_SEPARATOR, index)) != -1; ++index) {</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                                if (count++ &gt; 1) {</span>
+<span class="nc" id="L371">                                    break;</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                        return count == 1;</span>
+                    })
+<span class="nc" id="L377">                    .map(child -&gt; child.substring(len + 1))</span>
+<span class="nc" id="L378">                    .collect(toList());</span>
+        }
+
+        /**
+         * create new watching request for current path.
+         */
+        protected WatchRequest nextRequest() {
+
+<span class="nc" id="L386">            WatchCreateRequest.Builder builder = WatchCreateRequest.newBuilder()</span>
+<span class="nc" id="L387">                    .setKey(ByteString.copyFromUtf8(path))</span>
+<span class="nc" id="L388">                    .setRangeEnd(ByteString.copyFrom(</span>
+<span class="nc" id="L389">                            OptionUtil.prefixEndOf(ByteSequence.from(path, UTF_8)).getBytes()))</span>
+<span class="nc" id="L390">                    .setProgressNotify(true);</span>
+
+<span class="nc" id="L392">            return WatchRequest.newBuilder().setCreateRequest(builder).build();</span>
+        }
+
+        public void tryReconnect(Throwable e) {
+
+<span class="nc" id="L397">            this.throwable = e;</span>
+
+<span class="nc" id="L399">            logger.error(&quot;watcher client has error occurred, current path '&quot; + path + &quot;'&quot;, e);</span>
+
+            // prevents grpc on sending error to a closed watch client.
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            if (!isConnected()) {</span>
+<span class="nc" id="L403">                return;</span>
+            }
+
+
+<span class="nc" id="L407">            Status status = Status.fromThrowable(e);</span>
+            // system may be recover later, current connect won't be lost
+<span class="nc bnc" id="L409" title="All 4 branches missed.">            if (OptionUtil.isHaltError(status) || OptionUtil.isNoLeaderError(status)) {</span>
+<span class="nc" id="L410">                reconnectSchedule.schedule(this::reconnect, new Random().nextInt(delayPeriod), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L411">                return;</span>
+            }
+            // reconnect with a delay; avoiding immediate retry on a long connection downtime.
+<span class="nc" id="L414">            reconnectSchedule.schedule(this::reconnect, new Random().nextInt(delayPeriod), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L415">        }</span>
+
+        protected synchronized void reconnect() {
+<span class="nc" id="L418">            this.closeWatchRequest();</span>
+<span class="nc" id="L419">            this.recreateWatchRequest();</span>
+<span class="nc" id="L420">        }</span>
+
+        protected void recreateWatchRequest() {
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (watchRequest == null) {</span>
+<span class="nc" id="L424">                this.watchStub = WatchGrpc.newStub(clientWrapper.getChannel());</span>
+<span class="nc" id="L425">                this.watchRequest = watchStub.watch(this);</span>
+            }
+<span class="nc" id="L427">            this.watchRequest.onNext(nextRequest());</span>
+<span class="nc" id="L428">            this.throwable = null;</span>
+<span class="nc" id="L429">            logger.warn(&quot;watch client retried connect for path '&quot; + path + &quot;', connection status : &quot; + isConnected());</span>
+<span class="nc" id="L430">        }</span>
+
+        protected void closeWatchRequest() {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            if (this.watchRequest == null) {</span>
+<span class="nc" id="L434">                return;</span>
+            }
+<span class="nc" id="L436">            this.watchRequest.onCompleted();</span>
+<span class="nc" id="L437">            this.watchRequest = null;</span>
+<span class="nc" id="L438">        }</span>
+
+        @Override
+        public void onCompleted() {
+            // do not touch this method, if you want terminate this stream.
+<span class="nc" id="L443">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

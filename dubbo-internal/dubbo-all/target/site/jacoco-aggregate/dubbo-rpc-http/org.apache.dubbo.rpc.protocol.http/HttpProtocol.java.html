@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-http</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.http</a> &gt; <span class="el_source">HttpProtocol.java</span></div><h1>HttpProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.http;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.remoting.http.HttpBinder;
+import org.apache.dubbo.remoting.http.HttpHandler;
+import org.apache.dubbo.remoting.http.HttpServer;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.protocol.AbstractProxyProtocol;
+import org.apache.dubbo.rpc.service.GenericService;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.remoting.RemoteAccessException;
+import org.springframework.remoting.httpinvoker.HttpComponentsHttpInvokerRequestExecutor;
+import org.springframework.remoting.httpinvoker.HttpInvokerProxyFactoryBean;
+import org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter;
+import org.springframework.remoting.httpinvoker.SimpleHttpInvokerRequestExecutor;
+import org.springframework.remoting.support.RemoteInvocation;
+import org.springframework.remoting.support.RemoteInvocationFactory;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * HttpProtocol
+ */
+public class HttpProtocol extends AbstractProxyProtocol {
+
+    public static final int DEFAULT_PORT = 80;
+
+<span class="nc" id="L57">    private final Map&lt;String, HttpServer&gt; serverMap = new ConcurrentHashMap&lt;String, HttpServer&gt;();</span>
+
+<span class="nc" id="L59">    private final Map&lt;String, HttpInvokerServiceExporter&gt; skeletonMap = new ConcurrentHashMap&lt;String, HttpInvokerServiceExporter&gt;();</span>
+
+    private HttpBinder httpBinder;
+
+    public HttpProtocol() {
+<span class="nc" id="L64">        super(RemoteAccessException.class);</span>
+<span class="nc" id="L65">    }</span>
+
+    public void setHttpBinder(HttpBinder httpBinder) {
+<span class="nc" id="L68">        this.httpBinder = httpBinder;</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L73">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    protected &lt;T&gt; Runnable doExport(final T impl, Class&lt;T&gt; type, URL url) throws RpcException {
+<span class="nc" id="L78">        String addr = getAddr(url);</span>
+<span class="nc" id="L79">        HttpServer server = serverMap.get(addr);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (server == null) {</span>
+<span class="nc" id="L81">            server = httpBinder.bind(url, new InternalHandler());</span>
+<span class="nc" id="L82">            serverMap.put(addr, server);</span>
+        }
+<span class="nc" id="L84">        final String path = url.getAbsolutePath();</span>
+<span class="nc" id="L85">        skeletonMap.put(path, createExporter(impl, type));</span>
+
+<span class="nc" id="L87">        final String genericPath = path + &quot;/&quot; + Constants.GENERIC_KEY;</span>
+
+<span class="nc" id="L89">        skeletonMap.put(genericPath, createExporter(impl, GenericService.class));</span>
+<span class="nc" id="L90">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L93">                skeletonMap.remove(path);</span>
+<span class="nc" id="L94">                skeletonMap.remove(genericPath);</span>
+<span class="nc" id="L95">            }</span>
+        };
+    }
+
+    private &lt;T&gt; HttpInvokerServiceExporter createExporter(T impl, Class&lt;?&gt; type) {
+<span class="nc" id="L100">        final HttpInvokerServiceExporter httpServiceExporter = new HttpInvokerServiceExporter();</span>
+<span class="nc" id="L101">        httpServiceExporter.setServiceInterface(type);</span>
+<span class="nc" id="L102">        httpServiceExporter.setService(impl);</span>
+        try {
+<span class="nc" id="L104">            httpServiceExporter.afterPropertiesSet();</span>
+<span class="nc" id="L105">        } catch (Exception e) {</span>
+<span class="nc" id="L106">            throw new RpcException(e.getMessage(), e);</span>
+<span class="nc" id="L107">        }</span>
+<span class="nc" id="L108">        return httpServiceExporter;</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected &lt;T&gt; T doRefer(final Class&lt;T&gt; serviceType, final URL url) throws RpcException {
+<span class="nc" id="L114">        final String generic = url.getParameter(Constants.GENERIC_KEY);</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        final boolean isGeneric = ProtocolUtils.isGeneric(generic) || serviceType.equals(GenericService.class);</span>
+
+<span class="nc" id="L117">        final HttpInvokerProxyFactoryBean httpProxyFactoryBean = new HttpInvokerProxyFactoryBean();</span>
+<span class="nc" id="L118">        httpProxyFactoryBean.setRemoteInvocationFactory(new RemoteInvocationFactory() {</span>
+            @Override
+            public RemoteInvocation createRemoteInvocation(MethodInvocation methodInvocation) {
+                RemoteInvocation invocation;
+                /*
+                  package was renamed to 'org.apache.dubbo' in v2.7.0, so only provider versions after v2.7.0 can
+                  recognize org.apache.xxx.HttpRemoteInvocation'.
+                 */
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                if (Version.isRelease270OrHigher(url.getParameter(Constants.RELEASE_KEY))) {</span>
+<span class="nc" id="L127">                    invocation = new HttpRemoteInvocation(methodInvocation);</span>
+                } else {
+                    /*
+                      The customized 'com.alibaba.dubbo.rpc.protocol.http.HttpRemoteInvocation' was firstly introduced
+                      in v2.6.3. The main purpose is to support transformation of attachments in HttpProtocol, see
+                      https://github.com/apache/incubator-dubbo/pull/1827. To guarantee interoperability with lower
+                      versions, we need to check if the provider is v2.6.3 or higher before sending customized
+                      HttpRemoteInvocation.
+                     */
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                    if (Version.isRelease263OrHigher(url.getParameter(Constants.DUBBO_VERSION_KEY))) {</span>
+<span class="nc" id="L137">                        invocation = new com.alibaba.dubbo.rpc.protocol.http.HttpRemoteInvocation(methodInvocation);</span>
+                    } else {
+<span class="nc" id="L139">                        invocation = new RemoteInvocation(methodInvocation);</span>
+                    }
+                }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (isGeneric) {</span>
+<span class="nc" id="L143">                    invocation.addAttribute(Constants.GENERIC_KEY, generic);</span>
+                }
+<span class="nc" id="L145">                return invocation;</span>
+            }
+        });
+
+<span class="nc" id="L149">        String key = url.toIdentityString();</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (isGeneric) {</span>
+<span class="nc" id="L151">            key = key + &quot;/&quot; + Constants.GENERIC_KEY;</span>
+        }
+
+<span class="nc" id="L154">        httpProxyFactoryBean.setServiceUrl(key);</span>
+<span class="nc" id="L155">        httpProxyFactoryBean.setServiceInterface(serviceType);</span>
+<span class="nc" id="L156">        String client = url.getParameter(Constants.CLIENT_KEY);</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (StringUtils.isEmpty(client) || &quot;simple&quot;.equals(client)) {</span>
+<span class="nc" id="L158">            SimpleHttpInvokerRequestExecutor httpInvokerRequestExecutor = new SimpleHttpInvokerRequestExecutor() {</span>
+                @Override
+                protected void prepareConnection(HttpURLConnection con,
+                                                 int contentLength) throws IOException {
+<span class="nc" id="L162">                    super.prepareConnection(con, contentLength);</span>
+<span class="nc" id="L163">                    con.setReadTimeout(url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));</span>
+<span class="nc" id="L164">                    con.setConnectTimeout(url.getParameter(Constants.CONNECT_TIMEOUT_KEY, Constants.DEFAULT_CONNECT_TIMEOUT));</span>
+<span class="nc" id="L165">                }</span>
+            };
+<span class="nc" id="L167">            httpProxyFactoryBean.setHttpInvokerRequestExecutor(httpInvokerRequestExecutor);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        } else if (&quot;commons&quot;.equals(client)) {</span>
+<span class="nc" id="L169">            HttpComponentsHttpInvokerRequestExecutor httpInvokerRequestExecutor = new HttpComponentsHttpInvokerRequestExecutor();</span>
+<span class="nc" id="L170">            httpInvokerRequestExecutor.setReadTimeout(url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));</span>
+<span class="nc" id="L171">            httpInvokerRequestExecutor.setConnectTimeout(url.getParameter(Constants.CONNECT_TIMEOUT_KEY, Constants.DEFAULT_CONNECT_TIMEOUT));</span>
+<span class="nc" id="L172">            httpProxyFactoryBean.setHttpInvokerRequestExecutor(httpInvokerRequestExecutor);</span>
+<span class="nc" id="L173">        } else {</span>
+<span class="nc" id="L174">            throw new IllegalStateException(&quot;Unsupported http protocol client &quot; + client + &quot;, only supported: simple, commons&quot;);</span>
+        }
+<span class="nc" id="L176">        httpProxyFactoryBean.afterPropertiesSet();</span>
+<span class="nc" id="L177">        return (T) httpProxyFactoryBean.getObject();</span>
+    }
+
+    @Override
+    protected int getErrorCode(Throwable e) {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (e instanceof RemoteAccessException) {</span>
+<span class="nc" id="L183">            e = e.getCause();</span>
+        }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (e != null) {</span>
+<span class="nc" id="L186">            Class&lt;?&gt; cls = e.getClass();</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (SocketTimeoutException.class.equals(cls)) {</span>
+<span class="nc" id="L188">                return RpcException.TIMEOUT_EXCEPTION;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            } else if (IOException.class.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L190">                return RpcException.NETWORK_EXCEPTION;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            } else if (ClassNotFoundException.class.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L192">                return RpcException.SERIALIZATION_EXCEPTION;</span>
+            }
+        }
+<span class="nc" id="L195">        return super.getErrorCode(e);</span>
+    }
+
+<span class="nc" id="L198">    private class InternalHandler implements HttpHandler {</span>
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response)
+                throws IOException, ServletException {
+<span class="nc" id="L203">            String uri = request.getRequestURI();</span>
+<span class="nc" id="L204">            HttpInvokerServiceExporter skeleton = skeletonMap.get(uri);</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (!request.getMethod().equalsIgnoreCase(&quot;POST&quot;)) {</span>
+<span class="nc" id="L206">                response.setStatus(500);</span>
+            } else {
+<span class="nc" id="L208">                RpcContext.getContext().setRemoteAddress(request.getRemoteAddr(), request.getRemotePort());</span>
+                try {
+<span class="nc" id="L210">                    skeleton.handleRequest(request, response);</span>
+<span class="nc" id="L211">                } catch (Throwable e) {</span>
+<span class="nc" id="L212">                    throw new ServletException(e);</span>
+<span class="nc" id="L213">                }</span>
+            }
+<span class="nc" id="L215">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Response.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange</a> &gt; <span class="el_source">Response.java</span></div><h1>Response.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange;
+
+/**
+ * Response
+ */
+public class Response {
+
+<span class="nc" id="L24">    public static final String HEARTBEAT_EVENT = null;</span>
+
+    public static final String READONLY_EVENT = &quot;R&quot;;
+
+    /**
+     * ok.
+     */
+    public static final byte OK = 20;
+
+    /**
+     * client side timeout.
+     */
+    public static final byte CLIENT_TIMEOUT = 30;
+
+    /**
+     * server side timeout.
+     */
+    public static final byte SERVER_TIMEOUT = 31;
+
+    /**
+     * channel inactive, directly return the unfinished requests.
+     */
+    public static final byte CHANNEL_INACTIVE = 35;
+
+    /**
+     * request format error.
+     */
+    public static final byte BAD_REQUEST = 40;
+
+    /**
+     * response format error.
+     */
+    public static final byte BAD_RESPONSE = 50;
+
+    /**
+     * service not found.
+     */
+    public static final byte SERVICE_NOT_FOUND = 60;
+
+    /**
+     * service error.
+     */
+    public static final byte SERVICE_ERROR = 70;
+
+    /**
+     * internal server error.
+     */
+    public static final byte SERVER_ERROR = 80;
+
+    /**
+     * internal server error.
+     */
+    public static final byte CLIENT_ERROR = 90;
+
+    /**
+     * server side threadpool exhausted and quick return.
+     */
+    public static final byte SERVER_THREADPOOL_EXHAUSTED_ERROR = 100;
+
+    /**
+     * server side request limit
+     */
+    public static final byte SERVER_REQUEST_LIMIT = 110;
+
+<span class="nc" id="L88">    private long mId = 0;</span>
+
+    private String mVersion;
+
+<span class="nc" id="L92">    private byte mStatus = OK;</span>
+
+<span class="nc" id="L94">    private boolean mEvent = false;</span>
+
+    private String mErrorMsg;
+
+    private Object mResult;
+
+<span class="nc" id="L100">    public Response() {</span>
+<span class="nc" id="L101">    }</span>
+
+<span class="nc" id="L103">    public Response(long id) {</span>
+<span class="nc" id="L104">        mId = id;</span>
+<span class="nc" id="L105">    }</span>
+
+<span class="nc" id="L107">    public Response(long id, String version) {</span>
+<span class="nc" id="L108">        mId = id;</span>
+<span class="nc" id="L109">        mVersion = version;</span>
+<span class="nc" id="L110">    }</span>
+
+    public long getId() {
+<span class="nc" id="L113">        return mId;</span>
+    }
+
+    public void setId(long id) {
+<span class="nc" id="L117">        mId = id;</span>
+<span class="nc" id="L118">    }</span>
+
+    public String getVersion() {
+<span class="nc" id="L121">        return mVersion;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L125">        mVersion = version;</span>
+<span class="nc" id="L126">    }</span>
+
+    public byte getStatus() {
+<span class="nc" id="L129">        return mStatus;</span>
+    }
+
+    public void setStatus(byte status) {
+<span class="nc" id="L133">        mStatus = status;</span>
+<span class="nc" id="L134">    }</span>
+
+    public boolean isEvent() {
+<span class="nc" id="L137">        return mEvent;</span>
+    }
+
+    public void setEvent(String event) {
+<span class="nc" id="L141">        mEvent = true;</span>
+<span class="nc" id="L142">        mResult = event;</span>
+<span class="nc" id="L143">    }</span>
+
+    public void setEvent(boolean mEvent) {
+<span class="nc" id="L146">        this.mEvent = mEvent;</span>
+<span class="nc" id="L147">    }</span>
+
+    public boolean isHeartbeat() {
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        return mEvent &amp;&amp; HEARTBEAT_EVENT == mResult;</span>
+    }
+
+    @Deprecated
+    public void setHeartbeat(boolean isHeartbeat) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (isHeartbeat) {</span>
+<span class="nc" id="L156">            setEvent(HEARTBEAT_EVENT);</span>
+        }
+<span class="nc" id="L158">    }</span>
+
+    public Object getResult() {
+<span class="nc" id="L161">        return mResult;</span>
+    }
+
+    public void setResult(Object msg) {
+<span class="nc" id="L165">        mResult = msg;</span>
+<span class="nc" id="L166">    }</span>
+
+    public String getErrorMessage() {
+<span class="nc" id="L169">        return mErrorMsg;</span>
+    }
+
+    public void setErrorMessage(String msg) {
+<span class="nc" id="L173">        mErrorMsg = msg;</span>
+<span class="nc" id="L174">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L178">        return &quot;Response [id=&quot; + mId + &quot;, version=&quot; + mVersion + &quot;, status=&quot; + mStatus + &quot;, event=&quot; + mEvent</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                + &quot;, error=&quot; + mErrorMsg + &quot;, result=&quot; + (mResult == this ? &quot;this&quot; : mResult) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

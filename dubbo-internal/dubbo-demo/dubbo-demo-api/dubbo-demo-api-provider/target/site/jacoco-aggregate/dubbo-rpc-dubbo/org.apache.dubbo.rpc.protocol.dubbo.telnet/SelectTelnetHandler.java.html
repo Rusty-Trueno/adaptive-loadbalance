@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SelectTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo.telnet</a> &gt; <span class="el_source">SelectTelnetHandler.java</span></div><h1>SelectTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo.telnet;
+
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+
+import java.lang.reflect.Method;
+import java.util.List;
+
+/**
+ * SelectTelnetHandler
+ */
+@Activate
+@Help(parameter = &quot;[index]&quot;, summary = &quot;Select the index of the method you want to invoke.&quot;,
+        detail = &quot;Select the index of the method you want to invoke.&quot;)
+<span class="nc" id="L35">public class SelectTelnetHandler implements TelnetHandler {</span>
+    public static final String SELECT_METHOD_KEY = &quot;telnet.select.method&quot;;
+    public static final String SELECT_KEY = &quot;telnet.select&quot;;
+
+<span class="nc" id="L39">    private InvokeTelnetHandler invokeTelnetHandler = new InvokeTelnetHandler();</span>
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public String telnet(Channel channel, String message) {
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        if (message == null || message.length() == 0) {</span>
+<span class="nc" id="L45">            return &quot;Please input the index of the method you want to invoke, eg: \r\n select 1&quot;;</span>
+        }
+<span class="nc" id="L47">        List&lt;Method&gt; methodList = (List&lt;Method&gt;) channel.getAttribute(InvokeTelnetHandler.INVOKE_METHOD_LIST_KEY);</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(methodList)) {</span>
+<span class="nc" id="L49">            return &quot;Please use the invoke command first.&quot;;</span>
+        }
+<span class="nc bnc" id="L51" title="All 6 branches missed.">        if (!StringUtils.isInteger(message) || Integer.parseInt(message) &lt; 1 || Integer.parseInt(message) &gt; methodList.size()) {</span>
+<span class="nc" id="L52">            return &quot;Illegal index ,please input select 1~&quot; + methodList.size();</span>
+        }
+<span class="nc" id="L54">        Method method = methodList.get(Integer.parseInt(message));</span>
+<span class="nc" id="L55">        channel.setAttribute(SELECT_METHOD_KEY, method);</span>
+<span class="nc" id="L56">        channel.setAttribute(SELECT_KEY, Boolean.TRUE);</span>
+<span class="nc" id="L57">        String invokeMessage = (String) channel.getAttribute(InvokeTelnetHandler.INVOKE_MESSAGE_KEY);</span>
+<span class="nc" id="L58">        return invokeTelnetHandler.telnet(channel, invokeMessage);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CIDRUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-definition</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.utils</a> &gt; <span class="el_source">CIDRUtils.java</span></div><h1>CIDRUtils.java</h1><pre class="source lang-java linenums">/*
+ * The MIT License
+ *
+ * Copyright (c) 2013 Edin Dazdarevic (edin.dazdarevic@gmail.com)
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ **/
+package org.apache.dubbo.common.utils;
+
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A class that enables to get an IP range from CIDR specification. It supports
+ * both IPv4 and IPv6.
+ * &lt;p&gt;
+ * From https://github.com/edazdarevic/CIDRUtils/blob/master/CIDRUtils.java
+ */
+public class CIDRUtils {
+    private final String cidr;
+
+    private InetAddress inetAddress;
+    private InetAddress startAddress;
+    private InetAddress endAddress;
+    private final int prefixLength;
+
+
+<span class="nc" id="L46">    public CIDRUtils(String cidr) throws UnknownHostException {</span>
+
+<span class="nc" id="L48">        this.cidr = cidr;</span>
+
+        /* split CIDR to address and prefix part */
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (this.cidr.contains(&quot;/&quot;)) {</span>
+<span class="nc" id="L52">            int index = this.cidr.indexOf(&quot;/&quot;);</span>
+<span class="nc" id="L53">            String addressPart = this.cidr.substring(0, index);</span>
+<span class="nc" id="L54">            String networkPart = this.cidr.substring(index + 1);</span>
+
+<span class="nc" id="L56">            inetAddress = InetAddress.getByName(addressPart);</span>
+<span class="nc" id="L57">            prefixLength = Integer.parseInt(networkPart);</span>
+
+<span class="nc" id="L59">            calculate();</span>
+<span class="nc" id="L60">        } else {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;not an valid CIDR format!&quot;);</span>
+        }
+<span class="nc" id="L63">    }</span>
+
+
+    private void calculate() throws UnknownHostException {
+
+        ByteBuffer maskBuffer;
+        int targetSize;
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (inetAddress.getAddress().length == 4) {</span>
+<span class="nc" id="L71">            maskBuffer =</span>
+                    ByteBuffer
+<span class="nc" id="L73">                            .allocate(4)</span>
+<span class="nc" id="L74">                            .putInt(-1);</span>
+<span class="nc" id="L75">            targetSize = 4;</span>
+        } else {
+<span class="nc" id="L77">            maskBuffer = ByteBuffer.allocate(16)</span>
+<span class="nc" id="L78">                    .putLong(-1L)</span>
+<span class="nc" id="L79">                    .putLong(-1L);</span>
+<span class="nc" id="L80">            targetSize = 16;</span>
+        }
+
+<span class="nc" id="L83">        BigInteger mask = (new BigInteger(1, maskBuffer.array())).not().shiftRight(prefixLength);</span>
+
+<span class="nc" id="L85">        ByteBuffer buffer = ByteBuffer.wrap(inetAddress.getAddress());</span>
+<span class="nc" id="L86">        BigInteger ipVal = new BigInteger(1, buffer.array());</span>
+
+<span class="nc" id="L88">        BigInteger startIp = ipVal.and(mask);</span>
+<span class="nc" id="L89">        BigInteger endIp = startIp.add(mask.not());</span>
+
+<span class="nc" id="L91">        byte[] startIpArr = toBytes(startIp.toByteArray(), targetSize);</span>
+<span class="nc" id="L92">        byte[] endIpArr = toBytes(endIp.toByteArray(), targetSize);</span>
+
+<span class="nc" id="L94">        this.startAddress = InetAddress.getByAddress(startIpArr);</span>
+<span class="nc" id="L95">        this.endAddress = InetAddress.getByAddress(endIpArr);</span>
+
+<span class="nc" id="L97">    }</span>
+
+    private byte[] toBytes(byte[] array, int targetSize) {
+<span class="nc" id="L100">        int counter = 0;</span>
+<span class="nc" id="L101">        List&lt;Byte&gt; newArr = new ArrayList&lt;Byte&gt;();</span>
+<span class="nc bnc" id="L102" title="All 4 branches missed.">        while (counter &lt; targetSize &amp;&amp; (array.length - 1 - counter &gt;= 0)) {</span>
+<span class="nc" id="L103">            newArr.add(0, array[array.length - 1 - counter]);</span>
+<span class="nc" id="L104">            counter++;</span>
+        }
+
+<span class="nc" id="L107">        int size = newArr.size();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        for (int i = 0; i &lt; (targetSize - size); i++) {</span>
+
+<span class="nc" id="L110">            newArr.add(0, (byte) 0);</span>
+        }
+
+<span class="nc" id="L113">        byte[] ret = new byte[newArr.size()];</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (int i = 0; i &lt; newArr.size(); i++) {</span>
+<span class="nc" id="L115">            ret[i] = newArr.get(i);</span>
+        }
+<span class="nc" id="L117">        return ret;</span>
+    }
+
+    public String getNetworkAddress() {
+
+<span class="nc" id="L122">        return this.startAddress.getHostAddress();</span>
+    }
+
+    public String getBroadcastAddress() {
+<span class="nc" id="L126">        return this.endAddress.getHostAddress();</span>
+    }
+
+    public boolean isInRange(String ipAddress) throws UnknownHostException {
+<span class="nc" id="L130">        InetAddress address = InetAddress.getByName(ipAddress);</span>
+<span class="nc" id="L131">        BigInteger start = new BigInteger(1, this.startAddress.getAddress());</span>
+<span class="nc" id="L132">        BigInteger end = new BigInteger(1, this.endAddress.getAddress());</span>
+<span class="nc" id="L133">        BigInteger target = new BigInteger(1, address.getAddress());</span>
+
+<span class="nc" id="L135">        int st = start.compareTo(target);</span>
+<span class="nc" id="L136">        int te = target.compareTo(end);</span>
+
+<span class="nc bnc" id="L138" title="All 8 branches missed.">        return (st == -1 || st == 0) &amp;&amp; (te == -1 || te == 0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MetadataReportConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">MetadataReportConfig.java</span></div><h1>MetadataReportConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.support.Parameter;
+
+import java.util.Map;
+
+import static org.apache.dubbo.common.Constants.PROPERTIES_CHAR_SEPERATOR;
+
+/**
+ * MetadataReportConfig
+ *
+ * @export
+ */
+public class MetadataReportConfig extends AbstractConfig {
+
+    private static final long serialVersionUID = 55233L;
+    /**
+     * the value is : metadata-report
+     */
+<span class="nc" id="L38">    private static final String PREFIX_TAG = StringUtils.camelToSplitName(</span>
+<span class="nc" id="L39">            MetadataReportConfig.class.getSimpleName().substring(0, MetadataReportConfig.class.getSimpleName().length() - 6), PROPERTIES_CHAR_SEPERATOR);</span>
+
+    // Register center address
+    private String address;
+
+    // Username to login register center
+    private String username;
+
+    // Password to login register center
+    private String password;
+
+    // Request timeout in milliseconds for register center
+    private Integer timeout;
+
+    /**
+     * The group the metadata in . It is the same as registry
+     */
+    private String group;
+
+    // Customized parameters
+    private Map&lt;String, String&gt; parameters;
+
+    private Integer retryTimes;
+
+    private Integer retryPeriod;
+    /**
+     * By default the metadatastore will store full metadata repeatly every day .
+     */
+    private Boolean cycleReport;
+
+    /**
+     * Sync report, default async
+     */
+    private Boolean syncReport;
+
+<span class="nc" id="L74">    public MetadataReportConfig() {</span>
+<span class="nc" id="L75">    }</span>
+
+<span class="nc" id="L77">    public MetadataReportConfig(String address) {</span>
+<span class="nc" id="L78">        setAddress(address);</span>
+<span class="nc" id="L79">    }</span>
+
+    @Parameter(excluded = true)
+    public String getAddress() {
+<span class="nc" id="L83">        return address;</span>
+    }
+
+    public void setAddress(String address) {
+<span class="nc" id="L87">        this.address = address;</span>
+<span class="nc" id="L88">    }</span>
+
+    public String getUsername() {
+<span class="nc" id="L91">        return username;</span>
+    }
+
+    public void setUsername(String username) {
+<span class="nc" id="L95">        this.username = username;</span>
+<span class="nc" id="L96">    }</span>
+
+    public String getPassword() {
+<span class="nc" id="L99">        return password;</span>
+    }
+
+    public void setPassword(String password) {
+<span class="nc" id="L103">        this.password = password;</span>
+<span class="nc" id="L104">    }</span>
+
+    public Integer getTimeout() {
+<span class="nc" id="L107">        return timeout;</span>
+    }
+
+    public void setTimeout(Integer timeout) {
+<span class="nc" id="L111">        this.timeout = timeout;</span>
+<span class="nc" id="L112">    }</span>
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L115">        return parameters;</span>
+    }
+
+    public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L119">        this.parameters = parameters;</span>
+<span class="nc" id="L120">    }</span>
+
+    @Parameter(key = &quot;retry-times&quot;)
+    public Integer getRetryTimes() {
+<span class="nc" id="L124">        return retryTimes;</span>
+    }
+
+    public void setRetryTimes(Integer retryTimes) {
+<span class="nc" id="L128">        this.retryTimes = retryTimes;</span>
+<span class="nc" id="L129">    }</span>
+
+    @Parameter(key = &quot;retry-period&quot;)
+    public Integer getRetryPeriod() {
+<span class="nc" id="L133">        return retryPeriod;</span>
+    }
+
+    public void setRetryPeriod(Integer retryPeriod) {
+<span class="nc" id="L137">        this.retryPeriod = retryPeriod;</span>
+<span class="nc" id="L138">    }</span>
+
+    @Parameter(key = &quot;cycle-report&quot;)
+    public Boolean getCycleReport() {
+<span class="nc" id="L142">        return cycleReport;</span>
+    }
+
+    public void setCycleReport(Boolean cycleReport) {
+<span class="nc" id="L146">        this.cycleReport = cycleReport;</span>
+<span class="nc" id="L147">    }</span>
+
+    @Parameter(key = &quot;sync-report&quot;)
+    public Boolean getSyncReport() {
+<span class="nc" id="L151">        return syncReport;</span>
+    }
+
+    public void setSyncReport(Boolean syncReport) {
+<span class="nc" id="L155">        this.syncReport = syncReport;</span>
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    @Parameter(excluded = true)
+    public String getPrefix() {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        return StringUtils.isNotEmpty(prefix) ? prefix : (Constants.DUBBO + &quot;.&quot; + PREFIX_TAG);</span>
+    }
+
+    @Override
+    @Parameter(excluded = true)
+    public boolean isValid() {
+<span class="nc" id="L167">        return StringUtils.isNotEmpty(address);</span>
+    }
+
+    public String getGroup() {
+<span class="nc" id="L171">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L175">        this.group = group;</span>
+<span class="nc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

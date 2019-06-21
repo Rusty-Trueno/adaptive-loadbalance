@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-rest</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.rest</a> &gt; <span class="el_source">NettyServer.java</span></div><h1>NettyServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.rest;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.NetUtils;
+
+import io.netty.channel.ChannelOption;
+import org.jboss.resteasy.plugins.server.netty.NettyJaxrsServer;
+import org.jboss.resteasy.spi.ResteasyDeployment;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Netty server can't support @Context injection of servlet objects since it's not a servlet container
+ *
+ */
+<span class="nc" id="L34">public class NettyServer extends BaseRestServer {</span>
+
+<span class="nc" id="L36">    private final NettyJaxrsServer server = new NettyJaxrsServer();</span>
+
+    @Override
+    protected void doStart(URL url) {
+<span class="nc" id="L40">        String bindIp = url.getParameter(Constants.BIND_IP_KEY, url.getHost());</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        if (!url.isAnyHost() &amp;&amp; NetUtils.isValidLocalHost(bindIp)) {</span>
+<span class="nc" id="L42">            server.setHostname(bindIp);</span>
+        }
+<span class="nc" id="L44">        server.setPort(url.getParameter(Constants.BIND_PORT_KEY, url.getPort()));</span>
+<span class="nc" id="L45">        Map&lt;ChannelOption, Object&gt; channelOption = new HashMap&lt;ChannelOption, Object&gt;();</span>
+<span class="nc" id="L46">        channelOption.put(ChannelOption.SO_KEEPALIVE, url.getParameter(Constants.KEEP_ALIVE_KEY, Constants.DEFAULT_KEEP_ALIVE));</span>
+<span class="nc" id="L47">        server.setChildChannelOptions(channelOption);</span>
+<span class="nc" id="L48">        server.setExecutorThreadCount(url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS));</span>
+<span class="nc" id="L49">        server.setIoWorkerCount(url.getParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS));</span>
+<span class="nc" id="L50">        server.setMaxRequestSize(url.getParameter(Constants.PAYLOAD_KEY, Constants.DEFAULT_PAYLOAD));</span>
+<span class="nc" id="L51">        server.start();</span>
+<span class="nc" id="L52">    }</span>
+
+    @Override
+    public void stop() {
+<span class="nc" id="L56">        server.stop();</span>
+<span class="nc" id="L57">    }</span>
+
+    @Override
+    protected ResteasyDeployment getDeployment() {
+<span class="nc" id="L61">        return server.getDeployment();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

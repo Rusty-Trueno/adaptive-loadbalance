@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TokenFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.filter</a> &gt; <span class="el_source">TokenFilter.java</span></div><h1>TokenFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.Map;
+
+/**
+ * Perform check whether given provider token is matching with remote token or not. If it does not match
+ * it will not allow to invoke remote method.
+ *
+ * @see Filter
+ */
+@Activate(group = Constants.PROVIDER, value = Constants.TOKEN_KEY)
+<span class="nc" id="L38">public class TokenFilter implements Filter {</span>
+
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation inv)
+            throws RpcException {
+<span class="nc" id="L43">        String token = invoker.getUrl().getParameter(Constants.TOKEN_KEY);</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (ConfigUtils.isNotEmpty(token)) {</span>
+<span class="nc" id="L45">            Class&lt;?&gt; serviceType = invoker.getInterface();</span>
+<span class="nc" id="L46">            Map&lt;String, String&gt; attachments = inv.getAttachments();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">            String remoteToken = attachments == null ? null : attachments.get(Constants.TOKEN_KEY);</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (!token.equals(remoteToken)) {</span>
+<span class="nc" id="L49">                throw new RpcException(&quot;Invalid token! Forbid invoke remote service &quot; + serviceType + &quot; method &quot; + inv.getMethodName() + &quot;() from consumer &quot; + RpcContext.getContext().getRemoteHost() + &quot; to provider &quot; + RpcContext.getContext().getLocalHost());</span>
+            }
+        }
+<span class="nc" id="L52">        return invoker.invoke(inv);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

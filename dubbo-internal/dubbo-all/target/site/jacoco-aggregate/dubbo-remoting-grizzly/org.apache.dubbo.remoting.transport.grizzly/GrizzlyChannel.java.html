@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GrizzlyChannel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-grizzly</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.grizzly</a> &gt; <span class="el_source">GrizzlyChannel.java</span></div><h1>GrizzlyChannel.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.grizzly;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractChannel;
+
+import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.Grizzly;
+import org.glassfish.grizzly.GrizzlyFuture;
+import org.glassfish.grizzly.attributes.Attribute;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * GrizzlyChannel
+ *
+ *
+ */
+final class GrizzlyChannel extends AbstractChannel {
+
+<span class="nc" id="L43">    private static final Logger logger = LoggerFactory.getLogger(GrizzlyChannel.class);</span>
+
+<span class="nc" id="L45">    private static final String CHANNEL_KEY = GrizzlyChannel.class.getName() + &quot;.CHANNEL&quot;;</span>
+
+<span class="nc" id="L47">    private static final Attribute&lt;GrizzlyChannel&gt; ATTRIBUTE = Grizzly.DEFAULT_ATTRIBUTE_BUILDER.createAttribute(CHANNEL_KEY);</span>
+
+    private final Connection&lt;?&gt; connection;
+
+    /**
+     * @param connection
+     * @param url
+     * @param handler
+     */
+    private GrizzlyChannel(Connection&lt;?&gt; connection, URL url, ChannelHandler handler) {
+<span class="nc" id="L57">        super(url, handler);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (connection == null) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;grizzly connection == null&quot;);</span>
+        }
+<span class="nc" id="L61">        this.connection = connection;</span>
+<span class="nc" id="L62">    }</span>
+
+    static GrizzlyChannel getOrAddChannel(Connection&lt;?&gt; connection, URL url, ChannelHandler handler) {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (connection == null) {</span>
+<span class="nc" id="L66">            return null;</span>
+        }
+<span class="nc" id="L68">        GrizzlyChannel ret = ATTRIBUTE.get(connection);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (ret == null) {</span>
+<span class="nc" id="L70">            ret = new GrizzlyChannel(connection, url, handler);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (connection.isOpen()) {</span>
+<span class="nc" id="L72">                ATTRIBUTE.set(connection, ret);</span>
+            }
+        }
+<span class="nc" id="L75">        return ret;</span>
+    }
+
+    static void removeChannelIfDisconnected(Connection&lt;?&gt; connection) {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        if (connection != null &amp;&amp; !connection.isOpen()) {</span>
+<span class="nc" id="L80">            ATTRIBUTE.remove(connection);</span>
+        }
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L86">        return (InetSocketAddress) connection.getPeerAddress();</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc" id="L91">        return connection.isOpen();</span>
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L96">        return (InetSocketAddress) connection.getLocalAddress();</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;rawtypes&quot;)
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L102">        super.send(message, sent);</span>
+
+<span class="nc" id="L104">        int timeout = 0;</span>
+        try {
+<span class="nc" id="L106">            GrizzlyFuture future = connection.write(message);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (sent) {</span>
+<span class="nc" id="L108">                timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc" id="L109">                future.get(timeout, TimeUnit.MILLISECONDS);</span>
+            }
+<span class="nc" id="L111">        } catch (TimeoutException e) {</span>
+<span class="nc" id="L112">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress()</span>
+                    + &quot;in timeout(&quot; + timeout + &quot;ms) limit&quot;, e);
+<span class="nc" id="L114">        } catch (Throwable e) {</span>
+<span class="nc" id="L115">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L122">            super.close();</span>
+<span class="nc" id="L123">        } catch (Exception e) {</span>
+<span class="nc" id="L124">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L125">        }</span>
+        try {
+<span class="nc" id="L127">            removeChannelIfDisconnected(connection);</span>
+<span class="nc" id="L128">        } catch (Exception e) {</span>
+<span class="nc" id="L129">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L130">        }</span>
+        try {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L133">                logger.info(&quot;Close grizzly channel &quot; + connection);</span>
+            }
+<span class="nc" id="L135">            connection.close();</span>
+<span class="nc" id="L136">        } catch (Exception e) {</span>
+<span class="nc" id="L137">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L138">        }</span>
+<span class="nc" id="L139">    }</span>
+
+    @Override
+    public boolean hasAttribute(String key) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        return getAttribute(key) == null;</span>
+    }
+
+    @Override
+    public Object getAttribute(String key) {
+<span class="nc" id="L148">        return Grizzly.DEFAULT_ATTRIBUTE_BUILDER.createAttribute(key).get(connection);</span>
+    }
+
+    @Override
+    public void setAttribute(String key, Object value) {
+<span class="nc" id="L153">        Grizzly.DEFAULT_ATTRIBUTE_BUILDER.createAttribute(key).set(connection, value);</span>
+<span class="nc" id="L154">    }</span>
+
+    @Override
+    public void removeAttribute(String key) {
+<span class="nc" id="L158">        Grizzly.DEFAULT_ATTRIBUTE_BUILDER.createAttribute(key).remove(connection);</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L163">        final int prime = 31;</span>
+<span class="nc" id="L164">        int result = 1;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        result = prime * result + ((connection == null) ? 0 : connection.hashCode());</span>
+<span class="nc" id="L166">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L172">            return true;</span>
+        }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L175">            return false;</span>
+        }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L178">            return false;</span>
+        }
+<span class="nc" id="L180">        GrizzlyChannel other = (GrizzlyChannel) obj;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (connection == null) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (other.connection != null) {</span>
+<span class="nc" id="L183">                return false;</span>
+            }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        } else if (!connection.equals(other.connection)) {</span>
+<span class="nc" id="L186">            return false;</span>
+        }
+<span class="nc" id="L188">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L193">        return &quot;GrizzlyChannel [connection=&quot; + connection + &quot;]&quot;;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

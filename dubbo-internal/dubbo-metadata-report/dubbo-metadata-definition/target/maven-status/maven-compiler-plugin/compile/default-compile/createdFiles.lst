@@ -1,0 +1,14 @@
+org/apache/dubbo/metadata/definition/ServiceDefinitionBuilder.class
+org/apache/dubbo/metadata/definition/TypeDefinitionBuilder.class
+org/apache/dubbo/metadata/definition/model/MethodDefinition.class
+org/apache/dubbo/metadata/definition/util/JaketConfigurationUtils.class
+org/apache/dubbo/metadata/definition/builder/DefaultTypeBuilder.class
+org/apache/dubbo/metadata/definition/builder/ArrayTypeBuilder.class
+org/apache/dubbo/metadata/definition/model/TypeDefinition.class
+org/apache/dubbo/metadata/definition/builder/CollectionTypeBuilder.class
+org/apache/dubbo/metadata/definition/model/ServiceDefinition.class
+org/apache/dubbo/metadata/definition/builder/EnumTypeBuilder.class
+org/apache/dubbo/metadata/definition/model/FullServiceDefinition.class
+org/apache/dubbo/metadata/definition/util/ClassUtils.class
+org/apache/dubbo/metadata/definition/builder/TypeBuilder.class
+org/apache/dubbo/metadata/definition/builder/MapTypeBuilder.class

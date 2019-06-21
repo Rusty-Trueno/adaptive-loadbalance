@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InvokerInvocationHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.proxy</a> &gt; <span class="el_source">InvokerInvocationHandler.java</span></div><h1>InvokerInvocationHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.proxy;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+
+/**
+ * InvokerHandler
+ */
+public class InvokerInvocationHandler implements InvocationHandler {
+<span class="nc" id="L33">    private static final Logger logger = LoggerFactory.getLogger(InvokerInvocationHandler.class);</span>
+    private final Invoker&lt;?&gt; invoker;
+
+<span class="nc" id="L36">    public InvokerInvocationHandler(Invoker&lt;?&gt; handler) {</span>
+<span class="nc" id="L37">        this.invoker = handler;</span>
+<span class="nc" id="L38">    }</span>
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+<span class="nc" id="L42">        String methodName = method.getName();</span>
+<span class="nc" id="L43">        Class&lt;?&gt;[] parameterTypes = method.getParameterTypes();</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (method.getDeclaringClass() == Object.class) {</span>
+<span class="nc" id="L45">            return method.invoke(invoker, args);</span>
+        }
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        if (&quot;toString&quot;.equals(methodName) &amp;&amp; parameterTypes.length == 0) {</span>
+<span class="nc" id="L48">            return invoker.toString();</span>
+        }
+<span class="nc bnc" id="L50" title="All 4 branches missed.">        if (&quot;hashCode&quot;.equals(methodName) &amp;&amp; parameterTypes.length == 0) {</span>
+<span class="nc" id="L51">            return invoker.hashCode();</span>
+        }
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        if (&quot;equals&quot;.equals(methodName) &amp;&amp; parameterTypes.length == 1) {</span>
+<span class="nc" id="L54">            return invoker.equals(args[0]);</span>
+        }
+
+<span class="nc" id="L57">        return invoker.invoke(createInvocation(method, args)).recreate();</span>
+    }
+
+    private RpcInvocation createInvocation(Method method, Object[] args) {
+<span class="nc" id="L61">        RpcInvocation invocation = new RpcInvocation(method, args);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (RpcUtils.hasFutureReturnType(method)) {</span>
+<span class="nc" id="L63">            invocation.setAttachment(Constants.FUTURE_RETURNTYPE_KEY, &quot;true&quot;);</span>
+<span class="nc" id="L64">            invocation.setAttachment(Constants.ASYNC_KEY, &quot;true&quot;);</span>
+        }
+<span class="nc" id="L66">        return invocation;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TomcatHttpServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-http</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.http.tomcat</a> &gt; <span class="el_source">TomcatHttpServer.java</span></div><h1>TomcatHttpServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.http.tomcat;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.http.HttpHandler;
+import org.apache.dubbo.remoting.http.servlet.DispatcherServlet;
+import org.apache.dubbo.remoting.http.servlet.ServletManager;
+import org.apache.dubbo.remoting.http.support.AbstractHttpServer;
+
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.startup.Tomcat;
+
+import java.io.File;
+
+public class TomcatHttpServer extends AbstractHttpServer {
+
+<span class="nc" id="L36">    private static final Logger logger = LoggerFactory.getLogger(TomcatHttpServer.class);</span>
+
+    private final Tomcat tomcat;
+
+    private final URL url;
+
+    public TomcatHttpServer(URL url, final HttpHandler handler) {
+<span class="nc" id="L43">        super(url, handler);</span>
+
+<span class="nc" id="L45">        this.url = url;</span>
+<span class="nc" id="L46">        DispatcherServlet.addHttpHandler(url.getPort(), handler);</span>
+<span class="nc" id="L47">        String baseDir = new File(System.getProperty(&quot;java.io.tmpdir&quot;)).getAbsolutePath();</span>
+<span class="nc" id="L48">        tomcat = new Tomcat();</span>
+<span class="nc" id="L49">        tomcat.setBaseDir(baseDir);</span>
+<span class="nc" id="L50">        tomcat.setPort(url.getPort());</span>
+<span class="nc" id="L51">        tomcat.getConnector().setProperty(</span>
+<span class="nc" id="L52">                &quot;maxThreads&quot;, String.valueOf(url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS)));</span>
+//        tomcat.getConnector().setProperty(
+//                &quot;minSpareThreads&quot;, String.valueOf(url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS)));
+
+<span class="nc" id="L56">        tomcat.getConnector().setProperty(</span>
+<span class="nc" id="L57">                &quot;maxConnections&quot;, String.valueOf(url.getParameter(Constants.ACCEPTS_KEY, -1)));</span>
+
+<span class="nc" id="L59">        tomcat.getConnector().setProperty(&quot;URIEncoding&quot;, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L60">        tomcat.getConnector().setProperty(&quot;connectionTimeout&quot;, &quot;60000&quot;);</span>
+
+<span class="nc" id="L62">        tomcat.getConnector().setProperty(&quot;maxKeepAliveRequests&quot;, &quot;-1&quot;);</span>
+<span class="nc" id="L63">        tomcat.getConnector().setProtocol(&quot;org.apache.coyote.http11.Http11NioProtocol&quot;);</span>
+
+<span class="nc" id="L65">        Context context = tomcat.addContext(&quot;/&quot;, baseDir);</span>
+<span class="nc" id="L66">        Tomcat.addServlet(context, &quot;dispatcher&quot;, new DispatcherServlet());</span>
+<span class="nc" id="L67">        context.addServletMapping(&quot;/*&quot;, &quot;dispatcher&quot;);</span>
+<span class="nc" id="L68">        ServletManager.getInstance().addServletContext(url.getPort(), context.getServletContext());</span>
+
+        // tell tomcat to fail on startup failures.
+<span class="nc" id="L71">        System.setProperty(&quot;org.apache.catalina.startup.EXIT_ON_INIT_FAILURE&quot;, &quot;true&quot;);</span>
+
+        try {
+<span class="nc" id="L74">            tomcat.start();</span>
+<span class="nc" id="L75">        } catch (LifecycleException e) {</span>
+<span class="nc" id="L76">            throw new IllegalStateException(&quot;Failed to start tomcat server at &quot; + url.getAddress(), e);</span>
+<span class="nc" id="L77">        }</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L82">        super.close();</span>
+
+<span class="nc" id="L84">        ServletManager.getInstance().removeServletContext(url.getPort());</span>
+
+        try {
+<span class="nc" id="L87">            tomcat.stop();</span>
+<span class="nc" id="L88">        } catch (Exception e) {</span>
+<span class="nc" id="L89">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L90">        }</span>
+<span class="nc" id="L91">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

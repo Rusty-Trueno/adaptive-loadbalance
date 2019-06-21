@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ListenableRouter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.router.condition.config</a> &gt; <span class="el_source">ListenableRouter.java</span></div><h1>ListenableRouter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.router.condition.config;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.configcenter.ConfigChangeEvent;
+import org.apache.dubbo.configcenter.ConfigChangeType;
+import org.apache.dubbo.configcenter.ConfigurationListener;
+import org.apache.dubbo.configcenter.DynamicConfiguration;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.cluster.Router;
+import org.apache.dubbo.rpc.cluster.router.AbstractRouter;
+import org.apache.dubbo.rpc.cluster.router.condition.ConditionRouter;
+import org.apache.dubbo.rpc.cluster.router.condition.config.model.ConditionRouterRule;
+import org.apache.dubbo.rpc.cluster.router.condition.config.model.ConditionRuleParser;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Abstract router which listens to dynamic configuration
+ */
+public abstract class ListenableRouter extends AbstractRouter implements ConfigurationListener {
+    public static final String NAME = &quot;LISTENABLE_ROUTER&quot;;
+    private static final String RULE_SUFFIX = &quot;.condition-router&quot;;
+
+<span class="nc" id="L48">    private static final Logger logger = LoggerFactory.getLogger(ListenableRouter.class);</span>
+    private ConditionRouterRule routerRule;
+<span class="nc" id="L50">    private List&lt;ConditionRouter&gt; conditionRouters = Collections.emptyList();</span>
+
+    public ListenableRouter(DynamicConfiguration configuration, URL url, String ruleKey) {
+<span class="nc" id="L53">        super(configuration, url);</span>
+<span class="nc" id="L54">        this.force = false;</span>
+<span class="nc" id="L55">        this.init(ruleKey);</span>
+<span class="nc" id="L56">    }</span>
+
+    @Override
+    public synchronized void process(ConfigChangeEvent event) {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L61">            logger.info(&quot;Notification of condition rule, change type is: &quot; + event.getChangeType() +</span>
+<span class="nc" id="L62">                    &quot;, raw rule is:\n &quot; + event.getValue());</span>
+        }
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (event.getChangeType().equals(ConfigChangeType.DELETED)) {</span>
+<span class="nc" id="L66">            routerRule = null;</span>
+<span class="nc" id="L67">            conditionRouters = Collections.emptyList();</span>
+        } else {
+            try {
+<span class="nc" id="L70">                routerRule = ConditionRuleParser.parse(event.getValue());</span>
+<span class="nc" id="L71">                generateConditions(routerRule);</span>
+<span class="nc" id="L72">            } catch (Exception e) {</span>
+<span class="nc" id="L73">                logger.error(&quot;Failed to parse the raw condition rule and it will not take effect, please check &quot; +</span>
+<span class="nc" id="L74">                        &quot;if the condition rule matches with the template, the raw rule is:\n &quot; + event.getValue(), e);</span>
+<span class="nc" id="L75">            }</span>
+        }
+<span class="nc" id="L77">    }</span>
+
+    @Override
+    public &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; route(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) throws RpcException {
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        if (CollectionUtils.isEmpty(invokers) || conditionRouters.size() == 0) {</span>
+<span class="nc" id="L82">            return invokers;</span>
+        }
+
+        // We will check enabled status inside each router.
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (Router router : conditionRouters) {</span>
+<span class="nc" id="L87">            invokers = router.route(invokers, url, invocation);</span>
+<span class="nc" id="L88">        }</span>
+
+<span class="nc" id="L90">        return invokers;</span>
+    }
+
+    @Override
+    public int getPriority() {
+<span class="nc" id="L95">        return DEFAULT_PRIORITY;</span>
+    }
+
+    @Override
+    public boolean isForce() {
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        return (routerRule != null &amp;&amp; routerRule.isForce());</span>
+    }
+
+    private boolean isRuleRuntime() {
+<span class="nc bnc" id="L104" title="All 6 branches missed.">        return routerRule != null &amp;&amp; routerRule.isValid() &amp;&amp; routerRule.isRuntime();</span>
+    }
+
+    private void generateConditions(ConditionRouterRule rule) {
+<span class="nc bnc" id="L108" title="All 4 branches missed.">        if (rule != null &amp;&amp; rule.isValid()) {</span>
+<span class="nc" id="L109">            this.conditionRouters = rule.getConditions()</span>
+<span class="nc" id="L110">                    .stream()</span>
+<span class="nc" id="L111">                    .map(condition -&gt; new ConditionRouter(condition, rule.isForce(), rule.isEnabled()))</span>
+<span class="nc" id="L112">                    .collect(Collectors.toList());</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    private synchronized void init(String ruleKey) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (StringUtils.isEmpty(ruleKey)) {</span>
+<span class="nc" id="L118">            return;</span>
+        }
+<span class="nc" id="L120">        String routerKey = ruleKey + RULE_SUFFIX;</span>
+<span class="nc" id="L121">        configuration.addListener(routerKey, this);</span>
+<span class="nc" id="L122">        String rule = configuration.getConfig(routerKey);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(rule)) {</span>
+<span class="nc" id="L124">            this.process(new ConfigChangeEvent(routerKey, rule));</span>
+        }
+<span class="nc" id="L126">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

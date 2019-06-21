@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JEtcdClientWrapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.etcd.jetcd</a> &gt; <span class="el_source">JEtcdClientWrapper.java</span></div><h1>JEtcdClientWrapper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.etcd.jetcd;
+
+import io.etcd.jetcd.kv.PutResponse;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.etcd.RetryPolicy;
+import org.apache.dubbo.remoting.etcd.StateListener;
+import org.apache.dubbo.remoting.etcd.option.Constants;
+
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.Client;
+import io.etcd.jetcd.ClientBuilder;
+import io.etcd.jetcd.CloseableClient;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.Observers;
+import io.etcd.jetcd.common.exception.ErrorCode;
+import io.etcd.jetcd.common.exception.EtcdException;
+import io.etcd.jetcd.kv.GetResponse;
+import io.etcd.jetcd.lease.LeaseKeepAliveResponse;
+import io.etcd.jetcd.options.GetOption;
+import io.etcd.jetcd.options.PutOption;
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
+import io.grpc.util.RoundRobinLoadBalancerFactory;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+
+import static java.util.stream.Collectors.toList;
+
+public class JEtcdClientWrapper {
+
+<span class="nc" id="L72">    private Logger logger = LoggerFactory.getLogger(JEtcdClientWrapper.class);</span>
+
+    private final URL url;
+    private volatile Client client;
+<span class="nc" id="L76">    private volatile boolean started = false;</span>
+<span class="nc" id="L77">    private volatile boolean connectState = false;</span>
+    private ScheduledFuture future;
+    private ScheduledExecutorService reconnectNotify;
+    private AtomicReference&lt;ManagedChannel&gt; channel;
+
+    private ConnectionStateListener connectionStateListener;
+
+    private long expirePeriod;
+
+    private CompletableFuture&lt;Client&gt; completableFuture;
+
+    private RetryPolicy retryPolicy;
+
+    private RuntimeException failed;
+
+    private final ScheduledFuture&lt;?&gt; retryFuture;
+<span class="nc" id="L93">    private final ScheduledExecutorService retryExecutor = Executors.newScheduledThreadPool(1,</span>
+            new NamedThreadFactory(&quot;Etcd3RegistryKeepAliveFailedRetryTimer&quot;, true));
+
+<span class="nc" id="L96">    private final Set&lt;String&gt; failedRegistered = new ConcurrentHashSet&lt;String&gt;();</span>
+
+<span class="nc" id="L98">    private final Set&lt;String&gt; registeredPaths = new ConcurrentHashSet&lt;&gt;();</span>
+<span class="nc" id="L99">    private volatile CloseableClient keepAlive = null;</span>
+
+    /**
+     * Support temporary nodes to reuse the same lease
+     */
+    private volatile long globalLeaseId;
+
+<span class="nc" id="L106">    private volatile boolean cancelKeepAlive = false;</span>
+
+<span class="nc" id="L108">    public static final Charset UTF_8 = Charset.forName(&quot;UTF-8&quot;);</span>
+
+<span class="nc" id="L110">    public JEtcdClientWrapper(URL url) {</span>
+<span class="nc" id="L111">        this.url = url;</span>
+<span class="nc" id="L112">        this.expirePeriod = url.getParameter(Constants.SESSION_TIMEOUT_KEY, Constants.DEFAULT_KEEPALIVE_TIMEOUT) / 1000;</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (expirePeriod &lt;= 0) {</span>
+<span class="nc" id="L114">            this.expirePeriod = Constants.DEFAULT_KEEPALIVE_TIMEOUT / 1000;</span>
+        }
+<span class="nc" id="L116">        this.channel = new AtomicReference&lt;&gt;();</span>
+<span class="nc" id="L117">        this.completableFuture = CompletableFuture.supplyAsync(() -&gt; prepareClient(url));</span>
+<span class="nc" id="L118">        this.reconnectNotify = Executors.newScheduledThreadPool(1,</span>
+                new NamedThreadFactory(&quot;reconnectNotify&quot;, true));
+<span class="nc" id="L120">        this.retryPolicy = new RetryNTimes(1, 1000, TimeUnit.MILLISECONDS);</span>
+
+<span class="nc" id="L122">        this.failed = new IllegalStateException(&quot;Etcd3 registry is not connected yet, url:&quot; + url);</span>
+<span class="nc" id="L123">        int retryPeriod = url.getParameter(Constants.REGISTRY_RETRY_PERIOD_KEY, Constants.DEFAULT_REGISTRY_RETRY_PERIOD);</span>
+
+<span class="nc" id="L125">        this.retryFuture = retryExecutor.scheduleWithFixedDelay(() -&gt; {</span>
+            try {
+<span class="nc" id="L127">                retry();</span>
+<span class="nc" id="L128">            } catch (Throwable t) {</span>
+<span class="nc" id="L129">                logger.error(&quot;Unexpected error occur at failed retry, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L130">            }</span>
+<span class="nc" id="L131">        }, retryPeriod, retryPeriod, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L132">    }</span>
+
+    private Client prepareClient(URL url) {
+
+<span class="nc" id="L136">        int maxInboundSize = DEFAULT_INBOUND_SIZE;</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(System.getProperty(GRPC_MAX_INBOUND_SIZE_KEY))) {</span>
+<span class="nc" id="L138">            maxInboundSize = Integer.valueOf(System.getProperty(GRPC_MAX_INBOUND_SIZE_KEY));</span>
+        }
+
+<span class="nc" id="L141">        ClientBuilder clientBuilder = Client.builder()</span>
+<span class="nc" id="L142">                .loadBalancerFactory(RoundRobinLoadBalancerFactory.getInstance())</span>
+<span class="nc" id="L143">                .endpoints(endPoints(url.getBackupAddress()))</span>
+<span class="nc" id="L144">                .maxInboundMessageSize(maxInboundSize);</span>
+
+<span class="nc" id="L146">        return clientBuilder.build();</span>
+    }
+
+    public Client getClient() {
+<span class="nc" id="L150">        return client;</span>
+    }
+
+    /**
+     * try to get current connected channel.
+     *
+     * @return connected channel.
+     */
+    public ManagedChannel getChannel() {
+<span class="nc bnc" id="L159" title="All 6 branches missed.">        if (channel.get() == null || (channel.get().isShutdown() || channel.get().isTerminated())) {</span>
+<span class="nc" id="L160">            channel.set(newChannel(client));</span>
+        }
+<span class="nc" id="L162">        return channel.get();</span>
+    }
+
+    /**
+     * find direct children directory, excluding path self,
+     * Never return null.
+     *
+     * @param path the path to be found direct children.
+     * @return direct children directory, contains zero element
+     * list if children directory not exists.
+     */
+    public List&lt;String&gt; getChildren(String path) {
+        try {
+<span class="nc" id="L175">            return RetryLoops.invokeWithRetry(</span>
+                    () -&gt; {
+<span class="nc" id="L177">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L178">                        int len = path.length();</span>
+<span class="nc" id="L179">                        return client.getKVClient()</span>
+<span class="nc" id="L180">                                .get(ByteSequence.from(path, UTF_8),</span>
+<span class="nc" id="L181">                                        GetOption.newBuilder().withPrefix(ByteSequence.from(path, UTF_8)).build())</span>
+<span class="nc" id="L182">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS)</span>
+<span class="nc" id="L183">                                .getKvs().stream().parallel()</span>
+<span class="nc" id="L184">                                .filter(pair -&gt; {</span>
+<span class="nc" id="L185">                                    String key = pair.getKey().toString(UTF_8);</span>
+<span class="nc" id="L186">                                    int index = len, count = 0;</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                                    if (key.length() &gt; len) {</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                                        for (; (index = key.indexOf(Constants.PATH_SEPARATOR, index)) != -1; ++index) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                                            if (count++ &gt; 1) break;</span>
+                                        }
+                                    }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                                    return count == 1;</span>
+                                })
+<span class="nc" id="L194">                                .map(pair -&gt; pair.getKey().toString(UTF_8))</span>
+<span class="nc" id="L195">                                .collect(toList());</span>
+                    }, retryPolicy);
+<span class="nc" id="L197">        } catch (Exception e) {</span>
+<span class="nc" id="L198">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    public boolean isConnected() {
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        return ConnectivityState.READY == (getChannel().getState(false))</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                || ConnectivityState.IDLE == (getChannel().getState(false));</span>
+    }
+
+    public long createLease(long second) {
+        try {
+<span class="nc" id="L209">            return RetryLoops.invokeWithRetry(</span>
+                    () -&gt; {
+<span class="nc" id="L211">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L212">                        return client.getLeaseClient()</span>
+<span class="nc" id="L213">                                .grant(second)</span>
+<span class="nc" id="L214">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS)</span>
+<span class="nc" id="L215">                                .getID();</span>
+                    }, retryPolicy);
+<span class="nc" id="L217">        } catch (Exception e) {</span>
+<span class="nc" id="L218">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    public void revokeLease(long lease) {
+        try {
+<span class="nc" id="L224">            RetryLoops.invokeWithRetry(</span>
+                    (Callable&lt;Void&gt;) () -&gt; {
+<span class="nc" id="L226">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L227">                        client.getLeaseClient()</span>
+<span class="nc" id="L228">                                .revoke(lease)</span>
+<span class="nc" id="L229">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L230">                        return null;</span>
+                    }, retryPolicy);
+<span class="nc" id="L232">        } catch (Exception e) {</span>
+<span class="nc" id="L233">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L234">        }</span>
+<span class="nc" id="L235">    }</span>
+
+    public long createLease(long ttl, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (timeout &lt;= 0) {</span>
+<span class="nc" id="L241">            return createLease(ttl);</span>
+        }
+
+<span class="nc" id="L244">        requiredNotNull(client, failed);</span>
+<span class="nc" id="L245">        return client.getLeaseClient()</span>
+<span class="nc" id="L246">                .grant(ttl)</span>
+<span class="nc" id="L247">                .get(timeout, unit).getID();</span>
+    }
+
+
+    /**
+     * try to check if path exists.
+     */
+    public boolean checkExists(String path) {
+        try {
+<span class="nc" id="L256">            return RetryLoops.invokeWithRetry(</span>
+                    () -&gt; {
+<span class="nc" id="L258">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L259">                        return client.getKVClient()</span>
+<span class="nc" id="L260">                                .get(ByteSequence.from(path, UTF_8), GetOption.newBuilder().withCountOnly(true).build())</span>
+<span class="nc" id="L261">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS)</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                                .getCount() &gt; 0;</span>
+                    }, retryPolicy);
+<span class="nc" id="L264">        } catch (Exception e) {</span>
+<span class="nc" id="L265">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    /**
+     * only internal use only, maybe change in the future
+     */
+    protected Long find(String path) {
+        try {
+<span class="nc" id="L274">            return RetryLoops.invokeWithRetry(</span>
+                    () -&gt; {
+<span class="nc" id="L276">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L277">                        return client.getKVClient()</span>
+<span class="nc" id="L278">                                .get(ByteSequence.from(path, UTF_8))</span>
+<span class="nc" id="L279">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS)</span>
+<span class="nc" id="L280">                                .getKvs().stream()</span>
+<span class="nc" id="L281">                                .mapToLong(keyValue -&gt; Long.valueOf(keyValue.getValue().toString(UTF_8)))</span>
+<span class="nc" id="L282">                                .findFirst().getAsLong();</span>
+                    }, retryPolicy);
+<span class="nc" id="L284">        } catch (Exception e) {</span>
+<span class="nc" id="L285">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    public void createPersistent(String path) {
+        try {
+<span class="nc" id="L291">            RetryLoops.invokeWithRetry(</span>
+                    (Callable&lt;Void&gt;) () -&gt; {
+<span class="nc" id="L293">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L294">                        client.getKVClient()</span>
+<span class="nc" id="L295">                                .put(ByteSequence.from(path, UTF_8),</span>
+<span class="nc" id="L296">                                        ByteSequence.from(String.valueOf(path.hashCode()), UTF_8))</span>
+<span class="nc" id="L297">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L298">                        return null;</span>
+                    }, retryPolicy);
+<span class="nc" id="L300">        } catch (Exception e) {</span>
+<span class="nc" id="L301">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L302">        }</span>
+<span class="nc" id="L303">    }</span>
+
+    /**
+     * create new ephemeral path save to etcd .
+     * if node disconnect from etcd, it will be deleted
+     * automatically by etcd when sessian timeout.
+     *
+     * @param path the path to be saved
+     * @return the lease of current path.
+     */
+    public long createEphemeral(String path) {
+        try {
+<span class="nc" id="L315">            return RetryLoops.invokeWithRetry(</span>
+                    () -&gt; {
+<span class="nc" id="L317">                        requiredNotNull(client, failed);</span>
+
+<span class="nc" id="L319">                        registeredPaths.add(path);</span>
+<span class="nc" id="L320">                        keepAlive();</span>
+<span class="nc" id="L321">                        final long leaseId = globalLeaseId;</span>
+<span class="nc" id="L322">                        client.getKVClient()</span>
+<span class="nc" id="L323">                                .put(ByteSequence.from(path, UTF_8)</span>
+<span class="nc" id="L324">                                        , ByteSequence.from(String.valueOf(leaseId), UTF_8)</span>
+<span class="nc" id="L325">                                        , PutOption.newBuilder().withLeaseId(leaseId).build())</span>
+<span class="nc" id="L326">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L327">                        return leaseId;</span>
+                    }, retryPolicy);
+<span class="nc" id="L329">        } catch (Exception e) {</span>
+<span class="nc" id="L330">            throw new IllegalStateException(e.getMessage(), e);</span>
+        }
+    }
+
+    // easy for mock
+    public void keepAlive(long lease) {
+<span class="nc" id="L336">        this.keepAlive(lease, null);</span>
+<span class="nc" id="L337">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private &lt;T&gt; void keepAlive(long lease, Consumer&lt;T&gt; onFailed) {
+<span class="nc" id="L341">        final StreamObserver&lt;LeaseKeepAliveResponse&gt; observer = new Observers.Builder()</span>
+<span class="nc" id="L342">                .onError((e) -&gt; {</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                    if (e instanceof EtcdException) {</span>
+<span class="nc" id="L344">                        EtcdException error = (EtcdException) e;</span>
+                        /**
+                         * ttl has expired
+                         */
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                        if (error.getErrorCode() == ErrorCode.NOT_FOUND) {</span>
+<span class="nc" id="L349">                            keepAlive0(onFailed);</span>
+                        }
+                    }
+<span class="nc" id="L352">                }).onCompleted(() -&gt; {</span>
+                    /**
+                     * deadline reached.
+                     */
+<span class="nc" id="L356">                    keepAlive0(onFailed);</span>
+<span class="nc" id="L357">                }).build();</span>
+
+        /**
+         * If there is already a keepalive, cancel first
+         */
+<span class="nc" id="L362">        cancelKeepAlive();</span>
+
+        /**
+         * create and set new keepAlive to globalKeepAliveRef
+         */
+<span class="nc" id="L367">        this.keepAlive = client.getLeaseClient().keepAlive(lease, observer);</span>
+<span class="nc" id="L368">    }</span>
+
+    private void keepAlive() throws Exception {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (keepAlive == null) {</span>
+<span class="nc" id="L372">            synchronized (this) {</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                if (keepAlive == null) {</span>
+<span class="nc" id="L374">                    this.globalLeaseId = client.getLeaseClient()</span>
+<span class="nc" id="L375">                            .grant(expirePeriod)</span>
+<span class="nc" id="L376">                            .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS)</span>
+<span class="nc" id="L377">                            .getID();</span>
+                    /**
+                     * If the keepAlive expires, the registration will be re-attempted
+                     */
+<span class="nc" id="L381">                    keepAlive(globalLeaseId, (NULL) -&gt; recovery());</span>
+                }
+<span class="nc" id="L383">            }</span>
+        }
+<span class="nc" id="L385">    }</span>
+
+    private &lt;T&gt; void keepAlive0(Consumer&lt;T&gt; onFailed) {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (onFailed != null) {</span>
+
+            /**
+             * The following two scenarios will cause the keep-alive failure：
+             *
+             * 1. Service is offline
+             * 2. Local deadline check expired
+             *
+             * The multiplex lease cannot update the local deadline,
+             * causing the extreme scene service to be dropped.
+             *
+             */
+<span class="nc" id="L400">            long leaseId = globalLeaseId;</span>
+            try {
+<span class="nc bnc" id="L402" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L403">                    logger.warn(&quot;Failed to keep alive for global lease '&quot; + leaseId + &quot;', waiting for retry again.&quot;);</span>
+                }
+<span class="nc" id="L405">                onFailed.accept(null);</span>
+<span class="nc" id="L406">            } catch (Exception ignored) {</span>
+<span class="nc" id="L407">                logger.warn(&quot;Failed to recover from global lease expired or lease deadline exceeded. lease '&quot; + leaseId + &quot;'&quot;, ignored);</span>
+<span class="nc" id="L408">            }</span>
+        }
+<span class="nc" id="L410">    }</span>
+
+    private void recovery() {
+
+        try {
+            /**
+             * The client is processing reconnection
+             */
+<span class="nc bnc" id="L418" title="All 2 branches missed.">            if (cancelKeepAlive) {</span>
+<span class="nc" id="L419">                return;</span>
+            }
+
+<span class="nc" id="L422">            cancelKeepAlive();</span>
+
+<span class="nc" id="L424">            Set&lt;String&gt; ephemeralPaths = new HashSet&lt;String&gt;(registeredPaths);</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">            if (!ephemeralPaths.isEmpty()) {</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                for (String path : ephemeralPaths) {</span>
+                    try {
+
+                        /**
+                         * The client is processing reconnection,
+                         * cancel remaining service registration
+                         */
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                        if (cancelKeepAlive) {</span>
+<span class="nc" id="L434">                            return;</span>
+                        }
+
+<span class="nc" id="L437">                        createEphemeral(path);</span>
+<span class="nc" id="L438">                        failedRegistered.remove(path);</span>
+<span class="nc" id="L439">                    } catch (Exception e) {</span>
+
+                        /**
+                         * waiting for retry again
+                         */
+<span class="nc" id="L444">                        failedRegistered.add(path);</span>
+
+<span class="nc" id="L446">                        Status status = Status.fromThrowable(e);</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">                        if (status.getCode() == Status.Code.NOT_FOUND) {</span>
+<span class="nc" id="L448">                            cancelKeepAlive();</span>
+                        }
+<span class="nc" id="L450">                    }</span>
+<span class="nc" id="L451">                }</span>
+            }
+<span class="nc" id="L453">        } catch (Throwable t) {</span>
+<span class="nc" id="L454">            logger.warn(&quot;Unexpected error, failed to recover from global lease expired or deadline exceeded.&quot;, t);</span>
+<span class="nc" id="L455">        }</span>
+<span class="nc" id="L456">    }</span>
+
+    public void delete(String path) {
+        try {
+<span class="nc" id="L460">            RetryLoops.invokeWithRetry(</span>
+                    (Callable&lt;Void&gt;) () -&gt; {
+<span class="nc" id="L462">                        requiredNotNull(client, failed);</span>
+<span class="nc" id="L463">                        client.getKVClient()</span>
+<span class="nc" id="L464">                                .delete(ByteSequence.from(path, UTF_8))</span>
+<span class="nc" id="L465">                                .get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L466">                        registeredPaths.remove(path);</span>
+<span class="nc" id="L467">                        return null;</span>
+                    }, retryPolicy);
+<span class="nc" id="L469">        } catch (Exception e) {</span>
+<span class="nc" id="L470">            throw new IllegalStateException(e.getMessage(), e);</span>
+        } finally {
+            /**
+             * Cancel retry
+             */
+<span class="nc" id="L475">            failedRegistered.remove(path);</span>
+        }
+<span class="nc" id="L477">    }</span>
+
+    public String[] endPoints(String backupAddress) {
+<span class="nc" id="L480">        String[] endpoints = backupAddress.split(Constants.COMMA_SEPARATOR);</span>
+<span class="nc" id="L481">        List&lt;String&gt; addresses = Arrays.stream(endpoints)</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">                .map(address -&gt; address.contains(Constants.HTTP_SUBFIX_KEY)</span>
+<span class="nc" id="L483">                        ? address</span>
+<span class="nc" id="L484">                        : Constants.HTTP_KEY + address)</span>
+<span class="nc" id="L485">                .collect(toList());</span>
+<span class="nc" id="L486">        Collections.shuffle(addresses);</span>
+<span class="nc" id="L487">        return addresses.toArray(new String[0]);</span>
+    }
+
+    /**
+     * because jetcd's connection change callback not supported yet, we must
+     * loop to test if connect or disconnect event happend or not. It will be changed
+     * in the future if we found better choice.
+     */
+    public void start() {
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        if (!started) {</span>
+            try {
+<span class="nc" id="L498">                this.client = completableFuture.get(expirePeriod, TimeUnit.SECONDS);</span>
+<span class="nc" id="L499">                this.connectState = isConnected();</span>
+<span class="nc" id="L500">                this.started = true;</span>
+<span class="nc" id="L501">            } catch (Throwable t) {</span>
+<span class="nc" id="L502">                logger.error(&quot;Timeout! etcd3 server can not be connected in : &quot; + expirePeriod + &quot; seconds! url: &quot; + url, t);</span>
+
+<span class="nc" id="L504">                completableFuture.whenComplete((c, e) -&gt; {</span>
+<span class="nc" id="L505">                    this.client = c;</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                    if (e != null) {</span>
+<span class="nc" id="L507">                        logger.error(&quot;Got an exception when trying to create etcd3 instance, can not connect to etcd3 server, url: &quot; + url, e);</span>
+                    }
+<span class="nc" id="L509">                });</span>
+
+<span class="nc" id="L511">            }</span>
+
+            try {
+<span class="nc" id="L514">                this.future = reconnectNotify.scheduleWithFixedDelay(() -&gt; {</span>
+<span class="nc" id="L515">                    boolean connected = isConnected();</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                    if (connectState != connected) {</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                        int notifyState = connected ? StateListener.CONNECTED : StateListener.DISCONNECTED;</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                        if (connectionStateListener != null) {</span>
+                            try {
+<span class="nc bnc" id="L520" title="All 2 branches missed.">                                if (connected) {</span>
+<span class="nc" id="L521">                                    clearKeepAlive();</span>
+                                }
+<span class="nc" id="L523">                                connectionStateListener.stateChanged(getClient(), notifyState);</span>
+                            } finally {
+<span class="nc" id="L525">                                cancelKeepAlive = false;</span>
+                            }
+                        }
+<span class="nc" id="L528">                        connectState = connected;</span>
+                    }
+<span class="nc" id="L530">                }, Constants.DEFAULT_REGISTRY_RECONNECT_PERIOD, Constants.DEFAULT_REGISTRY_RECONNECT_PERIOD, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L531">            } catch (Throwable t) {</span>
+<span class="nc" id="L532">                logger.error(&quot;monitor reconnect status failed.&quot;, t);</span>
+<span class="nc" id="L533">            }</span>
+        }
+<span class="nc" id="L535">    }</span>
+
+    private void cancelKeepAlive() {
+        try {
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            if (keepAlive != null) {</span>
+<span class="nc" id="L540">                keepAlive.close();</span>
+            }
+        } finally {
+            // help for gc
+<span class="nc" id="L544">            keepAlive = null;</span>
+        }
+<span class="nc" id="L546">    }</span>
+
+    private void clearKeepAlive() {
+<span class="nc" id="L549">        cancelKeepAlive = true;</span>
+<span class="nc" id="L550">        failedRegistered.clear();</span>
+<span class="nc" id="L551">        cancelKeepAlive();</span>
+<span class="nc" id="L552">    }</span>
+
+    protected void doClose() {
+
+        try {
+<span class="nc" id="L557">            cancelKeepAlive = true;</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">            if (globalLeaseId != 0) {</span>
+<span class="nc" id="L559">                revokeLease(this.globalLeaseId);</span>
+            }
+<span class="nc" id="L561">        } catch (Exception e) {</span>
+<span class="nc" id="L562">            logger.warn(&quot;revoke global lease '&quot; + globalLeaseId + &quot;' failed, registry: &quot; + url, e);</span>
+<span class="nc" id="L563">        }</span>
+
+        try {
+<span class="nc bnc" id="L566" title="All 4 branches missed.">            if (started &amp;&amp; future != null) {</span>
+<span class="nc" id="L567">                started = false;</span>
+<span class="nc" id="L568">                future.cancel(true);</span>
+<span class="nc" id="L569">                reconnectNotify.shutdownNow();</span>
+            }
+<span class="nc" id="L571">        } catch (Exception e) {</span>
+<span class="nc" id="L572">            logger.warn(&quot;stop reconnect Notify failed, registry: &quot; + url, e);</span>
+<span class="nc" id="L573">        }</span>
+
+        try {
+<span class="nc" id="L576">            retryFuture.cancel(true);</span>
+<span class="nc" id="L577">            retryExecutor.shutdownNow();</span>
+<span class="nc" id="L578">        } catch (Throwable t) {</span>
+<span class="nc" id="L579">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L580">        }</span>
+
+<span class="nc bnc" id="L582" title="All 2 branches missed.">        if (getClient() != null) {</span>
+<span class="nc" id="L583">            getClient().close();</span>
+        }
+<span class="nc" id="L585">    }</span>
+
+    /**
+     * try get client's shared channel, becase all fields is private on jetcd,
+     * we must using it by reflect, in the future, jetcd may provider better tools.
+     *
+     * @param client get channel from current client
+     * @return current connection channel
+     */
+    private ManagedChannel newChannel(Client client) {
+        try {
+<span class="nc" id="L596">            Field connectionField = client.getClass().getDeclaredField(&quot;connectionManager&quot;);</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">            if (!connectionField.isAccessible()) {</span>
+<span class="nc" id="L598">                connectionField.setAccessible(true);</span>
+            }
+<span class="nc" id="L600">            Object connection = connectionField.get(client);</span>
+<span class="nc" id="L601">            Method channel = connection.getClass().getDeclaredMethod(&quot;getChannel&quot;);</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">            if (!channel.isAccessible()) {</span>
+<span class="nc" id="L603">                channel.setAccessible(true);</span>
+            }
+<span class="nc" id="L605">            return (ManagedChannel) channel.invoke(connection);</span>
+<span class="nc" id="L606">        } catch (Exception e) {</span>
+<span class="nc" id="L607">            throw new RuntimeException(&quot;Failed to obtain connection channel from &quot; + url.getBackupAddress(), e);</span>
+        }
+    }
+
+    public ConnectionStateListener getConnectionStateListener() {
+<span class="nc" id="L612">        return connectionStateListener;</span>
+    }
+
+    public void setConnectionStateListener(ConnectionStateListener connectionStateListener) {
+<span class="nc" id="L616">        this.connectionStateListener = connectionStateListener;</span>
+<span class="nc" id="L617">    }</span>
+
+    public static void requiredNotNull(Object obj, RuntimeException exeception) {
+<span class="nc bnc" id="L620" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L621">            throw exeception;</span>
+        }
+<span class="nc" id="L623">    }</span>
+
+    public String getKVValue(String key) {
+<span class="nc bnc" id="L626" title="All 2 branches missed.">        if (null == key) {</span>
+<span class="nc" id="L627">            return null;</span>
+        }
+
+<span class="nc" id="L630">        CompletableFuture&lt;GetResponse&gt; responseFuture = this.client.getKVClient().get(ByteSequence.from(key, UTF_8));</span>
+
+        try {
+<span class="nc" id="L633">            List&lt;KeyValue&gt; result = responseFuture.get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS).getKvs();</span>
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            if (!result.isEmpty()) {</span>
+<span class="nc" id="L635">                return result.get(0).getValue().toString(UTF_8);</span>
+            }
+<span class="nc" id="L637">        } catch (Exception e) {</span>
+            // ignore
+<span class="nc" id="L639">        }</span>
+
+<span class="nc" id="L641">        return null;</span>
+    }
+
+
+    public boolean put(String key, String value) {
+<span class="nc bnc" id="L646" title="All 4 branches missed.">        if (key == null || value == null) {</span>
+<span class="nc" id="L647">            return false;</span>
+        }
+<span class="nc" id="L649">        CompletableFuture&lt;PutResponse&gt; putFuture =</span>
+<span class="nc" id="L650">                this.client.getKVClient().put(ByteSequence.from(key, UTF_8), ByteSequence.from(value, UTF_8));</span>
+        try {
+<span class="nc" id="L652">            putFuture.get(DEFAULT_REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L653">            return true;</span>
+<span class="nc" id="L654">        } catch (Exception e) {</span>
+            // ignore
+        }
+<span class="nc" id="L657">        return false;</span>
+    }
+
+    private void retry() {
+<span class="nc bnc" id="L661" title="All 2 branches missed.">        if (!failedRegistered.isEmpty()) {</span>
+<span class="nc" id="L662">            Set&lt;String&gt; failed = new HashSet&lt;String&gt;(failedRegistered);</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            if (!failed.isEmpty()) {</span>
+
+<span class="nc bnc" id="L665" title="All 2 branches missed.">                if (cancelKeepAlive) {</span>
+<span class="nc" id="L666">                    return;</span>
+                }
+
+<span class="nc bnc" id="L669" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L670">                    logger.warn(&quot;Retry failed register(keep alive) for path '&quot; + failed</span>
+<span class="nc" id="L671">                            + &quot;', path size: &quot; + failed.size());</span>
+                }
+                try {
+<span class="nc bnc" id="L674" title="All 2 branches missed.">                    for (String path : failed) {</span>
+                        try {
+
+                            /**
+                             * Is it currently reconnecting ?
+                             */
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                            if (cancelKeepAlive) {</span>
+<span class="nc" id="L681">                                return;</span>
+                            }
+
+<span class="nc" id="L684">                            createEphemeral(path);</span>
+<span class="nc" id="L685">                            failedRegistered.remove(path);</span>
+<span class="nc" id="L686">                        } catch (Throwable e) {</span>
+
+<span class="nc" id="L688">                            failedRegistered.add(path);</span>
+
+<span class="nc" id="L690">                            Status status = Status.fromThrowable(e);</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">                            if (status.getCode() == Status.Code.NOT_FOUND) {</span>
+<span class="nc" id="L692">                                cancelKeepAlive();</span>
+                            }
+
+<span class="nc" id="L695">                            logger.warn(&quot;Failed to retry register(keep alive) for path '&quot; + path + &quot;', waiting for again, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L696">                        }</span>
+<span class="nc" id="L697">                    }</span>
+<span class="nc" id="L698">                } catch (Throwable t) {</span>
+<span class="nc" id="L699">                    logger.warn(&quot;Failed to retry register(keep alive) for path '&quot; + failed + &quot;', waiting for again, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L700">                }</span>
+            }
+        }
+<span class="nc" id="L703">    }</span>
+
+    /**
+     * default request timeout
+     */
+<span class="nc" id="L708">    public static final long DEFAULT_REQUEST_TIMEOUT = obtainRequestTimeout();</span>
+
+    public static final int DEFAULT_INBOUND_SIZE = 100 * 1024 * 1024;
+
+    public static final String GRPC_MAX_INBOUND_SIZE_KEY = &quot;grpc.max.inbound.size&quot;;
+
+    public static final String ETCD_REQUEST_TIMEOUT_KEY = &quot;etcd.request.timeout&quot;;
+
+    private static int obtainRequestTimeout() {
+<span class="nc bnc" id="L717" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(System.getProperty(ETCD_REQUEST_TIMEOUT_KEY))) {</span>
+<span class="nc" id="L718">            return Integer.valueOf(System.getProperty(ETCD_REQUEST_TIMEOUT_KEY));</span>
+        }
+        /**
+         * 10 seconds.
+         */
+<span class="nc" id="L723">        return 10 * 1000;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyHelper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty</a> &gt; <span class="el_source">NettyHelper.java</span></div><h1>NettyHelper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+
+import org.jboss.netty.logging.AbstractInternalLogger;
+import org.jboss.netty.logging.InternalLogger;
+import org.jboss.netty.logging.InternalLoggerFactory;
+
+<span class="nc" id="L26">final class NettyHelper {</span>
+
+    public static void setNettyLoggerFactory() {
+<span class="nc" id="L29">        InternalLoggerFactory factory = InternalLoggerFactory.getDefaultFactory();</span>
+<span class="nc bnc" id="L30" title="All 4 branches missed.">        if (factory == null || !(factory instanceof DubboLoggerFactory)) {</span>
+<span class="nc" id="L31">            InternalLoggerFactory.setDefaultFactory(new DubboLoggerFactory());</span>
+        }
+<span class="nc" id="L33">    }</span>
+
+<span class="nc" id="L35">    static class DubboLoggerFactory extends InternalLoggerFactory {</span>
+
+        @Override
+        public InternalLogger newInstance(String name) {
+<span class="nc" id="L39">            return new DubboLogger(LoggerFactory.getLogger(name));</span>
+        }
+    }
+
+    static class DubboLogger extends AbstractInternalLogger {
+
+        private Logger logger;
+
+<span class="nc" id="L47">        DubboLogger(Logger logger) {</span>
+<span class="nc" id="L48">            this.logger = logger;</span>
+<span class="nc" id="L49">        }</span>
+
+        @Override
+        public boolean isDebugEnabled() {
+<span class="nc" id="L53">            return logger.isDebugEnabled();</span>
+        }
+
+        @Override
+        public boolean isInfoEnabled() {
+<span class="nc" id="L58">            return logger.isInfoEnabled();</span>
+        }
+
+        @Override
+        public boolean isWarnEnabled() {
+<span class="nc" id="L63">            return logger.isWarnEnabled();</span>
+        }
+
+        @Override
+        public boolean isErrorEnabled() {
+<span class="nc" id="L68">            return logger.isErrorEnabled();</span>
+        }
+
+        @Override
+        public void debug(String msg) {
+<span class="nc" id="L73">            logger.debug(msg);</span>
+<span class="nc" id="L74">        }</span>
+
+        @Override
+        public void debug(String msg, Throwable cause) {
+<span class="nc" id="L78">            logger.debug(msg, cause);</span>
+<span class="nc" id="L79">        }</span>
+
+        @Override
+        public void info(String msg) {
+<span class="nc" id="L83">            logger.info(msg);</span>
+<span class="nc" id="L84">        }</span>
+
+        @Override
+        public void info(String msg, Throwable cause) {
+<span class="nc" id="L88">            logger.info(msg, cause);</span>
+<span class="nc" id="L89">        }</span>
+
+        @Override
+        public void warn(String msg) {
+<span class="nc" id="L93">            logger.warn(msg);</span>
+<span class="nc" id="L94">        }</span>
+
+        @Override
+        public void warn(String msg, Throwable cause) {
+<span class="nc" id="L98">            logger.warn(msg, cause);</span>
+<span class="nc" id="L99">        }</span>
+
+        @Override
+        public void error(String msg) {
+<span class="nc" id="L103">            logger.error(msg);</span>
+<span class="nc" id="L104">        }</span>
+
+        @Override
+        public void error(String msg, Throwable cause) {
+<span class="nc" id="L108">            logger.error(msg, cause);</span>
+<span class="nc" id="L109">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L113">            return logger.toString();</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

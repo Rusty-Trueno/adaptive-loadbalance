@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MinaChannel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-mina</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.mina</a> &gt; <span class="el_source">MinaChannel.java</span></div><h1>MinaChannel.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.mina;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractChannel;
+
+import org.apache.mina.common.IoSession;
+import org.apache.mina.common.WriteFuture;
+
+import java.net.InetSocketAddress;
+
+/**
+ * MinaChannel
+ */
+final class MinaChannel extends AbstractChannel {
+
+<span class="nc" id="L37">    private static final Logger logger = LoggerFactory.getLogger(MinaChannel.class);</span>
+
+<span class="nc" id="L39">    private static final String CHANNEL_KEY = MinaChannel.class.getName() + &quot;.CHANNEL&quot;;</span>
+
+    private final IoSession session;
+
+    private MinaChannel(IoSession session, URL url, ChannelHandler handler) {
+<span class="nc" id="L44">        super(url, handler);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (session == null) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;mina session == null&quot;);</span>
+        }
+<span class="nc" id="L48">        this.session = session;</span>
+<span class="nc" id="L49">    }</span>
+
+    static MinaChannel getOrAddChannel(IoSession session, URL url, ChannelHandler handler) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (session == null) {</span>
+<span class="nc" id="L53">            return null;</span>
+        }
+<span class="nc" id="L55">        MinaChannel ret = (MinaChannel) session.getAttribute(CHANNEL_KEY);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (ret == null) {</span>
+<span class="nc" id="L57">            ret = new MinaChannel(session, url, handler);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            if (session.isConnected()) {</span>
+<span class="nc" id="L59">                MinaChannel old = (MinaChannel) session.setAttribute(CHANNEL_KEY, ret);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                if (old != null) {</span>
+<span class="nc" id="L61">                    session.setAttribute(CHANNEL_KEY, old);</span>
+<span class="nc" id="L62">                    ret = old;</span>
+                }
+            }
+        }
+<span class="nc" id="L66">        return ret;</span>
+    }
+
+    static void removeChannelIfDisconnected(IoSession session) {
+<span class="nc bnc" id="L70" title="All 4 branches missed.">        if (session != null &amp;&amp; !session.isConnected()) {</span>
+<span class="nc" id="L71">            session.removeAttribute(CHANNEL_KEY);</span>
+        }
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L77">        return (InetSocketAddress) session.getLocalAddress();</span>
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L82">        return (InetSocketAddress) session.getRemoteAddress();</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc" id="L87">        return session.isConnected();</span>
+    }
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L92">        super.send(message, sent);</span>
+
+<span class="nc" id="L94">        boolean success = true;</span>
+<span class="nc" id="L95">        int timeout = 0;</span>
+        try {
+<span class="nc" id="L97">            WriteFuture future = session.write(message);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (sent) {</span>
+<span class="nc" id="L99">                timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc" id="L100">                success = future.join(timeout);</span>
+            }
+<span class="nc" id="L102">        } catch (Throwable e) {</span>
+<span class="nc" id="L103">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L104">        }</span>
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (!success) {</span>
+<span class="nc" id="L107">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress()</span>
+                    + &quot;in timeout(&quot; + timeout + &quot;ms) limit&quot;);
+        }
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L115">            super.close();</span>
+<span class="nc" id="L116">        } catch (Exception e) {</span>
+<span class="nc" id="L117">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L118">        }</span>
+        try {
+<span class="nc" id="L120">            removeChannelIfDisconnected(session);</span>
+<span class="nc" id="L121">        } catch (Exception e) {</span>
+<span class="nc" id="L122">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L123">        }</span>
+        try {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L126">                logger.info(&quot;CLose mina channel &quot; + session);</span>
+            }
+<span class="nc" id="L128">            session.close();</span>
+<span class="nc" id="L129">        } catch (Exception e) {</span>
+<span class="nc" id="L130">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L131">        }</span>
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    public boolean hasAttribute(String key) {
+<span class="nc" id="L136">        return session.containsAttribute(key);</span>
+    }
+
+    @Override
+    public Object getAttribute(String key) {
+<span class="nc" id="L141">        return session.getAttribute(key);</span>
+    }
+
+    @Override
+    public void setAttribute(String key, Object value) {
+<span class="nc" id="L146">        session.setAttribute(key, value);</span>
+<span class="nc" id="L147">    }</span>
+
+    @Override
+    public void removeAttribute(String key) {
+<span class="nc" id="L151">        session.removeAttribute(key);</span>
+<span class="nc" id="L152">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L156">        final int prime = 31;</span>
+<span class="nc" id="L157">        int result = 1;</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        result = prime * result + ((session == null) ? 0 : session.hashCode());</span>
+<span class="nc" id="L159">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L165">            return true;</span>
+        }
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L168">            return false;</span>
+        }
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L171">            return false;</span>
+        }
+<span class="nc" id="L173">        MinaChannel other = (MinaChannel) obj;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (session == null) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (other.session != null) {</span>
+<span class="nc" id="L176">                return false;</span>
+            }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        } else if (!session.equals(other.session)) {</span>
+<span class="nc" id="L179">            return false;</span>
+        }
+<span class="nc" id="L181">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L186">        return &quot;MinaChannel [session=&quot; + session + &quot;]&quot;;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,11 @@
+org/apache/dubbo/metadata/identifier/MetadataIdentifier.class
+org/apache/dubbo/metadata/integration/MetadataReportService.class
+org/apache/dubbo/metadata/support/AbstractMetadataReport$MetadataReportRetry$1.class
+org/apache/dubbo/metadata/support/AbstractMetadataReport.class
+org/apache/dubbo/metadata/support/AbstractMetadataReport$SaveProperties.class
+org/apache/dubbo/metadata/support/AbstractMetadataReportFactory.class
+org/apache/dubbo/metadata/identifier/MetadataIdentifier$KeyTypeEnum.class
+org/apache/dubbo/metadata/store/MetadataReport.class
+org/apache/dubbo/metadata/support/AbstractMetadataReport$1.class
+org/apache/dubbo/metadata/store/MetadataReportFactory.class
+org/apache/dubbo/metadata/support/AbstractMetadataReport$MetadataReportRetry.class

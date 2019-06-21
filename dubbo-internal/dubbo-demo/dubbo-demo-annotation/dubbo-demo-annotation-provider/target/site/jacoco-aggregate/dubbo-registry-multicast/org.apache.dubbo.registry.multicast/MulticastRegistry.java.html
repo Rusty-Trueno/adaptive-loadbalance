@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MulticastRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-multicast</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.multicast</a> &gt; <span class="el_source">MulticastRegistry.java</span></div><h1>MulticastRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.multicast;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * MulticastRegistry
+ */
+public class MulticastRegistry extends FailbackRegistry {
+
+    // logging output
+<span class="nc" id="L58">    private static final Logger logger = LoggerFactory.getLogger(MulticastRegistry.class);</span>
+
+    private static final int DEFAULT_MULTICAST_PORT = 1234;
+
+    private final InetAddress multicastAddress;
+
+    private final MulticastSocket multicastSocket;
+
+    private final int multicastPort;
+
+<span class="nc" id="L68">    private final ConcurrentMap&lt;URL, Set&lt;URL&gt;&gt; received = new ConcurrentHashMap&lt;URL, Set&lt;URL&gt;&gt;();</span>
+
+<span class="nc" id="L70">    private final ScheduledExecutorService cleanExecutor = Executors.newScheduledThreadPool(1, new NamedThreadFactory(&quot;DubboMulticastRegistryCleanTimer&quot;, true));</span>
+
+    private final ScheduledFuture&lt;?&gt; cleanFuture;
+
+    private final int cleanPeriod;
+
+<span class="nc" id="L76">    private volatile boolean admin = false;</span>
+
+    public MulticastRegistry(URL url) {
+<span class="nc" id="L79">        super(url);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (url.isAnyHost()) {</span>
+<span class="nc" id="L81">            throw new IllegalStateException(&quot;registry address == null&quot;);</span>
+        }
+        try {
+<span class="nc" id="L84">            multicastAddress = InetAddress.getByName(url.getHost());</span>
+<span class="nc" id="L85">            checkMulticastAddress(multicastAddress);</span>
+
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            multicastPort = url.getPort() &lt;= 0 ? DEFAULT_MULTICAST_PORT : url.getPort();</span>
+<span class="nc" id="L88">            multicastSocket = new MulticastSocket(multicastPort);</span>
+<span class="nc" id="L89">            NetUtils.joinMulticastGroup(multicastSocket, multicastAddress);</span>
+<span class="nc" id="L90">            Thread thread = new Thread(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L93">                    byte[] buf = new byte[2048];</span>
+<span class="nc" id="L94">                    DatagramPacket recv = new DatagramPacket(buf, buf.length);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                    while (!multicastSocket.isClosed()) {</span>
+                        try {
+<span class="nc" id="L97">                            multicastSocket.receive(recv);</span>
+<span class="nc" id="L98">                            String msg = new String(recv.getData()).trim();</span>
+<span class="nc" id="L99">                            int i = msg.indexOf('\n');</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                            if (i &gt; 0) {</span>
+<span class="nc" id="L101">                                msg = msg.substring(0, i).trim();</span>
+                            }
+<span class="nc" id="L103">                            MulticastRegistry.this.receive(msg, (InetSocketAddress) recv.getSocketAddress());</span>
+<span class="nc" id="L104">                            Arrays.fill(buf, (byte) 0);</span>
+<span class="nc" id="L105">                        } catch (Throwable e) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                            if (!multicastSocket.isClosed()) {</span>
+<span class="nc" id="L107">                                logger.error(e.getMessage(), e);</span>
+                            }
+<span class="nc" id="L109">                        }</span>
+                    }
+<span class="nc" id="L111">                }</span>
+            }, &quot;DubboMulticastRegistryReceiver&quot;);
+<span class="nc" id="L113">            thread.setDaemon(true);</span>
+<span class="nc" id="L114">            thread.start();</span>
+<span class="nc" id="L115">        } catch (IOException e) {</span>
+<span class="nc" id="L116">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L117">        }</span>
+<span class="nc" id="L118">        this.cleanPeriod = url.getParameter(Constants.SESSION_TIMEOUT_KEY, Constants.DEFAULT_SESSION_TIMEOUT);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (url.getParameter(&quot;clean&quot;, true)) {</span>
+<span class="nc" id="L120">            this.cleanFuture = cleanExecutor.scheduleWithFixedDelay(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="nc" id="L124">                        clean(); // Remove the expired</span>
+<span class="nc" id="L125">                    } catch (Throwable t) { // Defensive fault tolerance</span>
+<span class="nc" id="L126">                        logger.error(&quot;Unexpected exception occur at clean expired provider, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L127">                    }</span>
+<span class="nc" id="L128">                }</span>
+            }, cleanPeriod, cleanPeriod, TimeUnit.MILLISECONDS);
+        } else {
+<span class="nc" id="L131">            this.cleanFuture = null;</span>
+        }
+<span class="nc" id="L133">    }</span>
+
+    private void checkMulticastAddress(InetAddress multicastAddress) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (!multicastAddress.isMulticastAddress()) {</span>
+<span class="nc" id="L137">            String message = &quot;Invalid multicast address &quot; + multicastAddress;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (!(multicastAddress instanceof Inet4Address)) {</span>
+<span class="nc" id="L139">                throw new IllegalArgumentException(message + &quot;, &quot; +</span>
+                        &quot;ipv4 multicast address scope: 224.0.0.0 - 239.255.255.255.&quot;);
+            } else {
+<span class="nc" id="L142">                throw new IllegalArgumentException(message + &quot;, &quot; + &quot;ipv6 multicast address must start with ff, &quot; +</span>
+                        &quot;for example: ff01::1&quot;);
+            }
+        }
+<span class="nc" id="L146">    }</span>
+
+    /**
+     * Remove the expired providers, only when &quot;clean&quot; parameter is true.
+     */
+    private void clean() {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (admin) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            for (Set&lt;URL&gt; providers : new HashSet&lt;Set&lt;URL&gt;&gt;(received.values())) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                for (URL url : new HashSet&lt;URL&gt;(providers)) {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    if (isExpired(url)) {</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                        if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L157">                            logger.warn(&quot;Clean expired provider &quot; + url);</span>
+                        }
+<span class="nc" id="L159">                        doUnregister(url);</span>
+                    }
+<span class="nc" id="L161">                }</span>
+<span class="nc" id="L162">            }</span>
+        }
+<span class="nc" id="L164">    }</span>
+
+    private boolean isExpired(URL url) {
+<span class="nc bnc" id="L167" title="All 10 branches missed.">        if (!url.getParameter(Constants.DYNAMIC_KEY, true) || url.getPort() &lt;= 0 || Constants.CONSUMER_PROTOCOL.equals(url.getProtocol()) || Constants.ROUTE_PROTOCOL.equals(url.getProtocol()) || Constants.OVERRIDE_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L168">            return false;</span>
+        }
+<span class="nc" id="L170">        try (Socket socket = new Socket(url.getHost(), url.getPort())) {</span>
+<span class="nc" id="L171">        } catch (Throwable e) {</span>
+            try {
+<span class="nc" id="L173">                Thread.sleep(100);</span>
+<span class="nc" id="L174">            } catch (Throwable e2) {</span>
+<span class="nc" id="L175">            }</span>
+<span class="nc" id="L176">            try (Socket socket2 = new Socket(url.getHost(), url.getPort())) {</span>
+<span class="nc" id="L177">            } catch (Throwable e2) {</span>
+<span class="nc" id="L178">                return true;</span>
+<span class="nc" id="L179">            }</span>
+<span class="nc" id="L180">        }</span>
+<span class="nc" id="L181">        return false;</span>
+    }
+
+    private void receive(String msg, InetSocketAddress remoteAddress) {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L186">            logger.info(&quot;Receive multicast message: &quot; + msg + &quot; from &quot; + remoteAddress);</span>
+        }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (msg.startsWith(Constants.REGISTER)) {</span>
+<span class="nc" id="L189">            URL url = URL.valueOf(msg.substring(Constants.REGISTER.length()).trim());</span>
+<span class="nc" id="L190">            registered(url);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        } else if (msg.startsWith(Constants.UNREGISTER)) {</span>
+<span class="nc" id="L192">            URL url = URL.valueOf(msg.substring(Constants.UNREGISTER.length()).trim());</span>
+<span class="nc" id="L193">            unregistered(url);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        } else if (msg.startsWith(Constants.SUBSCRIBE)) {</span>
+<span class="nc" id="L195">            URL url = URL.valueOf(msg.substring(Constants.SUBSCRIBE.length()).trim());</span>
+<span class="nc" id="L196">            Set&lt;URL&gt; urls = getRegistered();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(urls)) {</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                for (URL u : urls) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                    if (UrlUtils.isMatch(url, u)) {</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                        String host = remoteAddress != null &amp;&amp; remoteAddress.getAddress() != null ? remoteAddress.getAddress().getHostAddress() : url.getIp();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                        if (url.getParameter(&quot;unicast&quot;, true) // Whether the consumer's machine has only one process</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                                &amp;&amp; !NetUtils.getLocalHost().equals(host)) { // Multiple processes in the same machine cannot be unicast with unicast or there will be only one process receiving information</span>
+<span class="nc" id="L203">                            unicast(Constants.REGISTER + &quot; &quot; + u.toFullString(), host);</span>
+                        } else {
+<span class="nc" id="L205">                            multicast(Constants.REGISTER + &quot; &quot; + u.toFullString());</span>
+                        }
+                    }
+<span class="nc" id="L208">                }</span>
+            }
+        }/* else if (msg.startsWith(UNSUBSCRIBE)) {
+        }*/
+<span class="nc" id="L212">    }</span>
+
+    private void multicast(String msg) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L216">            logger.info(&quot;Send multicast message: &quot; + msg + &quot; to &quot; + multicastAddress + &quot;:&quot; + multicastPort);</span>
+        }
+        try {
+<span class="nc" id="L219">            byte[] data = (msg + &quot;\n&quot;).getBytes();</span>
+<span class="nc" id="L220">            DatagramPacket hi = new DatagramPacket(data, data.length, multicastAddress, multicastPort);</span>
+<span class="nc" id="L221">            multicastSocket.send(hi);</span>
+<span class="nc" id="L222">        } catch (Exception e) {</span>
+<span class="nc" id="L223">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L224">        }</span>
+<span class="nc" id="L225">    }</span>
+
+    private void unicast(String msg, String host) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L229">            logger.info(&quot;Send unicast message: &quot; + msg + &quot; to &quot; + host + &quot;:&quot; + multicastPort);</span>
+        }
+        try {
+<span class="nc" id="L232">            byte[] data = (msg + &quot;\n&quot;).getBytes();</span>
+<span class="nc" id="L233">            DatagramPacket hi = new DatagramPacket(data, data.length, InetAddress.getByName(host), multicastPort);</span>
+<span class="nc" id="L234">            multicastSocket.send(hi);</span>
+<span class="nc" id="L235">        } catch (Exception e) {</span>
+<span class="nc" id="L236">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L237">        }</span>
+<span class="nc" id="L238">    }</span>
+
+    @Override
+    public void doRegister(URL url) {
+<span class="nc" id="L242">        multicast(Constants.REGISTER + &quot; &quot; + url.toFullString());</span>
+<span class="nc" id="L243">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+<span class="nc" id="L247">        multicast(Constants.UNREGISTER + &quot; &quot; + url.toFullString());</span>
+<span class="nc" id="L248">    }</span>
+
+    @Override
+    public void doSubscribe(URL url, NotifyListener listener) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L253">            admin = true;</span>
+        }
+<span class="nc" id="L255">        multicast(Constants.SUBSCRIBE + &quot; &quot; + url.toFullString());</span>
+<span class="nc" id="L256">        synchronized (listener) {</span>
+            try {
+<span class="nc" id="L258">                listener.wait(url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));</span>
+<span class="nc" id="L259">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L260">            }</span>
+<span class="nc" id="L261">        }</span>
+<span class="nc" id="L262">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc bnc" id="L266" title="All 4 branches missed.">        if (!Constants.ANY_VALUE.equals(url.getServiceInterface()) &amp;&amp; url.getParameter(Constants.REGISTER_KEY, true)) {</span>
+<span class="nc" id="L267">            unregister(url);</span>
+        }
+<span class="nc" id="L269">        multicast(Constants.UNSUBSCRIBE + &quot; &quot; + url.toFullString());</span>
+<span class="nc" id="L270">    }</span>
+
+    @Override
+    public boolean isAvailable() {
+        try {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            return multicastSocket != null;</span>
+<span class="nc" id="L276">        } catch (Throwable t) {</span>
+<span class="nc" id="L277">            return false;</span>
+        }
+    }
+
+    /**
+     * Remove the expired providers(if clean is true), leave the multicast group and close the multicast socket.
+     */
+    @Override
+    public void destroy() {
+<span class="nc" id="L286">        super.destroy();</span>
+        try {
+<span class="nc" id="L288">            ExecutorUtil.cancelScheduledFuture(cleanFuture);</span>
+<span class="nc" id="L289">        } catch (Throwable t) {</span>
+<span class="nc" id="L290">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L291">        }</span>
+        try {
+<span class="nc" id="L293">            multicastSocket.leaveGroup(multicastAddress);</span>
+<span class="nc" id="L294">            multicastSocket.close();</span>
+<span class="nc" id="L295">        } catch (Throwable t) {</span>
+<span class="nc" id="L296">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L297">        }</span>
+<span class="nc" id="L298">        ExecutorUtil.gracefulShutdown(cleanExecutor, cleanPeriod);</span>
+<span class="nc" id="L299">    }</span>
+
+    protected void registered(URL url) {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        for (Map.Entry&lt;URL, Set&lt;NotifyListener&gt;&gt; entry : getSubscribed().entrySet()) {</span>
+<span class="nc" id="L303">            URL key = entry.getKey();</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            if (UrlUtils.isMatch(key, url)) {</span>
+<span class="nc" id="L305">                Set&lt;URL&gt; urls = received.get(key);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (urls == null) {</span>
+<span class="nc" id="L307">                    received.putIfAbsent(key, new ConcurrentHashSet&lt;URL&gt;());</span>
+<span class="nc" id="L308">                    urls = received.get(key);</span>
+                }
+<span class="nc" id="L310">                urls.add(url);</span>
+<span class="nc" id="L311">                List&lt;URL&gt; list = toList(urls);</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                for (NotifyListener listener : entry.getValue()) {</span>
+<span class="nc" id="L313">                    notify(key, listener, list);</span>
+<span class="nc" id="L314">                    synchronized (listener) {</span>
+<span class="nc" id="L315">                        listener.notify();</span>
+<span class="nc" id="L316">                    }</span>
+<span class="nc" id="L317">                }</span>
+            }
+<span class="nc" id="L319">        }</span>
+<span class="nc" id="L320">    }</span>
+
+    protected void unregistered(URL url) {
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        for (Map.Entry&lt;URL, Set&lt;NotifyListener&gt;&gt; entry : getSubscribed().entrySet()) {</span>
+<span class="nc" id="L324">            URL key = entry.getKey();</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (UrlUtils.isMatch(key, url)) {</span>
+<span class="nc" id="L326">                Set&lt;URL&gt; urls = received.get(key);</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">                if (urls != null) {</span>
+<span class="nc" id="L328">                    urls.remove(url);</span>
+                }
+<span class="nc bnc" id="L330" title="All 4 branches missed.">                if (urls == null || urls.isEmpty()) {</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                    if (urls == null) {</span>
+<span class="nc" id="L332">                        urls = new ConcurrentHashSet&lt;URL&gt;();</span>
+                    }
+<span class="nc" id="L334">                    URL empty = url.setProtocol(Constants.EMPTY_PROTOCOL);</span>
+<span class="nc" id="L335">                    urls.add(empty);</span>
+                }
+<span class="nc" id="L337">                List&lt;URL&gt; list = toList(urls);</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                for (NotifyListener listener : entry.getValue()) {</span>
+<span class="nc" id="L339">                    notify(key, listener, list);</span>
+<span class="nc" id="L340">                }</span>
+            }
+<span class="nc" id="L342">        }</span>
+<span class="nc" id="L343">    }</span>
+
+    protected void subscribed(URL url, NotifyListener listener) {
+<span class="nc" id="L346">        List&lt;URL&gt; urls = lookup(url);</span>
+<span class="nc" id="L347">        notify(url, listener, urls);</span>
+<span class="nc" id="L348">    }</span>
+
+    private List&lt;URL&gt; toList(Set&lt;URL&gt; urls) {
+<span class="nc" id="L351">        List&lt;URL&gt; list = new ArrayList&lt;URL&gt;();</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(urls)) {</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            for (URL url : urls) {</span>
+<span class="nc" id="L354">                list.add(url);</span>
+<span class="nc" id="L355">            }</span>
+        }
+<span class="nc" id="L357">        return list;</span>
+    }
+
+    @Override
+    public void register(URL url) {
+<span class="nc" id="L362">        super.register(url);</span>
+<span class="nc" id="L363">        registered(url);</span>
+<span class="nc" id="L364">    }</span>
+
+    @Override
+    public void unregister(URL url) {
+<span class="nc" id="L368">        super.unregister(url);</span>
+<span class="nc" id="L369">        unregistered(url);</span>
+<span class="nc" id="L370">    }</span>
+
+    @Override
+    public void subscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L374">        super.subscribe(url, listener);</span>
+<span class="nc" id="L375">        subscribed(url, listener);</span>
+<span class="nc" id="L376">    }</span>
+
+    @Override
+    public void unsubscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L380">        super.unsubscribe(url, listener);</span>
+<span class="nc" id="L381">        received.remove(url);</span>
+<span class="nc" id="L382">    }</span>
+
+    @Override
+    public List&lt;URL&gt; lookup(URL url) {
+<span class="nc" id="L386">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L387">        Map&lt;String, List&lt;URL&gt;&gt; notifiedUrls = getNotified().get(url);</span>
+<span class="nc bnc" id="L388" title="All 4 branches missed.">        if (notifiedUrls != null &amp;&amp; notifiedUrls.size() &gt; 0) {</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            for (List&lt;URL&gt; values : notifiedUrls.values()) {</span>
+<span class="nc" id="L390">                urls.addAll(values);</span>
+<span class="nc" id="L391">            }</span>
+        }
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (urls.isEmpty()) {</span>
+<span class="nc" id="L394">            List&lt;URL&gt; cacheUrls = getCacheUrls(url);</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(cacheUrls)) {</span>
+<span class="nc" id="L396">                urls.addAll(cacheUrls);</span>
+            }
+        }
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (urls.isEmpty()) {</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            for (URL u : getRegistered()) {</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                if (UrlUtils.isMatch(url, u)) {</span>
+<span class="nc" id="L402">                    urls.add(u);</span>
+                }
+<span class="nc" id="L404">            }</span>
+        }
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            for (URL u : getSubscribed().keySet()) {</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                if (UrlUtils.isMatch(url, u)) {</span>
+<span class="nc" id="L409">                    urls.add(u);</span>
+                }
+<span class="nc" id="L411">            }</span>
+        }
+<span class="nc" id="L413">        return urls;</span>
+    }
+
+    public MulticastSocket getMulticastSocket() {
+<span class="nc" id="L417">        return multicastSocket;</span>
+    }
+
+    public Map&lt;URL, Set&lt;URL&gt;&gt; getReceived() {
+<span class="nc" id="L421">        return received;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">DubboCodec.java</span></div><h1>DubboCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.io.Bytes;
+import org.apache.dubbo.common.io.UnsafeByteArrayInputStream;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.ObjectOutput;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.exchange.codec.ExchangeCodec;
+import org.apache.dubbo.remoting.transport.CodecSupport;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+import static org.apache.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.encodeInvocationArgument;
+
+/**
+ * Dubbo codec.
+ */
+<span class="nc" id="L47">public class DubboCodec extends ExchangeCodec {</span>
+
+    public static final String NAME = &quot;dubbo&quot;;
+<span class="nc" id="L50">    public static final String DUBBO_VERSION = Version.getProtocolVersion();</span>
+    public static final byte RESPONSE_WITH_EXCEPTION = 0;
+    public static final byte RESPONSE_VALUE = 1;
+    public static final byte RESPONSE_NULL_VALUE = 2;
+    public static final byte RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS = 3;
+    public static final byte RESPONSE_VALUE_WITH_ATTACHMENTS = 4;
+    public static final byte RESPONSE_NULL_VALUE_WITH_ATTACHMENTS = 5;
+<span class="nc" id="L57">    public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];</span>
+<span class="nc" id="L58">    public static final Class&lt;?&gt;[] EMPTY_CLASS_ARRAY = new Class&lt;?&gt;[0];</span>
+<span class="nc" id="L59">    private static final Logger log = LoggerFactory.getLogger(DubboCodec.class);</span>
+
+    @Override
+    protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+<span class="nc" id="L63">        byte flag = header[2], proto = (byte) (flag &amp; SERIALIZATION_MASK);</span>
+        // get request id.
+<span class="nc" id="L65">        long id = Bytes.bytes2long(header, 4);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if ((flag &amp; FLAG_REQUEST) == 0) {</span>
+            // decode response.
+<span class="nc" id="L68">            Response res = new Response(id);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if ((flag &amp; FLAG_EVENT) != 0) {</span>
+<span class="nc" id="L70">                res.setEvent(true);</span>
+            }
+            // get status.
+<span class="nc" id="L73">            byte status = header[3];</span>
+<span class="nc" id="L74">            res.setStatus(status);</span>
+            try {
+<span class="nc" id="L76">                ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                if (status == Response.OK) {</span>
+                    Object data;
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    if (res.isHeartbeat()) {</span>
+<span class="nc" id="L80">                        data = decodeHeartbeatData(channel, in);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                    } else if (res.isEvent()) {</span>
+<span class="nc" id="L82">                        data = decodeEventData(channel, in);</span>
+                    } else {
+                        DecodeableRpcResult result;
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                        if (channel.getUrl().getParameter(</span>
+                                Constants.DECODE_IN_IO_THREAD_KEY,
+                                Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
+<span class="nc" id="L88">                            result = new DecodeableRpcResult(channel, res, is,</span>
+<span class="nc" id="L89">                                    (Invocation) getRequestData(id), proto);</span>
+<span class="nc" id="L90">                            result.decode();</span>
+                        } else {
+<span class="nc" id="L92">                            result = new DecodeableRpcResult(channel, res,</span>
+<span class="nc" id="L93">                                    new UnsafeByteArrayInputStream(readMessageData(is)),</span>
+<span class="nc" id="L94">                                    (Invocation) getRequestData(id), proto);</span>
+                        }
+<span class="nc" id="L96">                        data = result;</span>
+                    }
+<span class="nc" id="L98">                    res.setResult(data);</span>
+<span class="nc" id="L99">                } else {</span>
+<span class="nc" id="L100">                    res.setErrorMessage(in.readUTF());</span>
+                }
+<span class="nc" id="L102">            } catch (Throwable t) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                if (log.isWarnEnabled()) {</span>
+<span class="nc" id="L104">                    log.warn(&quot;Decode response failed: &quot; + t.getMessage(), t);</span>
+                }
+<span class="nc" id="L106">                res.setStatus(Response.CLIENT_ERROR);</span>
+<span class="nc" id="L107">                res.setErrorMessage(StringUtils.toString(t));</span>
+<span class="nc" id="L108">            }</span>
+<span class="nc" id="L109">            return res;</span>
+        } else {
+            // decode request.
+<span class="nc" id="L112">            Request req = new Request(id);</span>
+<span class="nc" id="L113">            req.setVersion(Version.getProtocolVersion());</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            req.setTwoWay((flag &amp; FLAG_TWOWAY) != 0);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if ((flag &amp; FLAG_EVENT) != 0) {</span>
+<span class="nc" id="L116">                req.setEvent(true);</span>
+            }
+            try {
+                Object data;
+<span class="nc" id="L120">                ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (req.isHeartbeat()) {</span>
+<span class="nc" id="L122">                    data = decodeHeartbeatData(channel, in);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                } else if (req.isEvent()) {</span>
+<span class="nc" id="L124">                    data = decodeEventData(channel, in);</span>
+                } else {
+                    DecodeableRpcInvocation inv;
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                    if (channel.getUrl().getParameter(</span>
+                            Constants.DECODE_IN_IO_THREAD_KEY,
+                            Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
+<span class="nc" id="L130">                        inv = new DecodeableRpcInvocation(channel, req, is, proto);</span>
+<span class="nc" id="L131">                        inv.decode();</span>
+                    } else {
+<span class="nc" id="L133">                        inv = new DecodeableRpcInvocation(channel, req,</span>
+<span class="nc" id="L134">                                new UnsafeByteArrayInputStream(readMessageData(is)), proto);</span>
+                    }
+<span class="nc" id="L136">                    data = inv;</span>
+                }
+<span class="nc" id="L138">                req.setData(data);</span>
+<span class="nc" id="L139">            } catch (Throwable t) {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (log.isWarnEnabled()) {</span>
+<span class="nc" id="L141">                    log.warn(&quot;Decode request failed: &quot; + t.getMessage(), t);</span>
+                }
+                // bad request
+<span class="nc" id="L144">                req.setBroken(true);</span>
+<span class="nc" id="L145">                req.setData(t);</span>
+<span class="nc" id="L146">            }</span>
+
+<span class="nc" id="L148">            return req;</span>
+        }
+    }
+
+    private byte[] readMessageData(InputStream is) throws IOException {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (is.available() &gt; 0) {</span>
+<span class="nc" id="L154">            byte[] result = new byte[is.available()];</span>
+<span class="nc" id="L155">            is.read(result);</span>
+<span class="nc" id="L156">            return result;</span>
+        }
+<span class="nc" id="L158">        return new byte[]{};</span>
+    }
+
+    @Override
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L163">        encodeRequestData(channel, out, data, DUBBO_VERSION);</span>
+<span class="nc" id="L164">    }</span>
+
+    @Override
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data) throws IOException {
+<span class="nc" id="L168">        encodeResponseData(channel, out, data, DUBBO_VERSION);</span>
+<span class="nc" id="L169">    }</span>
+
+    @Override
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+<span class="nc" id="L173">        RpcInvocation inv = (RpcInvocation) data;</span>
+
+<span class="nc" id="L175">        out.writeUTF(version);</span>
+<span class="nc" id="L176">        out.writeUTF(inv.getAttachment(Constants.PATH_KEY));</span>
+<span class="nc" id="L177">        out.writeUTF(inv.getAttachment(Constants.VERSION_KEY));</span>
+
+<span class="nc" id="L179">        out.writeUTF(inv.getMethodName());</span>
+<span class="nc" id="L180">        out.writeUTF(ReflectUtils.getDesc(inv.getParameterTypes()));</span>
+<span class="nc" id="L181">        Object[] args = inv.getArguments();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (args != null) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc" id="L184">                out.writeObject(encodeInvocationArgument(channel, inv, i));</span>
+            }
+        }
+<span class="nc" id="L187">        out.writeObject(RpcUtils.getNecessaryAttachments(inv));</span>
+<span class="nc" id="L188">    }</span>
+
+    @Override
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+<span class="nc" id="L192">        Result result = (Result) data;</span>
+        // currently, the version value in Response records the version of Request
+<span class="nc" id="L194">        boolean attach = Version.isSupportResponseAttachment(version);</span>
+<span class="nc" id="L195">        Throwable th = result.getException();</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (th == null) {</span>
+<span class="nc" id="L197">            Object ret = result.getValue();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (ret == null) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                out.writeByte(attach ? RESPONSE_NULL_VALUE_WITH_ATTACHMENTS : RESPONSE_NULL_VALUE);</span>
+            } else {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                out.writeByte(attach ? RESPONSE_VALUE_WITH_ATTACHMENTS : RESPONSE_VALUE);</span>
+<span class="nc" id="L202">                out.writeObject(ret);</span>
+            }
+<span class="nc" id="L204">        } else {</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            out.writeByte(attach ? RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS : RESPONSE_WITH_EXCEPTION);</span>
+<span class="nc" id="L206">            out.writeObject(th);</span>
+        }
+
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (attach) {</span>
+            // returns current version of Response to consumer side.
+<span class="nc" id="L211">            result.getAttachments().put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());</span>
+<span class="nc" id="L212">            out.writeObject(result.getAttachments());</span>
+        }
+<span class="nc" id="L214">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

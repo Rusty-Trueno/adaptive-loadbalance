@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LoadBalance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-compatible</a> &gt; <a href="index.source.html" class="el_package">com.alibaba.dubbo.rpc.cluster</a> &gt; <span class="el_source">LoadBalance.java</span></div><h1>LoadBalance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.alibaba.dubbo.rpc.cluster;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Deprecated
+public interface LoadBalance extends org.apache.dubbo.rpc.cluster.LoadBalance {
+
+    &lt;T&gt; com.alibaba.dubbo.rpc.Invoker&lt;T&gt; select(List&lt;com.alibaba.dubbo.rpc.Invoker&lt;T&gt;&gt; invokers,
+                                                com.alibaba.dubbo.common.URL url,
+                                                com.alibaba.dubbo.rpc.Invocation invocation) throws RpcException;
+
+    @Override
+    default &lt;T&gt; Invoker&lt;T&gt; select(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) throws RpcException {
+<span class="nc" id="L37">        List&lt;com.alibaba.dubbo.rpc.Invoker&lt;T&gt;&gt; invs = invokers.stream().</span>
+<span class="nc" id="L38">                map(invoker -&gt; new com.alibaba.dubbo.rpc.Invoker.CompatibleInvoker&lt;T&gt;(invoker)).</span>
+<span class="nc" id="L39">                collect(Collectors.toList());</span>
+
+<span class="nc" id="L41">        return select(invs, new com.alibaba.dubbo.common.URL(url),</span>
+                new com.alibaba.dubbo.rpc.Invocation.CompatibleInvocation(invocation));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

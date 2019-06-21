@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractServiceConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">AbstractServiceConfig.java</span></div><h1>AbstractServiceConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.config.context.ConfigManager;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.rpc.ExporterListener;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * AbstractServiceConfig
+ *
+ * @export
+ */
+<span class="nc" id="L34">public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {</span>
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * The service version
+     */
+    protected String version;
+
+    /**
+     * The service group
+     */
+    protected String group;
+
+    /**
+     * whether the service is deprecated
+     */
+<span class="nc" id="L51">    protected Boolean deprecated = false;</span>
+
+    /**
+     * The time delay register service (milliseconds)
+     */
+    protected Integer delay;
+
+    /**
+     * Whether to export the service
+     */
+    protected Boolean export;
+
+    /**
+     * The service weight
+     */
+    protected Integer weight;
+
+    /**
+     * Document center
+     */
+    protected String document;
+
+    /**
+     * Whether to register as a dynamic service or not on register center, the value is true, the status will be enabled
+     * after the service registered,and it needs to be disabled manually; if you want to disable the service, you also need
+     * manual processing
+     */
+<span class="nc" id="L78">    protected Boolean dynamic = true;</span>
+
+    /**
+     * Whether to use token
+     */
+    protected String token;
+
+    /**
+     * Whether to export access logs to logs
+     */
+    protected String accesslog;
+
+    /**
+     * The protocol list the service will export with
+     */
+    protected List&lt;ProtocolConfig&gt; protocols;
+    protected String protocolIds;
+
+    // max allowed execute times
+    private Integer executes;
+
+    /**
+     * Whether to register
+     */
+<span class="nc" id="L102">    private Boolean register = true;</span>
+
+    /**
+     * Warm up period
+     */
+    private Integer warmup;
+
+    /**
+     * The serialization type
+     */
+    private String serialization;
+
+    public String getVersion() {
+<span class="nc" id="L115">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L119">        checkKey(Constants.VERSION_KEY, version);</span>
+<span class="nc" id="L120">        this.version = version;</span>
+<span class="nc" id="L121">    }</span>
+
+    public String getGroup() {
+<span class="nc" id="L124">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L128">        checkKey(Constants.GROUP_KEY, group);</span>
+<span class="nc" id="L129">        this.group = group;</span>
+<span class="nc" id="L130">    }</span>
+
+    public Integer getDelay() {
+<span class="nc" id="L133">        return delay;</span>
+    }
+
+    public void setDelay(Integer delay) {
+<span class="nc" id="L137">        this.delay = delay;</span>
+<span class="nc" id="L138">    }</span>
+
+    public Boolean getExport() {
+<span class="nc" id="L141">        return export;</span>
+    }
+
+    public void setExport(Boolean export) {
+<span class="nc" id="L145">        this.export = export;</span>
+<span class="nc" id="L146">    }</span>
+
+    public Integer getWeight() {
+<span class="nc" id="L149">        return weight;</span>
+    }
+
+    public void setWeight(Integer weight) {
+<span class="nc" id="L153">        this.weight = weight;</span>
+<span class="nc" id="L154">    }</span>
+
+    @Parameter(escaped = true)
+    public String getDocument() {
+<span class="nc" id="L158">        return document;</span>
+    }
+
+    public void setDocument(String document) {
+<span class="nc" id="L162">        this.document = document;</span>
+<span class="nc" id="L163">    }</span>
+
+    public String getToken() {
+<span class="nc" id="L166">        return token;</span>
+    }
+
+    public void setToken(Boolean token) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (token == null) {</span>
+<span class="nc" id="L171">            setToken((String) null);</span>
+        } else {
+<span class="nc" id="L173">            setToken(String.valueOf(token));</span>
+        }
+<span class="nc" id="L175">    }</span>
+
+    public void setToken(String token) {
+<span class="nc" id="L178">        checkName(Constants.TOKEN_KEY, token);</span>
+<span class="nc" id="L179">        this.token = token;</span>
+<span class="nc" id="L180">    }</span>
+
+    public Boolean isDeprecated() {
+<span class="nc" id="L183">        return deprecated;</span>
+    }
+
+    public void setDeprecated(Boolean deprecated) {
+<span class="nc" id="L187">        this.deprecated = deprecated;</span>
+<span class="nc" id="L188">    }</span>
+
+    public Boolean isDynamic() {
+<span class="nc" id="L191">        return dynamic;</span>
+    }
+
+    public void setDynamic(Boolean dynamic) {
+<span class="nc" id="L195">        this.dynamic = dynamic;</span>
+<span class="nc" id="L196">    }</span>
+
+    public List&lt;ProtocolConfig&gt; getProtocols() {
+<span class="nc" id="L199">        return protocols;</span>
+    }
+
+    @SuppressWarnings({&quot;unchecked&quot;})
+    public void setProtocols(List&lt;? extends ProtocolConfig&gt; protocols) {
+<span class="nc" id="L204">        ConfigManager.getInstance().addProtocols((List&lt;ProtocolConfig&gt;) protocols);</span>
+<span class="nc" id="L205">        this.protocols = (List&lt;ProtocolConfig&gt;) protocols;</span>
+<span class="nc" id="L206">    }</span>
+
+    public ProtocolConfig getProtocol() {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        return CollectionUtils.isEmpty(protocols) ? null : protocols.get(0);</span>
+    }
+
+    public void setProtocol(ProtocolConfig protocol) {
+<span class="nc" id="L213">        setProtocols(new ArrayList&lt;&gt;(Arrays.asList(protocol)));</span>
+<span class="nc" id="L214">    }</span>
+
+    @Parameter(excluded = true)
+    public String getProtocolIds() {
+<span class="nc" id="L218">        return protocolIds;</span>
+    }
+
+    public void setProtocolIds(String protocolIds) {
+<span class="nc" id="L222">        this.protocolIds = protocolIds;</span>
+<span class="nc" id="L223">    }</span>
+
+    public String getAccesslog() {
+<span class="nc" id="L226">        return accesslog;</span>
+    }
+
+    public void setAccesslog(Boolean accesslog) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (accesslog == null) {</span>
+<span class="nc" id="L231">            setAccesslog((String) null);</span>
+        } else {
+<span class="nc" id="L233">            setAccesslog(String.valueOf(accesslog));</span>
+        }
+<span class="nc" id="L235">    }</span>
+
+    public void setAccesslog(String accesslog) {
+<span class="nc" id="L238">        this.accesslog = accesslog;</span>
+<span class="nc" id="L239">    }</span>
+
+    public Integer getExecutes() {
+<span class="nc" id="L242">        return executes;</span>
+    }
+
+    public void setExecutes(Integer executes) {
+<span class="nc" id="L246">        this.executes = executes;</span>
+<span class="nc" id="L247">    }</span>
+
+    @Override
+    @Parameter(key = Constants.SERVICE_FILTER_KEY, append = true)
+    public String getFilter() {
+<span class="nc" id="L252">        return super.getFilter();</span>
+    }
+
+    @Override
+    @Parameter(key = Constants.EXPORTER_LISTENER_KEY, append = true)
+    public String getListener() {
+<span class="nc" id="L258">        return listener;</span>
+    }
+
+    @Override
+    public void setListener(String listener) {
+<span class="nc" id="L263">        checkMultiExtension(ExporterListener.class, &quot;listener&quot;, listener);</span>
+<span class="nc" id="L264">        this.listener = listener;</span>
+<span class="nc" id="L265">    }</span>
+
+    public Boolean isRegister() {
+<span class="nc" id="L268">        return register;</span>
+    }
+
+    public void setRegister(Boolean register) {
+<span class="nc" id="L272">        this.register = register;</span>
+<span class="nc" id="L273">    }</span>
+
+    public Integer getWarmup() {
+<span class="nc" id="L276">        return warmup;</span>
+    }
+
+    public void setWarmup(Integer warmup) {
+<span class="nc" id="L280">        this.warmup = warmup;</span>
+<span class="nc" id="L281">    }</span>
+
+    public String getSerialization() {
+<span class="nc" id="L284">        return serialization;</span>
+    }
+
+    public void setSerialization(String serialization) {
+<span class="nc" id="L288">        this.serialization = serialization;</span>
+<span class="nc" id="L289">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

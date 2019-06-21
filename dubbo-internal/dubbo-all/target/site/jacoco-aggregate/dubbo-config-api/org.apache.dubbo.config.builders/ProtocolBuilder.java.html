@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProtocolBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">ProtocolBuilder.java</span></div><h1>ProtocolBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.ProtocolConfig;
+
+import java.util.Map;
+
+/**
+ * This is a builder for build {@link ProtocolConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L28">public class ProtocolBuilder extends AbstractBuilder&lt;ProtocolConfig, ProtocolBuilder&gt; {</span>
+    /**
+     * Protocol name
+     */
+    private String name;
+
+    /**
+     * Service ip address (when there are multiple network cards available)
+     */
+    private String host;
+
+    /**
+     * Service port
+     */
+    private Integer port;
+
+    /**
+     * Context path
+     */
+    private String contextpath;
+
+    /**
+     * Thread pool
+     */
+    private String threadpool;
+
+    /**
+     * Thread pool core thread size
+     */
+    private Integer corethreads;
+
+    /**
+     * Thread pool size (fixed size)
+     */
+    private Integer threads;
+
+    /**
+     * IO thread pool size (fixed size)
+     */
+    private Integer iothreads;
+
+    /**
+     * Thread pool's queue length
+     */
+    private Integer queues;
+
+    /**
+     * Max acceptable connections
+     */
+    private Integer accepts;
+
+    /**
+     * Protocol codec
+     */
+    private String codec;
+
+    /**
+     * Serialization
+     */
+    private String serialization;
+
+    /**
+     * Charset
+     */
+    private String charset;
+
+    /**
+     * Payload max length
+     */
+    private Integer payload;
+
+    /**
+     * Buffer size
+     */
+    private Integer buffer;
+
+    /**
+     * Heartbeat interval
+     */
+    private Integer heartbeat;
+
+    /**
+     * Access log
+     */
+    private String accesslog;
+
+    /**
+     * Transfort
+     */
+    private String transporter;
+
+    /**
+     * How information is exchanged
+     */
+    private String exchanger;
+
+    /**
+     * Thread dispatch mode
+     */
+    private String dispatcher;
+
+    /**
+     * Networker
+     */
+    private String networker;
+
+    /**
+     * Sever impl
+     */
+    private String server;
+
+    /**
+     * Client impl
+     */
+    private String client;
+
+    /**
+     * Supported telnet commands, separated with comma.
+     */
+    private String telnet;
+
+    /**
+     * Command line prompt
+     */
+    private String prompt;
+
+    /**
+     * Status check
+     */
+    private String status;
+
+    /**
+     * Whether to register
+     */
+    private Boolean register;
+
+    /**
+     * whether it is a persistent connection
+     */
+    //TODO add this to provider config
+    private Boolean keepAlive;
+
+    // TODO add this to provider config
+    private String optimizer;
+
+    /**
+     * The extension
+     */
+    private String extension;
+
+    /**
+     * The customized parameters
+     */
+    private Map&lt;String, String&gt; parameters;
+
+    /**
+     * If it's default
+     */
+    private Boolean isDefault;
+
+    public ProtocolBuilder name(String name) {
+<span class="nc" id="L189">        this.name = name;</span>
+<span class="nc" id="L190">        return getThis();</span>
+    }
+
+    public ProtocolBuilder host(String host) {
+<span class="nc" id="L194">        this.host = host;</span>
+<span class="nc" id="L195">        return getThis();</span>
+    }
+
+    public ProtocolBuilder port(Integer port) {
+<span class="nc" id="L199">        this.port = port;</span>
+<span class="nc" id="L200">        return getThis();</span>
+    }
+
+    public ProtocolBuilder contextpath(String contextpath) {
+<span class="nc" id="L204">        this.contextpath = contextpath;</span>
+<span class="nc" id="L205">        return getThis();</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.config.builders.ProtocolBuilder#contextpath(String)
+     * @param path
+     * @return ProtocolBuilder
+     */
+    @Deprecated
+    public ProtocolBuilder path(String path) {
+<span class="nc" id="L215">        this.contextpath = path;</span>
+<span class="nc" id="L216">        return getThis();</span>
+    }
+
+    public ProtocolBuilder threadpool(String threadpool) {
+<span class="nc" id="L220">        this.threadpool = threadpool;</span>
+<span class="nc" id="L221">        return getThis();</span>
+    }
+
+    public ProtocolBuilder corethreads(Integer corethreads) {
+<span class="nc" id="L225">        this.corethreads = corethreads;</span>
+<span class="nc" id="L226">        return getThis();</span>
+    }
+
+    public ProtocolBuilder threads(Integer threads) {
+<span class="nc" id="L230">        this.threads = threads;</span>
+<span class="nc" id="L231">        return getThis();</span>
+    }
+
+    public ProtocolBuilder iothreads(Integer iothreads) {
+<span class="nc" id="L235">        this.iothreads = iothreads;</span>
+<span class="nc" id="L236">        return getThis();</span>
+    }
+
+    public ProtocolBuilder queues(Integer queues) {
+<span class="nc" id="L240">        this.queues = queues;</span>
+<span class="nc" id="L241">        return getThis();</span>
+    }
+
+    public ProtocolBuilder accepts(Integer accepts) {
+<span class="nc" id="L245">        this.accepts = accepts;</span>
+<span class="nc" id="L246">        return getThis();</span>
+    }
+
+    public ProtocolBuilder codec(String codec) {
+<span class="nc" id="L250">        this.codec = codec;</span>
+<span class="nc" id="L251">        return getThis();</span>
+    }
+
+    public ProtocolBuilder serialization(String serialization) {
+<span class="nc" id="L255">        this.serialization = serialization;</span>
+<span class="nc" id="L256">        return getThis();</span>
+    }
+
+    public ProtocolBuilder charset(String charset) {
+<span class="nc" id="L260">        this.charset = charset;</span>
+<span class="nc" id="L261">        return getThis();</span>
+    }
+
+    public ProtocolBuilder payload(Integer payload) {
+<span class="nc" id="L265">        this.payload = payload;</span>
+<span class="nc" id="L266">        return getThis();</span>
+    }
+
+    public ProtocolBuilder buffer(Integer buffer) {
+<span class="nc" id="L270">        this.buffer = buffer;</span>
+<span class="nc" id="L271">        return getThis();</span>
+    }
+
+    public ProtocolBuilder heartbeat(Integer heartbeat) {
+<span class="nc" id="L275">        this.heartbeat = heartbeat;</span>
+<span class="nc" id="L276">        return getThis();</span>
+    }
+
+    public ProtocolBuilder accesslog(String accesslog) {
+<span class="nc" id="L280">        this.accesslog = accesslog;</span>
+<span class="nc" id="L281">        return getThis();</span>
+    }
+
+    public ProtocolBuilder transporter(String transporter) {
+<span class="nc" id="L285">        this.transporter = transporter;</span>
+<span class="nc" id="L286">        return getThis();</span>
+    }
+
+    public ProtocolBuilder exchanger(String exchanger) {
+<span class="nc" id="L290">        this.exchanger = exchanger;</span>
+<span class="nc" id="L291">        return getThis();</span>
+    }
+
+    public ProtocolBuilder dispatcher(String dispatcher) {
+<span class="nc" id="L295">        this.dispatcher = dispatcher;</span>
+<span class="nc" id="L296">        return getThis();</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.config.builders.ProtocolBuilder#dispatcher(String)
+     * @param dispather
+     * @return ProtocolBuilder
+     */
+    @Deprecated
+    public ProtocolBuilder dispather(String dispather) {
+<span class="nc" id="L306">        this.dispatcher = dispather;</span>
+<span class="nc" id="L307">        return getThis();</span>
+    }
+
+    public ProtocolBuilder networker(String networker) {
+<span class="nc" id="L311">        this.networker = networker;</span>
+<span class="nc" id="L312">        return getThis();</span>
+    }
+
+    public ProtocolBuilder server(String server) {
+<span class="nc" id="L316">        this.server = server;</span>
+<span class="nc" id="L317">        return getThis();</span>
+    }
+
+    public ProtocolBuilder client(String client) {
+<span class="nc" id="L321">        this.client = client;</span>
+<span class="nc" id="L322">        return getThis();</span>
+    }
+
+    public ProtocolBuilder telnet(String telnet) {
+<span class="nc" id="L326">        this.telnet = telnet;</span>
+<span class="nc" id="L327">        return getThis();</span>
+    }
+
+    public ProtocolBuilder prompt(String prompt) {
+<span class="nc" id="L331">        this.prompt = prompt;</span>
+<span class="nc" id="L332">        return getThis();</span>
+    }
+
+    public ProtocolBuilder status(String status) {
+<span class="nc" id="L336">        this.status = status;</span>
+<span class="nc" id="L337">        return getThis();</span>
+    }
+
+    public ProtocolBuilder register(Boolean register) {
+<span class="nc" id="L341">        this.register = register;</span>
+<span class="nc" id="L342">        return getThis();</span>
+    }
+
+    public ProtocolBuilder keepAlive(Boolean keepAlive) {
+<span class="nc" id="L346">        this.keepAlive = keepAlive;</span>
+<span class="nc" id="L347">        return getThis();</span>
+    }
+
+    public ProtocolBuilder optimizer(String optimizer) {
+<span class="nc" id="L351">        this.optimizer = optimizer;</span>
+<span class="nc" id="L352">        return getThis();</span>
+    }
+
+    public ProtocolBuilder extension(String extension) {
+<span class="nc" id="L356">        this.extension = extension;</span>
+<span class="nc" id="L357">        return getThis();</span>
+    }
+
+    public ProtocolBuilder appendParameter(String key, String value) {
+<span class="nc" id="L361">        this.parameters = appendParameter(parameters, key, value);</span>
+<span class="nc" id="L362">        return getThis();</span>
+    }
+
+    public ProtocolBuilder appendParameters(Map&lt;String, String&gt; appendParameters) {
+<span class="nc" id="L366">        this.parameters = appendParameters(parameters, appendParameters);</span>
+<span class="nc" id="L367">        return getThis();</span>
+    }
+
+    public ProtocolBuilder isDefault(Boolean isDefault) {
+<span class="nc" id="L371">        this.isDefault = isDefault;</span>
+<span class="nc" id="L372">        return getThis();</span>
+    }
+
+    public ProtocolConfig build() {
+<span class="nc" id="L376">        ProtocolConfig protocolConfig = new ProtocolConfig();</span>
+<span class="nc" id="L377">        super.build(protocolConfig);</span>
+
+<span class="nc" id="L379">        protocolConfig.setAccepts(accepts);</span>
+<span class="nc" id="L380">        protocolConfig.setAccesslog(accesslog);</span>
+<span class="nc" id="L381">        protocolConfig.setBuffer(buffer);</span>
+<span class="nc" id="L382">        protocolConfig.setCharset(charset);</span>
+<span class="nc" id="L383">        protocolConfig.setClient(client);</span>
+<span class="nc" id="L384">        protocolConfig.setCodec(codec);</span>
+<span class="nc" id="L385">        protocolConfig.setContextpath(contextpath);</span>
+<span class="nc" id="L386">        protocolConfig.setCorethreads(corethreads);</span>
+<span class="nc" id="L387">        protocolConfig.setDefault(isDefault);</span>
+<span class="nc" id="L388">        protocolConfig.setDispatcher(dispatcher);</span>
+<span class="nc" id="L389">        protocolConfig.setExchanger(exchanger);</span>
+<span class="nc" id="L390">        protocolConfig.setExtension(extension);</span>
+<span class="nc" id="L391">        protocolConfig.setHeartbeat(heartbeat);</span>
+<span class="nc" id="L392">        protocolConfig.setHost(host);</span>
+<span class="nc" id="L393">        protocolConfig.setIothreads(iothreads);</span>
+<span class="nc" id="L394">        protocolConfig.setKeepAlive(keepAlive);</span>
+<span class="nc" id="L395">        protocolConfig.setName(name);</span>
+<span class="nc" id="L396">        protocolConfig.setNetworker(networker);</span>
+<span class="nc" id="L397">        protocolConfig.setOptimizer(optimizer);</span>
+<span class="nc" id="L398">        protocolConfig.setParameters(parameters);</span>
+<span class="nc" id="L399">        protocolConfig.setPayload(payload);</span>
+<span class="nc" id="L400">        protocolConfig.setPort(port);</span>
+<span class="nc" id="L401">        protocolConfig.setPrompt(prompt);</span>
+<span class="nc" id="L402">        protocolConfig.setQueues(queues);</span>
+<span class="nc" id="L403">        protocolConfig.setRegister(register);</span>
+<span class="nc" id="L404">        protocolConfig.setSerialization(serialization);</span>
+<span class="nc" id="L405">        protocolConfig.setServer(server);</span>
+<span class="nc" id="L406">        protocolConfig.setStatus(status);</span>
+<span class="nc" id="L407">        protocolConfig.setTelnet(telnet);</span>
+<span class="nc" id="L408">        protocolConfig.setThreadpool(threadpool);</span>
+<span class="nc" id="L409">        protocolConfig.setThreads(threads);</span>
+<span class="nc" id="L410">        protocolConfig.setTransporter(transporter);</span>
+
+<span class="nc" id="L412">        return protocolConfig;</span>
+    }
+
+    @Override
+    protected ProtocolBuilder getThis() {
+<span class="nc" id="L417">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

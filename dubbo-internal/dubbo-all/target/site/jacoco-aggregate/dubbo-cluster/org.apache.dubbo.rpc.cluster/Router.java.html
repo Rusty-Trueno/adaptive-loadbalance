@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Router.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster</a> &gt; <span class="el_source">Router.java</span></div><h1>Router.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.List;
+
+/**
+ * Router. (SPI, Prototype, ThreadSafe)
+ * &lt;p&gt;
+ * &lt;a href=&quot;http://en.wikipedia.org/wiki/Routing&quot;&gt;Routing&lt;/a&gt;
+ *
+ * @see org.apache.dubbo.rpc.cluster.Cluster#join(Directory)
+ * @see org.apache.dubbo.rpc.cluster.Directory#list(Invocation)
+ */
+public interface Router extends Comparable&lt;Router&gt; {
+
+    int DEFAULT_PRIORITY = Integer.MAX_VALUE;
+
+    /**
+     * Get the router url.
+     *
+     * @return url
+     */
+    URL getUrl();
+
+    /**
+     * Filter invokers with current routing rule and only return the invokers that comply with the rule.
+     *
+     * @param invokers   invoker list
+     * @param url        refer url
+     * @param invocation invocation
+     * @return routed invokers
+     * @throws RpcException
+     */
+    &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; route(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) throws RpcException;
+
+
+    /**
+     * Notify the router the invoker list. Invoker list may change from time to time. This method gives the router a
+     * chance to prepare before {@link Router#route(List, URL, Invocation)} gets called.
+     *
+     * @param invokers invoker list
+     * @param &lt;T&gt;      invoker's type
+     */
+    default &lt;T&gt; void notify(List&lt;Invoker&lt;T&gt;&gt; invokers) {
+
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * To decide whether this router need to execute every time an RPC comes or should only execute when addresses or
+     * rule change.
+     *
+     * @return true if the router need to execute every time.
+     */
+    boolean isRuntime();
+
+    /**
+     * To decide whether this router should take effect when none of the invoker can match the router rule, which
+     * means the {@link #route(List, URL, Invocation)} would be empty. Most of time, most router implementation would
+     * default this value to false.
+     *
+     * @return true to execute if none of invokers matches the current router
+     */
+    boolean isForce();
+
+    /**
+     * Router's priority, used to sort routers.
+     *
+     * @return router's priority
+     */
+    int getPriority();
+
+    @Override
+    default int compareTo(Router o) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException();</span>
+        }
+<span class="nc" id="L97">        return Integer.compare(this.getPriority(), o.getPriority());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

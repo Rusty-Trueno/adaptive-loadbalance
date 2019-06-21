@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyCodecAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4</a> &gt; <span class="el_source">NettyCodecAdapter.java</span></div><h1>NettyCodecAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.codec.MessageToByteEncoder;
+
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * NettyCodecAdapter.
+ */
+final public class NettyCodecAdapter {
+
+<span class="nc" id="L38">    private final ChannelHandler encoder = new InternalEncoder();</span>
+
+<span class="nc" id="L40">    private final ChannelHandler decoder = new InternalDecoder();</span>
+
+    private final Codec2 codec;
+
+    private final URL url;
+
+    private final org.apache.dubbo.remoting.ChannelHandler handler;
+
+<span class="nc" id="L48">    public NettyCodecAdapter(Codec2 codec, URL url, org.apache.dubbo.remoting.ChannelHandler handler) {</span>
+<span class="nc" id="L49">        this.codec = codec;</span>
+<span class="nc" id="L50">        this.url = url;</span>
+<span class="nc" id="L51">        this.handler = handler;</span>
+<span class="nc" id="L52">    }</span>
+
+    public ChannelHandler getEncoder() {
+<span class="nc" id="L55">        return encoder;</span>
+    }
+
+    public ChannelHandler getDecoder() {
+<span class="nc" id="L59">        return decoder;</span>
+    }
+
+<span class="nc" id="L62">    private class InternalEncoder extends MessageToByteEncoder {</span>
+
+        @Override
+        protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf out) throws Exception {
+<span class="nc" id="L66">            org.apache.dubbo.remoting.buffer.ChannelBuffer buffer = new NettyBackedChannelBuffer(out);</span>
+<span class="nc" id="L67">            Channel ch = ctx.channel();</span>
+<span class="nc" id="L68">            NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);</span>
+            try {
+<span class="nc" id="L70">                codec.encode(channel, buffer, msg);</span>
+            } finally {
+<span class="nc" id="L72">                NettyChannel.removeChannelIfDisconnected(ch);</span>
+            }
+<span class="nc" id="L74">        }</span>
+    }
+
+<span class="nc" id="L77">    private class InternalDecoder extends ByteToMessageDecoder {</span>
+
+        @Override
+        protected void decode(ChannelHandlerContext ctx, ByteBuf input, List&lt;Object&gt; out) throws Exception {
+
+<span class="nc" id="L82">            ChannelBuffer message = new NettyBackedChannelBuffer(input);</span>
+
+<span class="nc" id="L84">            NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);</span>
+
+            try {
+                // decode object.
+                do {
+<span class="nc" id="L89">                    int saveReaderIndex = message.readerIndex();</span>
+<span class="nc" id="L90">                    Object msg = codec.decode(channel, message);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    if (msg == Codec2.DecodeResult.NEED_MORE_INPUT) {</span>
+<span class="nc" id="L92">                        message.readerIndex(saveReaderIndex);</span>
+<span class="nc" id="L93">                        break;</span>
+                    } else {
+                        //is it possible to go here ?
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                        if (saveReaderIndex == message.readerIndex()) {</span>
+<span class="nc" id="L97">                            throw new IOException(&quot;Decode without read data.&quot;);</span>
+                        }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                        if (msg != null) {</span>
+<span class="nc" id="L100">                            out.add(msg);</span>
+                        }
+                    }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                } while (message.readable());</span>
+            } finally {
+<span class="nc" id="L105">                NettyChannel.removeChannelIfDisconnected(ctx.channel());</span>
+            }
+<span class="nc" id="L107">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

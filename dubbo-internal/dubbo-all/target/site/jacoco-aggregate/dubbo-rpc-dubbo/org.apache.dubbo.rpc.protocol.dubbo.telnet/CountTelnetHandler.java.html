@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CountTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo.telnet</a> &gt; <span class="el_source">CountTelnetHandler.java</span></div><h1>CountTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo.telnet;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+import org.apache.dubbo.remoting.telnet.support.TelnetUtils;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcStatus;
+import org.apache.dubbo.rpc.protocol.dubbo.DubboProtocol;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * CountTelnetHandler
+ */
+@Activate
+@Help(parameter = &quot;[service] [method] [times]&quot;, summary = &quot;Count the service.&quot;, detail = &quot;Count the service.&quot;)
+<span class="nc" id="L41">public class CountTelnetHandler implements TelnetHandler {</span>
+
+    @Override
+    public String telnet(final Channel channel, String message) {
+<span class="nc" id="L45">        String service = (String) channel.getAttribute(ChangeTelnetHandler.SERVICE_KEY);</span>
+<span class="nc bnc" id="L46" title="All 6 branches missed.">        if ((service == null || service.length() == 0)</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                &amp;&amp; (message == null || message.length() == 0)) {</span>
+<span class="nc" id="L48">            return &quot;Please input service name, eg: \r\ncount XxxService\r\ncount XxxService xxxMethod\r\ncount XxxService xxxMethod 10\r\nor \&quot;cd XxxService\&quot; firstly.&quot;;</span>
+        }
+<span class="nc" id="L50">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">        if (service != null &amp;&amp; service.length() &gt; 0) {</span>
+<span class="nc" id="L52">            buf.append(&quot;Use default service &quot; + service + &quot;.\r\n&quot;);</span>
+        }
+<span class="nc" id="L54">        String[] parts = message.split(&quot;\\s+&quot;);</span>
+        String method;
+        String times;
+<span class="nc bnc" id="L57" title="All 4 branches missed.">        if (service == null || service.length() == 0) {</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            service = parts.length &gt; 0 ? parts[0] : null;</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            method = parts.length &gt; 1 ? parts[1] : null;</span>
+        } else {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            method = parts.length &gt; 0 ? parts[0] : null;</span>
+        }
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (StringUtils.isInteger(method)) {</span>
+<span class="nc" id="L64">            times = method;</span>
+<span class="nc" id="L65">            method = null;</span>
+        } else {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            times = parts.length &gt; 2 ? parts[2] : &quot;1&quot;;</span>
+        }
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (!StringUtils.isInteger(times)) {</span>
+<span class="nc" id="L70">            return &quot;Illegal times &quot; + times + &quot;, must be integer.&quot;;</span>
+        }
+<span class="nc" id="L72">        final int t = Integer.parseInt(times);</span>
+<span class="nc" id="L73">        Invoker&lt;?&gt; invoker = null;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        for (Exporter&lt;?&gt; exporter : DubboProtocol.getDubboProtocol().getExporters()) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (service.equals(exporter.getInvoker().getInterface().getSimpleName())</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    || service.equals(exporter.getInvoker().getInterface().getName())</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                    || service.equals(exporter.getInvoker().getUrl().getPath())) {</span>
+<span class="nc" id="L78">                invoker = exporter.getInvoker();</span>
+<span class="nc" id="L79">                break;</span>
+            }
+<span class="nc" id="L81">        }</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (invoker != null) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (t &gt; 0) {</span>
+<span class="nc" id="L84">                final String mtd = method;</span>
+<span class="nc" id="L85">                final Invoker&lt;?&gt; inv = invoker;</span>
+<span class="nc" id="L86">                final String prompt = channel.getUrl().getParameter(&quot;prompt&quot;, &quot;telnet&quot;);</span>
+<span class="nc" id="L87">                Thread thread = new Thread(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                        for (int i = 0; i &lt; t; i++) {</span>
+<span class="nc" id="L91">                            String result = count(inv, mtd);</span>
+                            try {
+<span class="nc" id="L93">                                channel.send(&quot;\r\n&quot; + result);</span>
+<span class="nc" id="L94">                            } catch (RemotingException e1) {</span>
+<span class="nc" id="L95">                                return;</span>
+<span class="nc" id="L96">                            }</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                            if (i &lt; t - 1) {</span>
+                                try {
+<span class="nc" id="L99">                                    Thread.sleep(1000);</span>
+<span class="nc" id="L100">                                } catch (InterruptedException e) {</span>
+<span class="nc" id="L101">                                }</span>
+                            }
+                        }
+                        try {
+<span class="nc" id="L105">                            channel.send(&quot;\r\n&quot; + prompt + &quot;&gt; &quot;);</span>
+<span class="nc" id="L106">                        } catch (RemotingException e1) {</span>
+<span class="nc" id="L107">                            return;</span>
+<span class="nc" id="L108">                        }</span>
+<span class="nc" id="L109">                    }</span>
+                }, &quot;TelnetCount&quot;);
+<span class="nc" id="L111">                thread.setDaemon(true);</span>
+<span class="nc" id="L112">                thread.start();</span>
+<span class="nc" id="L113">            }</span>
+        } else {
+<span class="nc" id="L115">            buf.append(&quot;No such service &quot; + service);</span>
+        }
+<span class="nc" id="L117">        return buf.toString();</span>
+    }
+
+    private String count(Invoker&lt;?&gt; invoker, String method) {
+<span class="nc" id="L121">        URL url = invoker.getUrl();</span>
+<span class="nc" id="L122">        List&lt;List&lt;String&gt;&gt; table = new ArrayList&lt;List&lt;String&gt;&gt;();</span>
+<span class="nc" id="L123">        List&lt;String&gt; header = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L124">        header.add(&quot;method&quot;);</span>
+<span class="nc" id="L125">        header.add(&quot;total&quot;);</span>
+<span class="nc" id="L126">        header.add(&quot;failed&quot;);</span>
+<span class="nc" id="L127">        header.add(&quot;active&quot;);</span>
+<span class="nc" id="L128">        header.add(&quot;average&quot;);</span>
+<span class="nc" id="L129">        header.add(&quot;max&quot;);</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        if (method == null || method.length() == 0) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            for (Method m : invoker.getInterface().getMethods()) {</span>
+<span class="nc" id="L132">                RpcStatus count = RpcStatus.getStatus(url, m.getName());</span>
+<span class="nc" id="L133">                List&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L134">                row.add(m.getName());</span>
+<span class="nc" id="L135">                row.add(String.valueOf(count.getTotal()));</span>
+<span class="nc" id="L136">                row.add(String.valueOf(count.getFailed()));</span>
+<span class="nc" id="L137">                row.add(String.valueOf(count.getActive()));</span>
+<span class="nc" id="L138">                row.add(String.valueOf(count.getSucceededAverageElapsed()) + &quot;ms&quot;);</span>
+<span class="nc" id="L139">                row.add(String.valueOf(count.getSucceededMaxElapsed()) + &quot;ms&quot;);</span>
+<span class="nc" id="L140">                table.add(row);</span>
+            }
+        } else {
+<span class="nc" id="L143">            boolean found = false;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            for (Method m : invoker.getInterface().getMethods()) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (m.getName().equals(method)) {</span>
+<span class="nc" id="L146">                    found = true;</span>
+<span class="nc" id="L147">                    break;</span>
+                }
+            }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (found) {</span>
+<span class="nc" id="L151">                RpcStatus count = RpcStatus.getStatus(url, method);</span>
+<span class="nc" id="L152">                List&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L153">                row.add(method);</span>
+<span class="nc" id="L154">                row.add(String.valueOf(count.getTotal()));</span>
+<span class="nc" id="L155">                row.add(String.valueOf(count.getFailed()));</span>
+<span class="nc" id="L156">                row.add(String.valueOf(count.getActive()));</span>
+<span class="nc" id="L157">                row.add(String.valueOf(count.getSucceededAverageElapsed()) + &quot;ms&quot;);</span>
+<span class="nc" id="L158">                row.add(String.valueOf(count.getSucceededMaxElapsed()) + &quot;ms&quot;);</span>
+<span class="nc" id="L159">                table.add(row);</span>
+<span class="nc" id="L160">            } else {</span>
+<span class="nc" id="L161">                return &quot;No such method &quot; + method + &quot; in class &quot; + invoker.getInterface().getName();</span>
+            }
+        }
+<span class="nc" id="L164">        return TelnetUtils.toTable(header, table);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

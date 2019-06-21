@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MetadataReportBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">MetadataReportBuilder.java</span></div><h1>MetadataReportBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.MetadataReportConfig;
+
+import java.util.Map;
+
+/**
+ * This is a builder for build {@link MetadataReportConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L28">public class MetadataReportBuilder extends AbstractBuilder&lt;MetadataReportConfig, MetadataReportBuilder&gt; {</span>
+
+    // Register center address
+    private String address;
+
+    // Username to login register center
+    private String username;
+
+    // Password to login register center
+    private String password;
+
+    // Request timeout in milliseconds for register center
+    private Integer timeout;
+
+    /**
+     * The group the metadata in . It is the same as registry
+     */
+    private String group;
+
+    // Customized parameters
+    private Map&lt;String, String&gt; parameters;
+
+    private Integer retryTimes;
+
+    private Integer retryPeriod;
+    /**
+     * By default the metadatastore will store full metadata repeatly every day .
+     */
+    private Boolean cycleReport;
+
+    /**
+     * Sync report, default async
+     */
+    private Boolean syncReport;
+
+    public MetadataReportBuilder address(String address) {
+<span class="nc" id="L64">        this.address = address;</span>
+<span class="nc" id="L65">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder username(String username) {
+<span class="nc" id="L69">        this.username = username;</span>
+<span class="nc" id="L70">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder password(String password) {
+<span class="nc" id="L74">        this.password = password;</span>
+<span class="nc" id="L75">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder timeout(Integer timeout) {
+<span class="nc" id="L79">        this.timeout = timeout;</span>
+<span class="nc" id="L80">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder group(String group) {
+<span class="nc" id="L84">        this.group = group;</span>
+<span class="nc" id="L85">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder appendParameters(Map&lt;String, String&gt; appendParameters) {
+<span class="nc" id="L89">        this.parameters = appendParameters(this.parameters, appendParameters);</span>
+<span class="nc" id="L90">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder appendParameter(String key, String value) {
+<span class="nc" id="L94">        this.parameters = appendParameter(this.parameters, key, value);</span>
+<span class="nc" id="L95">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder retryTimes(Integer retryTimes) {
+<span class="nc" id="L99">        this.retryTimes = retryTimes;</span>
+<span class="nc" id="L100">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder retryPeriod(Integer retryPeriod) {
+<span class="nc" id="L104">        this.retryPeriod = retryPeriod;</span>
+<span class="nc" id="L105">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder cycleReport(Boolean cycleReport) {
+<span class="nc" id="L109">        this.cycleReport = cycleReport;</span>
+<span class="nc" id="L110">        return getThis();</span>
+    }
+
+    public MetadataReportBuilder syncReport(Boolean syncReport) {
+<span class="nc" id="L114">        this.syncReport = syncReport;</span>
+<span class="nc" id="L115">        return getThis();</span>
+    }
+
+    public MetadataReportConfig build() {
+<span class="nc" id="L119">        MetadataReportConfig metadataReport = new MetadataReportConfig();</span>
+<span class="nc" id="L120">        super.build(metadataReport);</span>
+
+<span class="nc" id="L122">        metadataReport.setAddress(address);</span>
+<span class="nc" id="L123">        metadataReport.setUsername(username);</span>
+<span class="nc" id="L124">        metadataReport.setPassword(password);</span>
+<span class="nc" id="L125">        metadataReport.setTimeout(timeout);</span>
+<span class="nc" id="L126">        metadataReport.setGroup(group);</span>
+<span class="nc" id="L127">        metadataReport.setParameters(parameters);</span>
+<span class="nc" id="L128">        metadataReport.setRetryTimes(retryTimes);</span>
+<span class="nc" id="L129">        metadataReport.setRetryPeriod(retryPeriod);</span>
+<span class="nc" id="L130">        metadataReport.setCycleReport(cycleReport);</span>
+<span class="nc" id="L131">        metadataReport.setSyncReport(syncReport);</span>
+
+<span class="nc" id="L133">        return metadataReport;</span>
+    }
+
+    @Override
+    protected MetadataReportBuilder getThis() {
+<span class="nc" id="L138">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

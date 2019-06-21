@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">ConsumerBuilder.java</span></div><h1>ConsumerBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.ConsumerConfig;
+
+/**
+ * This is a builder for build {@link ConsumerConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L26">public class ConsumerBuilder extends AbstractReferenceBuilder&lt;ConsumerConfig, ConsumerBuilder&gt; {</span>
+
+    /**
+     * Whether to use the default protocol
+     */
+    private Boolean isDefault;
+
+    /**
+     * Networking framework client uses: netty, mina, etc.
+     */
+    private String client;
+
+    /**
+     * Consumer thread pool type: cached, fixed, limit, eager
+     */
+    private String threadpool;
+
+    /**
+     * Consumer threadpool core thread size
+     */
+    private Integer corethreads;
+
+    /**
+     * Consumer threadpool thread size
+     */
+    private Integer threads;
+
+    /**
+     * Consumer threadpool queue size
+     */
+    private Integer queues;
+
+    /**
+     * By default, a TCP long-connection communication is shared between the consumer process and the provider process.
+     * This property can be set to share multiple TCP long-connection communications. Note that only the dubbo protocol takes effect.
+     */
+    private Integer shareconnections;
+
+    public ConsumerBuilder isDefault(Boolean isDefault) {
+<span class="nc" id="L65">        this.isDefault = isDefault;</span>
+<span class="nc" id="L66">        return getThis();</span>
+    }
+
+    public ConsumerBuilder client(String client) {
+<span class="nc" id="L70">        this.client = client;</span>
+<span class="nc" id="L71">        return getThis();</span>
+    }
+
+    public ConsumerBuilder threadPool(String threadPool) {
+<span class="nc" id="L75">        this.threadpool = threadPool;</span>
+<span class="nc" id="L76">        return getThis();</span>
+    }
+
+    public ConsumerBuilder coreThreads(Integer coreThreads) {
+<span class="nc" id="L80">        this.corethreads = coreThreads;</span>
+<span class="nc" id="L81">        return getThis();</span>
+    }
+
+    public ConsumerBuilder threads(Integer threads) {
+<span class="nc" id="L85">        this.threads = threads;</span>
+<span class="nc" id="L86">        return getThis();</span>
+    }
+
+    public ConsumerBuilder queues(Integer queues) {
+<span class="nc" id="L90">        this.queues = queues;</span>
+<span class="nc" id="L91">        return getThis();</span>
+    }
+
+    public ConsumerBuilder shareConnections(Integer shareConnections) {
+<span class="nc" id="L95">        this.shareconnections = shareConnections;</span>
+<span class="nc" id="L96">        return getThis();</span>
+    }
+
+    public ConsumerConfig build() {
+<span class="nc" id="L100">        ConsumerConfig consumer = new ConsumerConfig();</span>
+<span class="nc" id="L101">        super.build(consumer);</span>
+
+<span class="nc" id="L103">        consumer.setDefault(isDefault);</span>
+<span class="nc" id="L104">        consumer.setClient(client);</span>
+<span class="nc" id="L105">        consumer.setThreadpool(threadpool);</span>
+<span class="nc" id="L106">        consumer.setCorethreads(corethreads);</span>
+<span class="nc" id="L107">        consumer.setThreads(threads);</span>
+<span class="nc" id="L108">        consumer.setQueues(queues);</span>
+<span class="nc" id="L109">        consumer.setShareconnections(shareconnections);</span>
+
+<span class="nc" id="L111">        return consumer;</span>
+    }
+
+    @Override
+    protected ConsumerBuilder getThis() {
+<span class="nc" id="L116">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

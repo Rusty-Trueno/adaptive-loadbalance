@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">AbstractConfig.java</span></div><h1>AbstractConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.config.CompositeConfiguration;
+import org.apache.dubbo.common.config.Environment;
+import org.apache.dubbo.common.config.InmemoryConfiguration;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.MethodUtils;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.rpc.model.ConsumerMethodModel;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * Utility methods and public methods for parsing configuration
+ *
+ * @export
+ */
+<span class="nc" id="L50">public abstract class AbstractConfig implements Serializable {</span>
+
+<span class="nc" id="L52">    protected static final Logger logger = LoggerFactory.getLogger(AbstractConfig.class);</span>
+    private static final long serialVersionUID = 4267533505537413570L;
+
+    /**
+     * The maximum length of a &lt;b&gt;parameter's value&lt;/b&gt;
+     */
+    private static final int MAX_LENGTH = 200;
+
+    /**
+     * The maximum length of a &lt;b&gt;path&lt;/b&gt;
+     */
+    private static final int MAX_PATH_LENGTH = 200;
+
+    /**
+     * The rule qualification for &lt;b&gt;name&lt;/b&gt;
+     */
+<span class="nc" id="L68">    private static final Pattern PATTERN_NAME = Pattern.compile(&quot;[\\-._0-9a-zA-Z]+&quot;);</span>
+
+    /**
+     * The rule qualification for &lt;b&gt;multiply name&lt;/b&gt;
+     */
+<span class="nc" id="L73">    private static final Pattern PATTERN_MULTI_NAME = Pattern.compile(&quot;[,\\-._0-9a-zA-Z]+&quot;);</span>
+
+    /**
+     * The rule qualification for &lt;b&gt;method names&lt;/b&gt;
+     */
+<span class="nc" id="L78">    private static final Pattern PATTERN_METHOD_NAME = Pattern.compile(&quot;[a-zA-Z][0-9a-zA-Z]*&quot;);</span>
+
+    /**
+     * The rule qualification for &lt;b&gt;path&lt;/b&gt;
+     */
+<span class="nc" id="L83">    private static final Pattern PATTERN_PATH = Pattern.compile(&quot;[/\\-$._0-9a-zA-Z]+&quot;);</span>
+
+    /**
+     * The pattern matches a value who has a symbol
+     */
+<span class="nc" id="L88">    private static final Pattern PATTERN_NAME_HAS_SYMBOL = Pattern.compile(&quot;[:*,\\s/\\-._0-9a-zA-Z]+&quot;);</span>
+
+    /**
+     * The pattern matches a property key
+     */
+<span class="nc" id="L93">    private static final Pattern PATTERN_KEY = Pattern.compile(&quot;[*,\\-._0-9a-zA-Z]+&quot;);</span>
+
+    /**
+     * The legacy properties container
+     */
+<span class="nc" id="L98">    private static final Map&lt;String, String&gt; LEGACY_PROPERTIES = new HashMap&lt;String, String&gt;();</span>
+
+    /**
+     * The suffix container
+     */
+<span class="nc" id="L103">    private static final String[] SUFFIXES = new String[]{&quot;Config&quot;, &quot;Bean&quot;};</span>
+
+    static {
+<span class="nc" id="L106">        LEGACY_PROPERTIES.put(&quot;dubbo.protocol.name&quot;, &quot;dubbo.service.protocol&quot;);</span>
+<span class="nc" id="L107">        LEGACY_PROPERTIES.put(&quot;dubbo.protocol.host&quot;, &quot;dubbo.service.server.host&quot;);</span>
+<span class="nc" id="L108">        LEGACY_PROPERTIES.put(&quot;dubbo.protocol.port&quot;, &quot;dubbo.service.server.port&quot;);</span>
+<span class="nc" id="L109">        LEGACY_PROPERTIES.put(&quot;dubbo.protocol.threads&quot;, &quot;dubbo.service.max.thread.pool.size&quot;);</span>
+<span class="nc" id="L110">        LEGACY_PROPERTIES.put(&quot;dubbo.consumer.timeout&quot;, &quot;dubbo.service.invoke.timeout&quot;);</span>
+<span class="nc" id="L111">        LEGACY_PROPERTIES.put(&quot;dubbo.consumer.retries&quot;, &quot;dubbo.service.max.retry.providers&quot;);</span>
+<span class="nc" id="L112">        LEGACY_PROPERTIES.put(&quot;dubbo.consumer.check&quot;, &quot;dubbo.service.allow.no.provider&quot;);</span>
+<span class="nc" id="L113">        LEGACY_PROPERTIES.put(&quot;dubbo.service.url&quot;, &quot;dubbo.service.address&quot;);</span>
+
+        // this is only for compatibility
+<span class="nc" id="L116">        DubboShutdownHook.getDubboShutdownHook().register();</span>
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * The config id
+     */
+    protected String id;
+    protected String prefix;
+
+    private static String convertLegacyValue(String key, String value) {
+<span class="nc bnc" id="L126" title="All 4 branches missed.">        if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (&quot;dubbo.service.max.retry.providers&quot;.equals(key)) {</span>
+<span class="nc" id="L128">                return String.valueOf(Integer.parseInt(value) - 1);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            } else if (&quot;dubbo.service.allow.no.provider&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                return String.valueOf(!Boolean.parseBoolean(value));</span>
+            }
+        }
+<span class="nc" id="L133">        return value;</span>
+    }
+
+    private static String getTagName(Class&lt;?&gt; cls) {
+<span class="nc" id="L137">        String tag = cls.getSimpleName();</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        for (String suffix : SUFFIXES) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (tag.endsWith(suffix)) {</span>
+<span class="nc" id="L140">                tag = tag.substring(0, tag.length() - suffix.length());</span>
+<span class="nc" id="L141">                break;</span>
+            }
+        }
+<span class="nc" id="L144">        return StringUtils.camelToSplitName(tag, &quot;-&quot;);</span>
+    }
+
+    protected static void appendParameters(Map&lt;String, String&gt; parameters, Object config) {
+<span class="nc" id="L148">        appendParameters(parameters, config, null);</span>
+<span class="nc" id="L149">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected static void appendParameters(Map&lt;String, String&gt; parameters, Object config, String prefix) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (config == null) {</span>
+<span class="nc" id="L154">            return;</span>
+        }
+<span class="nc" id="L156">        Method[] methods = config.getClass().getMethods();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (Method method : methods) {</span>
+            try {
+<span class="nc" id="L159">                String name = method.getName();</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (MethodUtils.isGetter(method)) {</span>
+<span class="nc" id="L161">                    Parameter parameter = method.getAnnotation(Parameter.class);</span>
+<span class="nc bnc" id="L162" title="All 6 branches missed.">                    if (method.getReturnType() == Object.class || parameter != null &amp;&amp; parameter.excluded()) {</span>
+<span class="nc" id="L163">                        continue;</span>
+                    }
+                    String key;
+<span class="nc bnc" id="L166" title="All 4 branches missed.">                    if (parameter != null &amp;&amp; parameter.key().length() &gt; 0) {</span>
+<span class="nc" id="L167">                        key = parameter.key();</span>
+                    } else {
+<span class="nc" id="L169">                        key = calculatePropertyFromGetter(name);</span>
+                    }
+<span class="nc" id="L171">                    Object value = method.invoke(config);</span>
+<span class="nc" id="L172">                    String str = String.valueOf(value).trim();</span>
+<span class="nc bnc" id="L173" title="All 4 branches missed.">                    if (value != null &amp;&amp; str.length() &gt; 0) {</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                        if (parameter != null &amp;&amp; parameter.escaped()) {</span>
+<span class="nc" id="L175">                            str = URL.encode(str);</span>
+                        }
+<span class="nc bnc" id="L177" title="All 4 branches missed.">                        if (parameter != null &amp;&amp; parameter.append()) {</span>
+<span class="nc" id="L178">                            String pre = parameters.get(Constants.DEFAULT_KEY + &quot;.&quot; + key);</span>
+<span class="nc bnc" id="L179" title="All 4 branches missed.">                            if (pre != null &amp;&amp; pre.length() &gt; 0) {</span>
+<span class="nc" id="L180">                                str = pre + &quot;,&quot; + str;</span>
+                            }
+<span class="nc" id="L182">                            pre = parameters.get(key);</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">                            if (pre != null &amp;&amp; pre.length() &gt; 0) {</span>
+<span class="nc" id="L184">                                str = pre + &quot;,&quot; + str;</span>
+                            }
+                        }
+<span class="nc bnc" id="L187" title="All 4 branches missed.">                        if (prefix != null &amp;&amp; prefix.length() &gt; 0) {</span>
+<span class="nc" id="L188">                            key = prefix + &quot;.&quot; + key;</span>
+                        }
+<span class="nc" id="L190">                        parameters.put(key, str);</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">                    } else if (parameter != null &amp;&amp; parameter.required()) {</span>
+<span class="nc" id="L192">                        throw new IllegalStateException(config.getClass().getSimpleName() + &quot;.&quot; + key + &quot; == null&quot;);</span>
+                    }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                } else if (&quot;getParameters&quot;.equals(name)</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                        &amp;&amp; Modifier.isPublic(method.getModifiers())</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                        &amp;&amp; method.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                        &amp;&amp; method.getReturnType() == Map.class) {</span>
+<span class="nc" id="L198">                    Map&lt;String, String&gt; map = (Map&lt;String, String&gt;) method.invoke(config, new Object[0]);</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">                    if (map != null &amp;&amp; map.size() &gt; 0) {</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                        String pre = (prefix != null &amp;&amp; prefix.length() &gt; 0 ? prefix + &quot;.&quot; : &quot;&quot;);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                        for (Map.Entry&lt;String, String&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L202">                            parameters.put(pre + entry.getKey().replace('-', '.'), entry.getValue());</span>
+<span class="nc" id="L203">                        }</span>
+                    }
+                }
+<span class="nc" id="L206">            } catch (Exception e) {</span>
+<span class="nc" id="L207">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L208">            }</span>
+        }
+<span class="nc" id="L210">    }</span>
+
+    protected static void appendAttributes(Map&lt;String, Object&gt; parameters, Object config) {
+<span class="nc" id="L213">        appendAttributes(parameters, config, null);</span>
+<span class="nc" id="L214">    }</span>
+
+    protected static void appendAttributes(Map&lt;String, Object&gt; parameters, Object config, String prefix) {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (config == null) {</span>
+<span class="nc" id="L218">            return;</span>
+        }
+<span class="nc" id="L220">        Method[] methods = config.getClass().getMethods();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        for (Method method : methods) {</span>
+            try {
+<span class="nc" id="L223">                Parameter parameter = method.getAnnotation(Parameter.class);</span>
+<span class="nc bnc" id="L224" title="All 4 branches missed.">                if (parameter == null || !parameter.attribute()) {</span>
+<span class="nc" id="L225">                    continue;</span>
+                }
+<span class="nc" id="L227">                String name = method.getName();</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (MethodUtils.isGetter(method)) {</span>
+                    String key;
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                    if (parameter.key().length() &gt; 0) {</span>
+<span class="nc" id="L231">                        key = parameter.key();</span>
+                    } else {
+<span class="nc" id="L233">                        key = calculateAttributeFromGetter(name);</span>
+                    }
+<span class="nc" id="L235">                    Object value = method.invoke(config);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                    if (value != null) {</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">                        if (prefix != null &amp;&amp; prefix.length() &gt; 0) {</span>
+<span class="nc" id="L238">                            key = prefix + &quot;.&quot; + key;</span>
+                        }
+<span class="nc" id="L240">                        parameters.put(key, value);</span>
+                    }
+                }
+<span class="nc" id="L243">            } catch (Exception e) {</span>
+<span class="nc" id="L244">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L245">            }</span>
+        }
+<span class="nc" id="L247">    }</span>
+
+    protected static ConsumerMethodModel.AsyncMethodInfo convertMethodConfig2AyncInfo(MethodConfig methodConfig) {
+<span class="nc bnc" id="L250" title="All 8 branches missed.">        if (methodConfig == null || (methodConfig.getOninvoke() == null &amp;&amp; methodConfig.getOnreturn() == null &amp;&amp; methodConfig.getOnthrow() == null)) {</span>
+<span class="nc" id="L251">            return null;</span>
+        }
+
+        //check config conflict
+<span class="nc bnc" id="L255" title="All 6 branches missed.">        if (Boolean.FALSE.equals(methodConfig.isReturn()) &amp;&amp; (methodConfig.getOnreturn() != null || methodConfig.getOnthrow() != null)) {</span>
+<span class="nc" id="L256">            throw new IllegalStateException(&quot;method config error : return attribute must be set true when onreturn or onthrow has been set.&quot;);</span>
+        }
+
+<span class="nc" id="L259">        ConsumerMethodModel.AsyncMethodInfo asyncMethodInfo = new ConsumerMethodModel.AsyncMethodInfo();</span>
+
+<span class="nc" id="L261">        asyncMethodInfo.setOninvokeInstance(methodConfig.getOninvoke());</span>
+<span class="nc" id="L262">        asyncMethodInfo.setOnreturnInstance(methodConfig.getOnreturn());</span>
+<span class="nc" id="L263">        asyncMethodInfo.setOnthrowInstance(methodConfig.getOnthrow());</span>
+
+        try {
+<span class="nc" id="L266">            String oninvokeMethod = methodConfig.getOninvokeMethod();</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(oninvokeMethod)) {</span>
+<span class="nc" id="L268">                asyncMethodInfo.setOninvokeMethod(getMethodByName(methodConfig.getOninvoke().getClass(), oninvokeMethod));</span>
+            }
+
+<span class="nc" id="L271">            String onreturnMethod = methodConfig.getOnreturnMethod();</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(onreturnMethod)) {</span>
+<span class="nc" id="L273">                asyncMethodInfo.setOnreturnMethod(getMethodByName(methodConfig.getOnreturn().getClass(), onreturnMethod));</span>
+            }
+
+<span class="nc" id="L276">            String onthrowMethod = methodConfig.getOnthrowMethod();</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(onthrowMethod)) {</span>
+<span class="nc" id="L278">                asyncMethodInfo.setOnthrowMethod(getMethodByName(methodConfig.getOnthrow().getClass(), onthrowMethod));</span>
+            }
+<span class="nc" id="L280">        } catch (Exception e) {</span>
+<span class="nc" id="L281">            throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L282">        }</span>
+
+<span class="nc" id="L284">        return asyncMethodInfo;</span>
+    }
+
+    private static Method getMethodByName(Class&lt;?&gt; clazz, String methodName) {
+        try {
+<span class="nc" id="L289">            return ReflectUtils.findMethodByMethodName(clazz, methodName);</span>
+<span class="nc" id="L290">        } catch (Exception e) {</span>
+<span class="nc" id="L291">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+
+    protected static void checkExtension(Class&lt;?&gt; type, String property, String value) {
+<span class="nc" id="L297">        checkName(property, value);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(value)</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                &amp;&amp; !ExtensionLoader.getExtensionLoader(type).hasExtension(value)) {</span>
+<span class="nc" id="L300">            throw new IllegalStateException(&quot;No such extension &quot; + value + &quot; for &quot; + property + &quot;/&quot; + type.getName());</span>
+        }
+<span class="nc" id="L302">    }</span>
+
+    /**
+     * Check whether there is a &lt;code&gt;Extension&lt;/code&gt; who's name (property) is &lt;code&gt;value&lt;/code&gt; (special treatment is
+     * required)
+     *
+     * @param type     The Extension type
+     * @param property The extension key
+     * @param value    The Extension name
+     */
+    protected static void checkMultiExtension(Class&lt;?&gt; type, String property, String value) {
+<span class="nc" id="L313">        checkMultiName(property, value);</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(value)) {</span>
+<span class="nc" id="L315">            String[] values = value.split(&quot;\\s*[,]+\\s*&quot;);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            for (String v : values) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (v.startsWith(Constants.REMOVE_VALUE_PREFIX)) {</span>
+<span class="nc" id="L318">                    v = v.substring(1);</span>
+                }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                if (Constants.DEFAULT_KEY.equals(v)) {</span>
+<span class="nc" id="L321">                    continue;</span>
+                }
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                if (!ExtensionLoader.getExtensionLoader(type).hasExtension(v)) {</span>
+<span class="nc" id="L324">                    throw new IllegalStateException(&quot;No such extension &quot; + v + &quot; for &quot; + property + &quot;/&quot; + type.getName());</span>
+                }
+            }
+        }
+<span class="nc" id="L328">    }</span>
+
+    protected static void checkLength(String property, String value) {
+<span class="nc" id="L331">        checkProperty(property, value, MAX_LENGTH, null);</span>
+<span class="nc" id="L332">    }</span>
+
+    protected static void checkPathLength(String property, String value) {
+<span class="nc" id="L335">        checkProperty(property, value, MAX_PATH_LENGTH, null);</span>
+<span class="nc" id="L336">    }</span>
+
+    protected static void checkName(String property, String value) {
+<span class="nc" id="L339">        checkProperty(property, value, MAX_LENGTH, PATTERN_NAME);</span>
+<span class="nc" id="L340">    }</span>
+
+    protected static void checkNameHasSymbol(String property, String value) {
+<span class="nc" id="L343">        checkProperty(property, value, MAX_LENGTH, PATTERN_NAME_HAS_SYMBOL);</span>
+<span class="nc" id="L344">    }</span>
+
+    protected static void checkKey(String property, String value) {
+<span class="nc" id="L347">        checkProperty(property, value, MAX_LENGTH, PATTERN_KEY);</span>
+<span class="nc" id="L348">    }</span>
+
+    protected static void checkMultiName(String property, String value) {
+<span class="nc" id="L351">        checkProperty(property, value, MAX_LENGTH, PATTERN_MULTI_NAME);</span>
+<span class="nc" id="L352">    }</span>
+
+    protected static void checkPathName(String property, String value) {
+<span class="nc" id="L355">        checkProperty(property, value, MAX_PATH_LENGTH, PATTERN_PATH);</span>
+<span class="nc" id="L356">    }</span>
+
+    protected static void checkMethodName(String property, String value) {
+<span class="nc" id="L359">        checkProperty(property, value, MAX_LENGTH, PATTERN_METHOD_NAME);</span>
+<span class="nc" id="L360">    }</span>
+
+    protected static void checkParameterName(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L364">            return;</span>
+        }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : parameters.entrySet()) {</span>
+<span class="nc" id="L367">            checkNameHasSymbol(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L368">        }</span>
+<span class="nc" id="L369">    }</span>
+
+    protected static void checkProperty(String property, String value, int maxlength, Pattern pattern) {
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L373">            return;</span>
+        }
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        if (value.length() &gt; maxlength) {</span>
+<span class="nc" id="L376">            throw new IllegalStateException(&quot;Invalid &quot; + property + &quot;=\&quot;&quot; + value + &quot;\&quot; is longer than &quot; + maxlength);</span>
+        }
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        if (pattern != null) {</span>
+<span class="nc" id="L379">            Matcher matcher = pattern.matcher(value);</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            if (!matcher.matches()) {</span>
+<span class="nc" id="L381">                throw new IllegalStateException(&quot;Invalid &quot; + property + &quot;=\&quot;&quot; + value + &quot;\&quot; contains illegal &quot; +</span>
+                        &quot;character, only digit, letter, '-', '_' or '.' is legal.&quot;);
+            }
+        }
+<span class="nc" id="L385">    }</span>
+
+    protected static Set&lt;String&gt; getSubProperties(Map&lt;String, String&gt; properties, String prefix) {
+<span class="nc" id="L388">        return properties.keySet().stream().filter(k -&gt; k.contains(prefix)).map(k -&gt; {</span>
+<span class="nc" id="L389">            k = k.substring(prefix.length());</span>
+<span class="nc" id="L390">            return k.substring(0, k.indexOf(&quot;.&quot;));</span>
+<span class="nc" id="L391">        }).collect(Collectors.toSet());</span>
+    }
+
+    private static String extractPropertyName(Class&lt;?&gt; clazz, Method setter) throws Exception {
+<span class="nc" id="L395">        String propertyName = setter.getName().substring(&quot;set&quot;.length());</span>
+<span class="nc" id="L396">        Method getter = null;</span>
+        try {
+<span class="nc" id="L398">            getter = clazz.getMethod(&quot;get&quot; + propertyName);</span>
+<span class="nc" id="L399">        } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L400">            getter = clazz.getMethod(&quot;is&quot; + propertyName);</span>
+<span class="nc" id="L401">        }</span>
+<span class="nc" id="L402">        Parameter parameter = getter.getAnnotation(Parameter.class);</span>
+<span class="nc bnc" id="L403" title="All 6 branches missed.">        if (parameter != null &amp;&amp; StringUtils.isNotEmpty(parameter.key()) &amp;&amp; parameter.useKeyAsProperty()) {</span>
+<span class="nc" id="L404">            propertyName = parameter.key();</span>
+        } else {
+<span class="nc" id="L406">            propertyName = propertyName.substring(0, 1).toLowerCase() + propertyName.substring(1);</span>
+        }
+<span class="nc" id="L408">        return propertyName;</span>
+    }
+
+    private static String calculatePropertyFromGetter(String name) {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        int i = name.startsWith(&quot;get&quot;) ? 3 : 2;</span>
+<span class="nc" id="L413">        return StringUtils.camelToSplitName(name.substring(i, i + 1).toLowerCase() + name.substring(i + 1), &quot;.&quot;);</span>
+    }
+
+    private static String calculateAttributeFromGetter(String getter) {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        int i = getter.startsWith(&quot;get&quot;) ? 3 : 2;</span>
+<span class="nc" id="L418">        return getter.substring(i, i + 1).toLowerCase() + getter.substring(i + 1);</span>
+    }
+
+    @Parameter(excluded = true)
+    public String getId() {
+<span class="nc" id="L423">        return id;</span>
+    }
+
+    public void setId(String id) {
+<span class="nc" id="L427">        this.id = id;</span>
+<span class="nc" id="L428">    }</span>
+
+    public void updateIdIfAbsent(String value) {
+<span class="nc bnc" id="L431" title="All 4 branches missed.">        if (StringUtils.isNotEmpty(value) &amp;&amp; StringUtils.isEmpty(id)) {</span>
+<span class="nc" id="L432">            this.id = value;</span>
+        }
+<span class="nc" id="L434">    }</span>
+
+    protected void appendAnnotation(Class&lt;?&gt; annotationClass, Object annotation) {
+<span class="nc" id="L437">        Method[] methods = annotationClass.getMethods();</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            if (method.getDeclaringClass() != Object.class</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">                    &amp;&amp; method.getReturnType() != void.class</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                    &amp;&amp; method.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">                    &amp;&amp; Modifier.isPublic(method.getModifiers())</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                    &amp;&amp; !Modifier.isStatic(method.getModifiers())) {</span>
+                try {
+<span class="nc" id="L445">                    String property = method.getName();</span>
+<span class="nc bnc" id="L446" title="All 4 branches missed.">                    if (&quot;interfaceClass&quot;.equals(property) || &quot;interfaceName&quot;.equals(property)) {</span>
+<span class="nc" id="L447">                        property = &quot;interface&quot;;</span>
+                    }
+<span class="nc" id="L449">                    String setter = &quot;set&quot; + property.substring(0, 1).toUpperCase() + property.substring(1);</span>
+<span class="nc" id="L450">                    Object value = method.invoke(annotation);</span>
+<span class="nc bnc" id="L451" title="All 4 branches missed.">                    if (value != null &amp;&amp; !value.equals(method.getDefaultValue())) {</span>
+<span class="nc" id="L452">                        Class&lt;?&gt; parameterType = ReflectUtils.getBoxedClass(method.getReturnType());</span>
+<span class="nc bnc" id="L453" title="All 4 branches missed.">                        if (&quot;filter&quot;.equals(property) || &quot;listener&quot;.equals(property)) {</span>
+<span class="nc" id="L454">                            parameterType = String.class;</span>
+<span class="nc" id="L455">                            value = StringUtils.join((String[]) value, &quot;,&quot;);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                        } else if (&quot;parameters&quot;.equals(property)) {</span>
+<span class="nc" id="L457">                            parameterType = Map.class;</span>
+<span class="nc" id="L458">                            value = CollectionUtils.toStringMap((String[]) value);</span>
+                        }
+                        try {
+<span class="nc" id="L461">                            Method setterMethod = getClass().getMethod(setter, parameterType);</span>
+<span class="nc" id="L462">                            setterMethod.invoke(this, value);</span>
+<span class="nc" id="L463">                        } catch (NoSuchMethodException e) {</span>
+                            // ignore
+<span class="nc" id="L465">                        }</span>
+                    }
+<span class="nc" id="L467">                } catch (Throwable e) {</span>
+<span class="nc" id="L468">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L469">                }</span>
+            }
+        }
+<span class="nc" id="L472">    }</span>
+
+    /**
+     * Should be called after Config was fully initialized.
+     * // FIXME: this method should be completely replaced by appendParameters
+     *
+     * @return
+     * @see AbstractConfig#appendParameters(Map, Object, String)
+     * &lt;p&gt;
+     * Notice! This method should include all properties in the returning map, treat @Parameter differently compared to appendParameters.
+     */
+    public Map&lt;String, String&gt; getMetaData() {
+<span class="nc" id="L484">        Map&lt;String, String&gt; metaData = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L485">        Method[] methods = this.getClass().getMethods();</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        for (Method method : methods) {</span>
+            try {
+<span class="nc" id="L488">                String name = method.getName();</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                if (isMetaMethod(method)) {</span>
+<span class="nc" id="L490">                    String prop = calculateAttributeFromGetter(name);</span>
+                    String key;
+<span class="nc" id="L492">                    Parameter parameter = method.getAnnotation(Parameter.class);</span>
+<span class="nc bnc" id="L493" title="All 6 branches missed.">                    if (parameter != null &amp;&amp; parameter.key().length() &gt; 0 &amp;&amp; parameter.useKeyAsProperty()) {</span>
+<span class="nc" id="L494">                        key = parameter.key();</span>
+                    } else {
+<span class="nc" id="L496">                        key = prop;</span>
+                    }
+                    // treat url and configuration differently, the value should always present in configuration though it may not need to present in url.
+                    //if (method.getReturnType() == Object.class || parameter != null &amp;&amp; parameter.excluded()) {
+<span class="nc bnc" id="L500" title="All 2 branches missed.">                    if (method.getReturnType() == Object.class) {</span>
+<span class="nc" id="L501">                        metaData.put(key, null);</span>
+<span class="nc" id="L502">                        continue;</span>
+                    }
+<span class="nc" id="L504">                    Object value = method.invoke(this);</span>
+<span class="nc" id="L505">                    String str = String.valueOf(value).trim();</span>
+<span class="nc bnc" id="L506" title="All 4 branches missed.">                    if (value != null &amp;&amp; str.length() &gt; 0) {</span>
+<span class="nc" id="L507">                        metaData.put(key, str);</span>
+                    } else {
+<span class="nc" id="L509">                        metaData.put(key, null);</span>
+                    }
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                } else if (&quot;getParameters&quot;.equals(name)</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                        &amp;&amp; Modifier.isPublic(method.getModifiers())</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                        &amp;&amp; method.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">                        &amp;&amp; method.getReturnType() == Map.class) {</span>
+<span class="nc" id="L515">                    Map&lt;String, String&gt; map = (Map&lt;String, String&gt;) method.invoke(this, new Object[0]);</span>
+<span class="nc bnc" id="L516" title="All 4 branches missed.">                    if (map != null &amp;&amp; map.size() &gt; 0) {</span>
+//                            String pre = (prefix != null &amp;&amp; prefix.length() &gt; 0 ? prefix + &quot;.&quot; : &quot;&quot;);
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                        for (Map.Entry&lt;String, String&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L519">                            metaData.put(entry.getKey().replace('-', '.'), entry.getValue());</span>
+<span class="nc" id="L520">                        }</span>
+                    }
+                }
+<span class="nc" id="L523">            } catch (Exception e) {</span>
+<span class="nc" id="L524">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L525">            }</span>
+        }
+<span class="nc" id="L527">        return metaData;</span>
+    }
+
+    @Parameter(excluded = true)
+    public String getPrefix() {
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        return StringUtils.isNotEmpty(prefix) ? prefix : (Constants.DUBBO + &quot;.&quot; + getTagName(this.getClass()));</span>
+    }
+
+    public void setPrefix(String prefix) {
+<span class="nc" id="L536">        this.prefix = prefix;</span>
+<span class="nc" id="L537">    }</span>
+
+    /**
+     * TODO: Currently, only support overriding of properties explicitly defined in Config class, doesn't support
+     * overriding of customized parameters stored in 'parameters'.
+     */
+    public void refresh() {
+        try {
+<span class="nc" id="L545">            CompositeConfiguration compositeConfiguration = Environment.getInstance().getConfiguration(getPrefix(), getId());</span>
+<span class="nc" id="L546">            InmemoryConfiguration config = new InmemoryConfiguration(getPrefix(), getId());</span>
+<span class="nc" id="L547">            config.addProperties(getMetaData());</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">            if (Environment.getInstance().isConfigCenterFirst()) {</span>
+                // The sequence would be: SystemConfiguration -&gt; AppExternalConfiguration -&gt; ExternalConfiguration -&gt; AbstractConfig -&gt; PropertiesConfiguration
+<span class="nc" id="L550">                compositeConfiguration.addConfiguration(3, config);</span>
+            } else {
+                // The sequence would be: SystemConfiguration -&gt; AbstractConfig -&gt; AppExternalConfiguration -&gt; ExternalConfiguration -&gt; PropertiesConfiguration
+<span class="nc" id="L553">                compositeConfiguration.addConfiguration(1, config);</span>
+            }
+
+            // loop methods, get override value and set the new value back to method
+<span class="nc" id="L557">            Method[] methods = getClass().getMethods();</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">            for (Method method : methods) {</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                if (MethodUtils.isSetter(method)) {</span>
+                    try {
+<span class="nc" id="L561">                        String value = StringUtils.trim(compositeConfiguration.getString(extractPropertyName(getClass(), method)));</span>
+                        // isTypeMatch() is called to avoid duplicate and incorrect update, for example, we have two 'setGeneric' methods in ReferenceConfig.
+<span class="nc bnc" id="L563" title="All 4 branches missed.">                        if (StringUtils.isNotEmpty(value) &amp;&amp; ClassUtils.isTypeMatch(method.getParameterTypes()[0], value)) {</span>
+<span class="nc" id="L564">                            method.invoke(this, ClassUtils.convertPrimitive(method.getParameterTypes()[0], value));</span>
+                        }
+<span class="nc" id="L566">                    } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L567">                        logger.info(&quot;Failed to override the property &quot; + method.getName() + &quot; in &quot; +</span>
+<span class="nc" id="L568">                                this.getClass().getSimpleName() +</span>
+                                &quot;, please make sure every property has getter/setter method provided.&quot;);
+<span class="nc" id="L570">                    }</span>
+                }
+            }
+<span class="nc" id="L573">        } catch (Exception e) {</span>
+<span class="nc" id="L574">            logger.error(&quot;Failed to override &quot;, e);</span>
+<span class="nc" id="L575">        }</span>
+<span class="nc" id="L576">    }</span>
+
+    @Override
+    public String toString() {
+        try {
+<span class="nc" id="L581">            StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L582">            buf.append(&quot;&lt;dubbo:&quot;);</span>
+<span class="nc" id="L583">            buf.append(getTagName(getClass()));</span>
+<span class="nc" id="L584">            Method[] methods = getClass().getMethods();</span>
+<span class="nc bnc" id="L585" title="All 2 branches missed.">            for (Method method : methods) {</span>
+                try {
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                    if (MethodUtils.isGetter(method)) {</span>
+<span class="nc" id="L588">                        String name = method.getName();</span>
+<span class="nc" id="L589">                        String key = calculateAttributeFromGetter(name);</span>
+<span class="nc" id="L590">                        Object value = method.invoke(this);</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">                        if (value != null) {</span>
+<span class="nc" id="L592">                            buf.append(&quot; &quot;);</span>
+<span class="nc" id="L593">                            buf.append(key);</span>
+<span class="nc" id="L594">                            buf.append(&quot;=\&quot;&quot;);</span>
+<span class="nc" id="L595">                            buf.append(value);</span>
+<span class="nc" id="L596">                            buf.append(&quot;\&quot;&quot;);</span>
+                        }
+                    }
+<span class="nc" id="L599">                } catch (Exception e) {</span>
+<span class="nc" id="L600">                    logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L601">                }</span>
+            }
+<span class="nc" id="L603">            buf.append(&quot; /&gt;&quot;);</span>
+<span class="nc" id="L604">            return buf.toString();</span>
+<span class="nc" id="L605">        } catch (Throwable t) {</span>
+<span class="nc" id="L606">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L607">            return super.toString();</span>
+        }
+    }
+
+    /**
+     * FIXME check @Parameter(required=true) and any conditions that need to match.
+     */
+    @Parameter(excluded = true)
+    public boolean isValid() {
+<span class="nc" id="L616">        return true;</span>
+    }
+
+    private boolean isMetaMethod(Method method) {
+<span class="nc" id="L620">        String name = method.getName();</span>
+<span class="nc bnc" id="L621" title="All 4 branches missed.">        if (!(name.startsWith(&quot;get&quot;) || name.startsWith(&quot;is&quot;))) {</span>
+<span class="nc" id="L622">            return false;</span>
+        }
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (&quot;get&quot;.equals(name)) {</span>
+<span class="nc" id="L625">            return false;</span>
+        }
+<span class="nc bnc" id="L627" title="All 2 branches missed.">        if (&quot;getClass&quot;.equals(name)) {</span>
+<span class="nc" id="L628">            return false;</span>
+        }
+<span class="nc bnc" id="L630" title="All 2 branches missed.">        if (!Modifier.isPublic(method.getModifiers())) {</span>
+<span class="nc" id="L631">            return false;</span>
+        }
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if (method.getParameterTypes().length != 0) {</span>
+<span class="nc" id="L634">            return false;</span>
+        }
+<span class="nc bnc" id="L636" title="All 2 branches missed.">        if (!ClassUtils.isPrimitive(method.getReturnType())) {</span>
+<span class="nc" id="L637">            return false;</span>
+        }
+<span class="nc" id="L639">        return true;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L644" title="All 4 branches missed.">        if (obj == null || !(obj.getClass().getName().equals(this.getClass().getName()))) {</span>
+<span class="nc" id="L645">            return false;</span>
+        }
+
+<span class="nc" id="L648">        Method[] methods = this.getClass().getMethods();</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        for (Method method1 : methods) {</span>
+<span class="nc bnc" id="L650" title="All 4 branches missed.">            if (MethodUtils.isGetter(method1) &amp;&amp; ClassUtils.isPrimitive(method1.getReturnType())) {</span>
+<span class="nc" id="L651">                Parameter parameter = method1.getAnnotation(Parameter.class);</span>
+<span class="nc bnc" id="L652" title="All 4 branches missed.">                if (parameter != null &amp;&amp; parameter.excluded()) {</span>
+<span class="nc" id="L653">                    continue;</span>
+                }
+                try {
+<span class="nc" id="L656">                    Method method2 = obj.getClass().getMethod(method1.getName(), method1.getParameterTypes());</span>
+<span class="nc" id="L657">                    Object value1 = method1.invoke(this, new Object[]{});</span>
+<span class="nc" id="L658">                    Object value2 = method2.invoke(obj, new Object[]{});</span>
+<span class="nc bnc" id="L659" title="All 6 branches missed.">                    if ((value1 != null &amp;&amp; value2 != null) &amp;&amp; !value1.equals(value2)) {</span>
+<span class="nc" id="L660">                        return false;</span>
+                    }
+<span class="nc" id="L662">                } catch (Exception e) {</span>
+<span class="nc" id="L663">                    return true;</span>
+<span class="nc" id="L664">                }</span>
+            }
+        }
+<span class="nc" id="L667">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

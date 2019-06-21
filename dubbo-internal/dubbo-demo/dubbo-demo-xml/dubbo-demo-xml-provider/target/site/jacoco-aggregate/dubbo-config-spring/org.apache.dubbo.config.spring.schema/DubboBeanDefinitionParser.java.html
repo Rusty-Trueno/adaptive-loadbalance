@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboBeanDefinitionParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.schema</a> &gt; <span class="el_source">DubboBeanDefinitionParser.java</span></div><h1>DubboBeanDefinitionParser.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.schema;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.ArgumentConfig;
+import org.apache.dubbo.config.ConsumerConfig;
+import org.apache.dubbo.config.MethodConfig;
+import org.apache.dubbo.config.ProtocolConfig;
+import org.apache.dubbo.config.ProviderConfig;
+import org.apache.dubbo.config.RegistryConfig;
+import org.apache.dubbo.config.spring.ReferenceBean;
+import org.apache.dubbo.config.spring.ServiceBean;
+
+import org.springframework.beans.PropertyValue;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.beans.factory.config.RuntimeBeanReference;
+import org.springframework.beans.factory.config.TypedStringValue;
+import org.springframework.beans.factory.support.ManagedList;
+import org.springframework.beans.factory.support.ManagedMap;
+import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.beans.factory.xml.BeanDefinitionParser;
+import org.springframework.beans.factory.xml.ParserContext;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * AbstractBeanDefinitionParser
+ *
+ * @export
+ */
+public class DubboBeanDefinitionParser implements BeanDefinitionParser {
+
+<span class="nc" id="L62">    private static final Logger logger = LoggerFactory.getLogger(DubboBeanDefinitionParser.class);</span>
+<span class="nc" id="L63">    private static final Pattern GROUP_AND_VERION = Pattern.compile(&quot;^[\\-.0-9_a-zA-Z]+(\\:[\\-.0-9_a-zA-Z]+)?$&quot;);</span>
+    private final Class&lt;?&gt; beanClass;
+    private final boolean required;
+
+<span class="nc" id="L67">    public DubboBeanDefinitionParser(Class&lt;?&gt; beanClass, boolean required) {</span>
+<span class="nc" id="L68">        this.beanClass = beanClass;</span>
+<span class="nc" id="L69">        this.required = required;</span>
+<span class="nc" id="L70">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static BeanDefinition parse(Element element, ParserContext parserContext, Class&lt;?&gt; beanClass, boolean required) {
+<span class="nc" id="L74">        RootBeanDefinition beanDefinition = new RootBeanDefinition();</span>
+<span class="nc" id="L75">        beanDefinition.setBeanClass(beanClass);</span>
+<span class="nc" id="L76">        beanDefinition.setLazyInit(false);</span>
+<span class="nc" id="L77">        String id = element.getAttribute(&quot;id&quot;);</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        if (StringUtils.isEmpty(id) &amp;&amp; required) {</span>
+<span class="nc" id="L79">            String generatedBeanName = element.getAttribute(&quot;name&quot;);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (StringUtils.isEmpty(generatedBeanName)) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (ProtocolConfig.class.equals(beanClass)) {</span>
+<span class="nc" id="L82">                    generatedBeanName = &quot;dubbo&quot;;</span>
+                } else {
+<span class="nc" id="L84">                    generatedBeanName = element.getAttribute(&quot;interface&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (StringUtils.isEmpty(generatedBeanName)) {</span>
+<span class="nc" id="L88">                generatedBeanName = beanClass.getName();</span>
+            }
+<span class="nc" id="L90">            id = generatedBeanName;</span>
+<span class="nc" id="L91">            int counter = 2;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            while (parserContext.getRegistry().containsBeanDefinition(id)) {</span>
+<span class="nc" id="L93">                id = generatedBeanName + (counter++);</span>
+            }
+        }
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (id != null &amp;&amp; id.length() &gt; 0) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (parserContext.getRegistry().containsBeanDefinition(id)) {</span>
+<span class="nc" id="L98">                throw new IllegalStateException(&quot;Duplicate spring bean id &quot; + id);</span>
+            }
+<span class="nc" id="L100">            parserContext.getRegistry().registerBeanDefinition(id, beanDefinition);</span>
+<span class="nc" id="L101">            beanDefinition.getPropertyValues().addPropertyValue(&quot;id&quot;, id);</span>
+        }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (ProtocolConfig.class.equals(beanClass)) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            for (String name : parserContext.getRegistry().getBeanDefinitionNames()) {</span>
+<span class="nc" id="L105">                BeanDefinition definition = parserContext.getRegistry().getBeanDefinition(name);</span>
+<span class="nc" id="L106">                PropertyValue property = definition.getPropertyValues().getPropertyValue(&quot;protocol&quot;);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                if (property != null) {</span>
+<span class="nc" id="L108">                    Object value = property.getValue();</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                    if (value instanceof ProtocolConfig &amp;&amp; id.equals(((ProtocolConfig) value).getName())) {</span>
+<span class="nc" id="L110">                        definition.getPropertyValues().addPropertyValue(&quot;protocol&quot;, new RuntimeBeanReference(id));</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        } else if (ServiceBean.class.equals(beanClass)) {</span>
+<span class="nc" id="L115">            String className = element.getAttribute(&quot;class&quot;);</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">            if (className != null &amp;&amp; className.length() &gt; 0) {</span>
+<span class="nc" id="L117">                RootBeanDefinition classDefinition = new RootBeanDefinition();</span>
+<span class="nc" id="L118">                classDefinition.setBeanClass(ReflectUtils.forName(className));</span>
+<span class="nc" id="L119">                classDefinition.setLazyInit(false);</span>
+<span class="nc" id="L120">                parseProperties(element.getChildNodes(), classDefinition);</span>
+<span class="nc" id="L121">                beanDefinition.getPropertyValues().addPropertyValue(&quot;ref&quot;, new BeanDefinitionHolder(classDefinition, id + &quot;Impl&quot;));</span>
+            }
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        } else if (ProviderConfig.class.equals(beanClass)) {</span>
+<span class="nc" id="L124">            parseNested(element, parserContext, ServiceBean.class, true, &quot;service&quot;, &quot;provider&quot;, id, beanDefinition);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        } else if (ConsumerConfig.class.equals(beanClass)) {</span>
+<span class="nc" id="L126">            parseNested(element, parserContext, ReferenceBean.class, false, &quot;reference&quot;, &quot;consumer&quot;, id, beanDefinition);</span>
+        }
+<span class="nc" id="L128">        Set&lt;String&gt; props = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L129">        ManagedMap parameters = null;</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        for (Method setter : beanClass.getMethods()) {</span>
+<span class="nc" id="L131">            String name = setter.getName();</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">            if (name.length() &gt; 3 &amp;&amp; name.startsWith(&quot;set&quot;)</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                    &amp;&amp; Modifier.isPublic(setter.getModifiers())</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                    &amp;&amp; setter.getParameterTypes().length == 1) {</span>
+<span class="nc" id="L135">                Class&lt;?&gt; type = setter.getParameterTypes()[0];</span>
+<span class="nc" id="L136">                String beanProperty = name.substring(3, 4).toLowerCase() + name.substring(4);</span>
+<span class="nc" id="L137">                String property = StringUtils.camelToSplitName(beanProperty, &quot;-&quot;);</span>
+<span class="nc" id="L138">                props.add(property);</span>
+                // check the setter/getter whether match
+<span class="nc" id="L140">                Method getter = null;</span>
+                try {
+<span class="nc" id="L142">                    getter = beanClass.getMethod(&quot;get&quot; + name.substring(3), new Class&lt;?&gt;[0]);</span>
+<span class="nc" id="L143">                } catch (NoSuchMethodException e) {</span>
+                    try {
+<span class="nc" id="L145">                        getter = beanClass.getMethod(&quot;is&quot; + name.substring(3), new Class&lt;?&gt;[0]);</span>
+<span class="nc" id="L146">                    } catch (NoSuchMethodException e2) {</span>
+                        // ignore, there is no need any log here since some class implement the interface: EnvironmentAware,
+                        // ApplicationAware, etc. They only have setter method, otherwise will cause the error log during application start up.
+<span class="nc" id="L149">                    }</span>
+<span class="nc" id="L150">                }</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (getter == null</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                        || !Modifier.isPublic(getter.getModifiers())</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                        || !type.equals(getter.getReturnType())) {</span>
+<span class="nc" id="L154">                    continue;</span>
+                }
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (&quot;parameters&quot;.equals(property)) {</span>
+<span class="nc" id="L157">                    parameters = parseParameters(element.getChildNodes(), beanDefinition);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                } else if (&quot;methods&quot;.equals(property)) {</span>
+<span class="nc" id="L159">                    parseMethods(id, element.getChildNodes(), beanDefinition, parserContext);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                } else if (&quot;arguments&quot;.equals(property)) {</span>
+<span class="nc" id="L161">                    parseArguments(id, element.getChildNodes(), beanDefinition, parserContext);</span>
+                } else {
+<span class="nc" id="L163">                    String value = element.getAttribute(property);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    if (value != null) {</span>
+<span class="nc" id="L165">                        value = value.trim();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                        if (value.length() &gt; 0) {</span>
+<span class="nc bnc" id="L167" title="All 4 branches missed.">                            if (&quot;registry&quot;.equals(property) &amp;&amp; RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(value)) {</span>
+<span class="nc" id="L168">                                RegistryConfig registryConfig = new RegistryConfig();</span>
+<span class="nc" id="L169">                                registryConfig.setAddress(RegistryConfig.NO_AVAILABLE);</span>
+<span class="nc" id="L170">                                beanDefinition.getPropertyValues().addPropertyValue(beanProperty, registryConfig);</span>
+<span class="nc bnc" id="L171" title="All 8 branches missed.">                            } else if (&quot;provider&quot;.equals(property) || &quot;registry&quot;.equals(property) || (&quot;protocol&quot;.equals(property) &amp;&amp; ServiceBean.class.equals(beanClass))) {</span>
+                                /**
+                                 * For 'provider' 'protocol' 'registry', keep literal value (should be id/name) and set the value to 'registryIds' 'providerIds' protocolIds'
+                                 * The following process should make sure each id refers to the corresponding instance, here's how to find the instance for different use cases:
+                                 * 1. Spring, check existing bean by id, see{@link ServiceBean#afterPropertiesSet()}; then try to use id to find configs defined in remote Config Center
+                                 * 2. API, directly use id to find configs defined in remote Config Center; if all config instances are defined locally, please use {@link org.apache.dubbo.config.ServiceConfig#setRegistries(List)}
+                                 */
+<span class="nc" id="L178">                                beanDefinition.getPropertyValues().addPropertyValue(beanProperty + &quot;Ids&quot;, value);</span>
+                            } else {
+                                Object reference;
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                                if (isPrimitive(type)) {</span>
+<span class="nc bnc" id="L182" title="All 4 branches missed.">                                    if (&quot;async&quot;.equals(property) &amp;&amp; &quot;false&quot;.equals(value)</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">                                            || &quot;timeout&quot;.equals(property) &amp;&amp; &quot;0&quot;.equals(value)</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">                                            || &quot;delay&quot;.equals(property) &amp;&amp; &quot;0&quot;.equals(value)</span>
+<span class="nc bnc" id="L185" title="All 4 branches missed.">                                            || &quot;version&quot;.equals(property) &amp;&amp; &quot;0.0.0&quot;.equals(value)</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">                                            || &quot;stat&quot;.equals(property) &amp;&amp; &quot;-1&quot;.equals(value)</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">                                            || &quot;reliable&quot;.equals(property) &amp;&amp; &quot;false&quot;.equals(value)) {</span>
+                                        // backward compatibility for the default value in old version's xsd
+<span class="nc" id="L189">                                        value = null;</span>
+                                    }
+<span class="nc" id="L191">                                    reference = value;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                                } else if (&quot;onreturn&quot;.equals(property)) {</span>
+<span class="nc" id="L193">                                    int index = value.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc" id="L194">                                    String returnRef = value.substring(0, index);</span>
+<span class="nc" id="L195">                                    String returnMethod = value.substring(index + 1);</span>
+<span class="nc" id="L196">                                    reference = new RuntimeBeanReference(returnRef);</span>
+<span class="nc" id="L197">                                    beanDefinition.getPropertyValues().addPropertyValue(&quot;onreturnMethod&quot;, returnMethod);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                                } else if (&quot;onthrow&quot;.equals(property)) {</span>
+<span class="nc" id="L199">                                    int index = value.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc" id="L200">                                    String throwRef = value.substring(0, index);</span>
+<span class="nc" id="L201">                                    String throwMethod = value.substring(index + 1);</span>
+<span class="nc" id="L202">                                    reference = new RuntimeBeanReference(throwRef);</span>
+<span class="nc" id="L203">                                    beanDefinition.getPropertyValues().addPropertyValue(&quot;onthrowMethod&quot;, throwMethod);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                                } else if (&quot;oninvoke&quot;.equals(property)) {</span>
+<span class="nc" id="L205">                                    int index = value.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc" id="L206">                                    String invokeRef = value.substring(0, index);</span>
+<span class="nc" id="L207">                                    String invokeRefMethod = value.substring(index + 1);</span>
+<span class="nc" id="L208">                                    reference = new RuntimeBeanReference(invokeRef);</span>
+<span class="nc" id="L209">                                    beanDefinition.getPropertyValues().addPropertyValue(&quot;oninvokeMethod&quot;, invokeRefMethod);</span>
+<span class="nc" id="L210">                                } else {</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">                                    if (&quot;ref&quot;.equals(property) &amp;&amp; parserContext.getRegistry().containsBeanDefinition(value)) {</span>
+<span class="nc" id="L212">                                        BeanDefinition refBean = parserContext.getRegistry().getBeanDefinition(value);</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                                        if (!refBean.isSingleton()) {</span>
+<span class="nc" id="L214">                                            throw new IllegalStateException(&quot;The exported service ref &quot; + value + &quot; must be singleton! Please set the &quot; + value + &quot; bean scope to singleton, eg: &lt;bean id=\&quot;&quot; + value + &quot;\&quot; scope=\&quot;singleton\&quot; ...&gt;&quot;);</span>
+                                        }
+                                    }
+<span class="nc" id="L217">                                    reference = new RuntimeBeanReference(value);</span>
+                                }
+<span class="nc" id="L219">                                beanDefinition.getPropertyValues().addPropertyValue(beanProperty, reference);</span>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+<span class="nc" id="L226">        NamedNodeMap attributes = element.getAttributes();</span>
+<span class="nc" id="L227">        int len = attributes.getLength();</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L229">            Node node = attributes.item(i);</span>
+<span class="nc" id="L230">            String name = node.getLocalName();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            if (!props.contains(name)) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                if (parameters == null) {</span>
+<span class="nc" id="L233">                    parameters = new ManagedMap();</span>
+                }
+<span class="nc" id="L235">                String value = node.getNodeValue();</span>
+<span class="nc" id="L236">                parameters.put(name, new TypedStringValue(value, String.class));</span>
+            }
+        }
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (parameters != null) {</span>
+<span class="nc" id="L240">            beanDefinition.getPropertyValues().addPropertyValue(&quot;parameters&quot;, parameters);</span>
+        }
+<span class="nc" id="L242">        return beanDefinition;</span>
+    }
+
+    private static boolean isPrimitive(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L246" title="All 24 branches missed.">        return cls.isPrimitive() || cls == Boolean.class || cls == Byte.class</span>
+                || cls == Character.class || cls == Short.class || cls == Integer.class
+                || cls == Long.class || cls == Float.class || cls == Double.class
+                || cls == String.class || cls == Date.class || cls == Class.class;
+    }
+
+    private static void parseNested(Element element, ParserContext parserContext, Class&lt;?&gt; beanClass, boolean required, String tag, String property, String ref, BeanDefinition beanDefinition) {
+<span class="nc" id="L253">        NodeList nodeList = element.getChildNodes();</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if (nodeList != null &amp;&amp; nodeList.getLength() &gt; 0) {</span>
+<span class="nc" id="L255">            boolean first = true;</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            for (int i = 0; i &lt; nodeList.getLength(); i++) {</span>
+<span class="nc" id="L257">                Node node = nodeList.item(i);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (node instanceof Element) {</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                    if (tag.equals(node.getNodeName())</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                            || tag.equals(node.getLocalName())) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                        if (first) {</span>
+<span class="nc" id="L262">                            first = false;</span>
+<span class="nc" id="L263">                            String isDefault = element.getAttribute(&quot;default&quot;);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                            if (StringUtils.isEmpty(isDefault)) {</span>
+<span class="nc" id="L265">                                beanDefinition.getPropertyValues().addPropertyValue(&quot;default&quot;, &quot;false&quot;);</span>
+                            }
+                        }
+<span class="nc" id="L268">                        BeanDefinition subDefinition = parse((Element) node, parserContext, beanClass, required);</span>
+<span class="nc bnc" id="L269" title="All 6 branches missed.">                        if (subDefinition != null &amp;&amp; ref != null &amp;&amp; ref.length() &gt; 0) {</span>
+<span class="nc" id="L270">                            subDefinition.getPropertyValues().addPropertyValue(property, new RuntimeBeanReference(ref));</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="nc" id="L276">    }</span>
+
+    private static void parseProperties(NodeList nodeList, RootBeanDefinition beanDefinition) {
+<span class="nc bnc" id="L279" title="All 4 branches missed.">        if (nodeList != null &amp;&amp; nodeList.getLength() &gt; 0) {</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            for (int i = 0; i &lt; nodeList.getLength(); i++) {</span>
+<span class="nc" id="L281">                Node node = nodeList.item(i);</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                if (node instanceof Element) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                    if (&quot;property&quot;.equals(node.getNodeName())</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                            || &quot;property&quot;.equals(node.getLocalName())) {</span>
+<span class="nc" id="L285">                        String name = ((Element) node).getAttribute(&quot;name&quot;);</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">                        if (name != null &amp;&amp; name.length() &gt; 0) {</span>
+<span class="nc" id="L287">                            String value = ((Element) node).getAttribute(&quot;value&quot;);</span>
+<span class="nc" id="L288">                            String ref = ((Element) node).getAttribute(&quot;ref&quot;);</span>
+<span class="nc bnc" id="L289" title="All 4 branches missed.">                            if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="nc" id="L290">                                beanDefinition.getPropertyValues().addPropertyValue(name, value);</span>
+<span class="nc bnc" id="L291" title="All 4 branches missed.">                            } else if (ref != null &amp;&amp; ref.length() &gt; 0) {</span>
+<span class="nc" id="L292">                                beanDefinition.getPropertyValues().addPropertyValue(name, new RuntimeBeanReference(ref));</span>
+                            } else {
+<span class="nc" id="L294">                                throw new UnsupportedOperationException(&quot;Unsupported &lt;property name=\&quot;&quot; + name + &quot;\&quot;&gt; sub tag, Only supported &lt;property name=\&quot;&quot; + name + &quot;\&quot; ref=\&quot;...\&quot; /&gt; or &lt;property name=\&quot;&quot; + name + &quot;\&quot; value=\&quot;...\&quot; /&gt;&quot;);</span>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+<span class="nc" id="L301">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static ManagedMap parseParameters(NodeList nodeList, RootBeanDefinition beanDefinition) {
+<span class="nc bnc" id="L305" title="All 4 branches missed.">        if (nodeList != null &amp;&amp; nodeList.getLength() &gt; 0) {</span>
+<span class="nc" id="L306">            ManagedMap parameters = null;</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            for (int i = 0; i &lt; nodeList.getLength(); i++) {</span>
+<span class="nc" id="L308">                Node node = nodeList.item(i);</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (node instanceof Element) {</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    if (&quot;parameter&quot;.equals(node.getNodeName())</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                            || &quot;parameter&quot;.equals(node.getLocalName())) {</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                        if (parameters == null) {</span>
+<span class="nc" id="L313">                            parameters = new ManagedMap();</span>
+                        }
+<span class="nc" id="L315">                        String key = ((Element) node).getAttribute(&quot;key&quot;);</span>
+<span class="nc" id="L316">                        String value = ((Element) node).getAttribute(&quot;value&quot;);</span>
+<span class="nc" id="L317">                        boolean hide = &quot;true&quot;.equals(((Element) node).getAttribute(&quot;hide&quot;));</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                        if (hide) {</span>
+<span class="nc" id="L319">                            key = Constants.HIDE_KEY_PREFIX + key;</span>
+                        }
+<span class="nc" id="L321">                        parameters.put(key, new TypedStringValue(value, String.class));</span>
+                    }
+                }
+            }
+<span class="nc" id="L325">            return parameters;</span>
+        }
+<span class="nc" id="L327">        return null;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static void parseMethods(String id, NodeList nodeList, RootBeanDefinition beanDefinition,
+                                     ParserContext parserContext) {
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        if (nodeList != null &amp;&amp; nodeList.getLength() &gt; 0) {</span>
+<span class="nc" id="L334">            ManagedList methods = null;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            for (int i = 0; i &lt; nodeList.getLength(); i++) {</span>
+<span class="nc" id="L336">                Node node = nodeList.item(i);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                if (node instanceof Element) {</span>
+<span class="nc" id="L338">                    Element element = (Element) node;</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">                    if (&quot;method&quot;.equals(node.getNodeName()) || &quot;method&quot;.equals(node.getLocalName())) {</span>
+<span class="nc" id="L340">                        String methodName = element.getAttribute(&quot;name&quot;);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                        if (StringUtils.isEmpty(methodName)) {</span>
+<span class="nc" id="L342">                            throw new IllegalStateException(&quot;&lt;dubbo:method&gt; name attribute == null&quot;);</span>
+                        }
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                        if (methods == null) {</span>
+<span class="nc" id="L345">                            methods = new ManagedList();</span>
+                        }
+<span class="nc" id="L347">                        BeanDefinition methodBeanDefinition = parse(((Element) node),</span>
+                                parserContext, MethodConfig.class, false);
+<span class="nc" id="L349">                        String name = id + &quot;.&quot; + methodName;</span>
+<span class="nc" id="L350">                        BeanDefinitionHolder methodBeanDefinitionHolder = new BeanDefinitionHolder(</span>
+                                methodBeanDefinition, name);
+<span class="nc" id="L352">                        methods.add(methodBeanDefinitionHolder);</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            if (methods != null) {</span>
+<span class="nc" id="L357">                beanDefinition.getPropertyValues().addPropertyValue(&quot;methods&quot;, methods);</span>
+            }
+        }
+<span class="nc" id="L360">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static void parseArguments(String id, NodeList nodeList, RootBeanDefinition beanDefinition,
+                                       ParserContext parserContext) {
+<span class="nc bnc" id="L365" title="All 4 branches missed.">        if (nodeList != null &amp;&amp; nodeList.getLength() &gt; 0) {</span>
+<span class="nc" id="L366">            ManagedList arguments = null;</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">            for (int i = 0; i &lt; nodeList.getLength(); i++) {</span>
+<span class="nc" id="L368">                Node node = nodeList.item(i);</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                if (node instanceof Element) {</span>
+<span class="nc" id="L370">                    Element element = (Element) node;</span>
+<span class="nc bnc" id="L371" title="All 4 branches missed.">                    if (&quot;argument&quot;.equals(node.getNodeName()) || &quot;argument&quot;.equals(node.getLocalName())) {</span>
+<span class="nc" id="L372">                        String argumentIndex = element.getAttribute(&quot;index&quot;);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                        if (arguments == null) {</span>
+<span class="nc" id="L374">                            arguments = new ManagedList();</span>
+                        }
+<span class="nc" id="L376">                        BeanDefinition argumentBeanDefinition = parse(((Element) node),</span>
+                                parserContext, ArgumentConfig.class, false);
+<span class="nc" id="L378">                        String name = id + &quot;.&quot; + argumentIndex;</span>
+<span class="nc" id="L379">                        BeanDefinitionHolder argumentBeanDefinitionHolder = new BeanDefinitionHolder(</span>
+                                argumentBeanDefinition, name);
+<span class="nc" id="L381">                        arguments.add(argumentBeanDefinitionHolder);</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            if (arguments != null) {</span>
+<span class="nc" id="L386">                beanDefinition.getPropertyValues().addPropertyValue(&quot;arguments&quot;, arguments);</span>
+            }
+        }
+<span class="nc" id="L389">    }</span>
+
+    @Override
+    public BeanDefinition parse(Element element, ParserContext parserContext) {
+<span class="nc" id="L393">        return parse(element, parserContext, beanClass, required);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

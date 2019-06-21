@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Environment.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.config</a> &gt; <span class="el_source">Environment.java</span></div><h1>Environment.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * TODO load as SPI will be better?
+ */
+<span class="nc" id="L30">public class Environment {</span>
+<span class="nc" id="L31">    private static final Environment INSTANCE = new Environment();</span>
+
+<span class="nc" id="L33">    private Map&lt;String, PropertiesConfiguration&gt; propertiesConfigs = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L34">    private Map&lt;String, SystemConfiguration&gt; systemConfigs = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L35">    private Map&lt;String, EnvironmentConfiguration&gt; environmentConfigs = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L36">    private Map&lt;String, InmemoryConfiguration&gt; externalConfigs = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L37">    private Map&lt;String, InmemoryConfiguration&gt; appExternalConfigs = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L39">    private Map&lt;String, String&gt; externalConfigurationMap = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L40">    private Map&lt;String, String&gt; appExternalConfigurationMap = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L42">    private boolean configCenterFirst = true;</span>
+
+    /**
+     * FIXME, this instance will always be a type of DynamicConfiguration, ConfigCenterConfig will load the instance at startup and assign it to here.
+     */
+    private Configuration dynamicConfiguration;
+
+    public static Environment getInstance() {
+<span class="nc" id="L50">        return INSTANCE;</span>
+    }
+
+    public PropertiesConfiguration getPropertiesConfig(String prefix, String id) {
+<span class="nc" id="L54">        return propertiesConfigs.computeIfAbsent(toKey(prefix, id), k -&gt; new PropertiesConfiguration(prefix, id));</span>
+    }
+
+    public SystemConfiguration getSystemConfig(String prefix, String id) {
+<span class="nc" id="L58">        return systemConfigs.computeIfAbsent(toKey(prefix, id), k -&gt; new SystemConfiguration(prefix, id));</span>
+    }
+
+    public InmemoryConfiguration getExternalConfig(String prefix, String id) {
+<span class="nc" id="L62">        return externalConfigs.computeIfAbsent(toKey(prefix, id), k -&gt; {</span>
+<span class="nc" id="L63">            InmemoryConfiguration configuration = new InmemoryConfiguration(prefix, id);</span>
+<span class="nc" id="L64">            configuration.setProperties(externalConfigurationMap);</span>
+<span class="nc" id="L65">            return configuration;</span>
+        });
+    }
+
+    public InmemoryConfiguration getAppExternalConfig(String prefix, String id) {
+<span class="nc" id="L70">        return appExternalConfigs.computeIfAbsent(toKey(prefix, id), k -&gt; {</span>
+<span class="nc" id="L71">            InmemoryConfiguration configuration = new InmemoryConfiguration(prefix, id);</span>
+<span class="nc" id="L72">            configuration.setProperties(appExternalConfigurationMap);</span>
+<span class="nc" id="L73">            return configuration;</span>
+        });
+    }
+
+    public EnvironmentConfiguration getEnvironmentConfig(String prefix, String id) {
+<span class="nc" id="L78">        return environmentConfigs.computeIfAbsent(toKey(prefix, id), k -&gt; new EnvironmentConfiguration(prefix, id));</span>
+    }
+
+    public void setExternalConfigMap(Map&lt;String, String&gt; externalConfiguration) {
+<span class="nc" id="L82">        this.externalConfigurationMap = externalConfiguration;</span>
+<span class="nc" id="L83">    }</span>
+
+    public void setAppExternalConfigMap(Map&lt;String, String&gt; appExternalConfiguration) {
+<span class="nc" id="L86">        this.appExternalConfigurationMap = appExternalConfiguration;</span>
+<span class="nc" id="L87">    }</span>
+
+    public Map&lt;String, String&gt; getExternalConfigurationMap() {
+<span class="nc" id="L90">        return externalConfigurationMap;</span>
+    }
+
+    public Map&lt;String, String&gt; getAppExternalConfigurationMap() {
+<span class="nc" id="L94">        return appExternalConfigurationMap;</span>
+    }
+
+    public void updateExternalConfigurationMap(Map&lt;String, String&gt; externalMap) {
+<span class="nc" id="L98">        this.externalConfigurationMap.putAll(externalMap);</span>
+<span class="nc" id="L99">    }</span>
+
+    public void updateAppExternalConfigurationMap(Map&lt;String, String&gt; externalMap) {
+<span class="nc" id="L102">        this.appExternalConfigurationMap.putAll(externalMap);</span>
+<span class="nc" id="L103">    }</span>
+
+    /**
+     * Create new instance for each call, since it will be called only at startup, I think there's no big deal of the potential cost.
+     * Otherwise, if use cache, we should make sure each Config has a unique id which is difficult to guarantee because is on the user's side,
+     * especially when it comes to ServiceConfig and ReferenceConfig.
+     *
+     * @param prefix
+     * @param id
+     * @return
+     */
+    public CompositeConfiguration getConfiguration(String prefix, String id) {
+<span class="nc" id="L115">        CompositeConfiguration compositeConfiguration = new CompositeConfiguration();</span>
+        // Config center has the highest priority
+<span class="nc" id="L117">        compositeConfiguration.addConfiguration(this.getSystemConfig(prefix, id));</span>
+<span class="nc" id="L118">        compositeConfiguration.addConfiguration(this.getAppExternalConfig(prefix, id));</span>
+<span class="nc" id="L119">        compositeConfiguration.addConfiguration(this.getExternalConfig(prefix, id));</span>
+<span class="nc" id="L120">        compositeConfiguration.addConfiguration(this.getPropertiesConfig(prefix, id));</span>
+<span class="nc" id="L121">        return compositeConfiguration;</span>
+    }
+
+    public Configuration getConfiguration() {
+<span class="nc" id="L125">        return getConfiguration(null, null);</span>
+    }
+
+    private static String toKey(String prefix, String id) {
+<span class="nc" id="L129">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(prefix)) {</span>
+<span class="nc" id="L131">            sb.append(prefix);</span>
+        }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(id)) {</span>
+<span class="nc" id="L134">            sb.append(id);</span>
+        }
+
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if (sb.length() &gt; 0 &amp;&amp; sb.charAt(sb.length() - 1) != '.') {</span>
+<span class="nc" id="L138">            sb.append(&quot;.&quot;);</span>
+        }
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (sb.length() &gt; 0) {</span>
+<span class="nc" id="L142">            return sb.toString();</span>
+        }
+<span class="nc" id="L144">        return Constants.DUBBO;</span>
+    }
+
+    public boolean isConfigCenterFirst() {
+<span class="nc" id="L148">        return configCenterFirst;</span>
+    }
+
+    public void setConfigCenterFirst(boolean configCenterFirst) {
+<span class="nc" id="L152">        this.configCenterFirst = configCenterFirst;</span>
+<span class="nc" id="L153">    }</span>
+
+    public Optional&lt;Configuration&gt; getDynamicConfiguration() {
+<span class="nc" id="L156">        return Optional.ofNullable(dynamicConfiguration);</span>
+    }
+
+    public void setDynamicConfiguration(Configuration dynamicConfiguration) {
+<span class="nc" id="L160">        this.dynamicConfiguration = dynamicConfiguration;</span>
+<span class="nc" id="L161">    }</span>
+
+    // For test
+    public void clearExternalConfigs() {
+<span class="nc" id="L165">        this.externalConfigs.clear();</span>
+<span class="nc" id="L166">        this.externalConfigurationMap.clear();</span>
+<span class="nc" id="L167">    }</span>
+
+    // For test
+    public void clearAppExternalConfigs() {
+<span class="nc" id="L171">        this.appExternalConfigs.clear();</span>
+<span class="nc" id="L172">        this.appExternalConfigurationMap.clear();</span>
+<span class="nc" id="L173">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

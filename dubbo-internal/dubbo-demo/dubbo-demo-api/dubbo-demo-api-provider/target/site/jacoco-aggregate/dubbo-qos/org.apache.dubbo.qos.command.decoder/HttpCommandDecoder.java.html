@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpCommandDecoder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.command.decoder</a> &gt; <span class="el_source">HttpCommandDecoder.java</span></div><h1>HttpCommandDecoder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.command.decoder;
+
+import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.command.CommandContextFactory;
+
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="nc" id="L33">public class HttpCommandDecoder {</span>
+    public static CommandContext decode(HttpRequest request) {
+<span class="nc" id="L35">        CommandContext commandContext = null;</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        if (request != null) {</span>
+<span class="nc" id="L37">            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.getUri());</span>
+<span class="nc" id="L38">            String path = queryStringDecoder.path();</span>
+<span class="nc" id="L39">            String[] array = path.split(&quot;/&quot;);</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            if (array.length == 2) {</span>
+<span class="nc" id="L41">                String name = array[1];</span>
+
+                // process GET request and POST request separately. Check url for GET, and check body for POST
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                if (request.getMethod() == HttpMethod.GET) {</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                    if (queryStringDecoder.parameters().isEmpty()) {</span>
+<span class="nc" id="L46">                        commandContext = CommandContextFactory.newInstance(name);</span>
+<span class="nc" id="L47">                        commandContext.setHttp(true);</span>
+                    } else {
+<span class="nc" id="L49">                        List&lt;String&gt; valueList = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                        for (List&lt;String&gt; values : queryStringDecoder.parameters().values()) {</span>
+<span class="nc" id="L51">                            valueList.addAll(values);</span>
+<span class="nc" id="L52">                        }</span>
+<span class="nc" id="L53">                        commandContext = CommandContextFactory.newInstance(name, valueList.toArray(new String[]{}),true);</span>
+<span class="nc" id="L54">                    }</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                } else if (request.getMethod() == HttpMethod.POST) {</span>
+<span class="nc" id="L56">                    HttpPostRequestDecoder httpPostRequestDecoder = new HttpPostRequestDecoder(request);</span>
+<span class="nc" id="L57">                    List&lt;String&gt; valueList = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                    for (InterfaceHttpData interfaceHttpData : httpPostRequestDecoder.getBodyHttpDatas()) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                        if (interfaceHttpData.getHttpDataType() == InterfaceHttpData.HttpDataType.Attribute) {</span>
+<span class="nc" id="L60">                            Attribute attribute = (Attribute) interfaceHttpData;</span>
+                            try {
+<span class="nc" id="L62">                                valueList.add(attribute.getValue());</span>
+<span class="nc" id="L63">                            } catch (IOException ex) {</span>
+<span class="nc" id="L64">                                throw new RuntimeException(ex);</span>
+<span class="nc" id="L65">                            }</span>
+                        }
+<span class="nc" id="L67">                    }</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                    if (valueList.isEmpty()) {</span>
+<span class="nc" id="L69">                        commandContext = CommandContextFactory.newInstance(name);</span>
+<span class="nc" id="L70">                        commandContext.setHttp(true);</span>
+                    } else {
+<span class="nc" id="L72">                        commandContext = CommandContextFactory.newInstance(name, valueList.toArray(new String[]{}),true);</span>
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L78">        return commandContext;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

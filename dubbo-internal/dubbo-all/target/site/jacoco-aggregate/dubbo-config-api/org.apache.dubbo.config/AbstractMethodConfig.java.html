@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMethodConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">AbstractMethodConfig.java</span></div><h1>AbstractMethodConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.rpc.cluster.LoadBalance;
+
+import java.util.Map;
+
+/**
+ * AbstractMethodConfig
+ *
+ * @export
+ */
+<span class="nc" id="L30">public abstract class AbstractMethodConfig extends AbstractConfig {</span>
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * The timeout for remote invocation in milliseconds
+     */
+    protected Integer timeout;
+
+    /**
+     * The retry times
+     */
+    protected Integer retries;
+
+    /**
+     * max concurrent invocations
+     */
+    protected Integer actives;
+
+    /**
+     * The load balance
+     */
+    protected String loadbalance;
+
+    /**
+     * Whether to async
+     * note that: it is an unreliable asynchronism that ignores return values and does not block threads.
+     */
+    protected Boolean async;
+
+    /**
+     * Whether to ack async-sent
+     */
+    protected Boolean sent;
+
+    /**
+     * The name of mock class which gets called when a service fails to execute
+     *
+     * note that: the mock doesn't support on the provider side，and the mock is executed when a non-business exception
+     * occurs after a remote service call
+     */
+    protected String mock;
+
+    /**
+     * Merger
+     */
+    protected String merger;
+
+    /**
+     * Cache the return result with the call parameter as key, the following options are available: lru, threadlocal,
+     * jcache, etc.
+     */
+    protected String cache;
+
+    /**
+     * Whether JSR303 standard annotation validation is enabled or not, if enabled, annotations on method parameters will
+     * be validated
+     */
+    protected String validation;
+
+    /**
+     * The customized parameters
+     */
+    protected Map&lt;String, String&gt; parameters;
+
+    /**
+     * Forks for forking cluster
+     */
+    protected Integer forks;
+
+    public Integer getForks() {
+<span class="nc" id="L101">        return forks;</span>
+    }
+
+    public void setForks(Integer forks) {
+<span class="nc" id="L105">        this.forks = forks;</span>
+<span class="nc" id="L106">    }</span>
+
+    public Integer getTimeout() {
+<span class="nc" id="L109">        return timeout;</span>
+    }
+
+    public void setTimeout(Integer timeout) {
+<span class="nc" id="L113">        this.timeout = timeout;</span>
+<span class="nc" id="L114">    }</span>
+
+    public Integer getRetries() {
+<span class="nc" id="L117">        return retries;</span>
+    }
+
+    public void setRetries(Integer retries) {
+<span class="nc" id="L121">        this.retries = retries;</span>
+<span class="nc" id="L122">    }</span>
+
+    public String getLoadbalance() {
+<span class="nc" id="L125">        return loadbalance;</span>
+    }
+
+    public void setLoadbalance(String loadbalance) {
+<span class="nc" id="L129">        checkExtension(LoadBalance.class, Constants.LOADBALANCE_KEY, loadbalance);</span>
+<span class="nc" id="L130">        this.loadbalance = loadbalance;</span>
+<span class="nc" id="L131">    }</span>
+
+    public Boolean isAsync() {
+<span class="nc" id="L134">        return async;</span>
+    }
+
+    public void setAsync(Boolean async) {
+<span class="nc" id="L138">        this.async = async;</span>
+<span class="nc" id="L139">    }</span>
+
+    public Integer getActives() {
+<span class="nc" id="L142">        return actives;</span>
+    }
+
+    public void setActives(Integer actives) {
+<span class="nc" id="L146">        this.actives = actives;</span>
+<span class="nc" id="L147">    }</span>
+
+    public Boolean getSent() {
+<span class="nc" id="L150">        return sent;</span>
+    }
+
+    public void setSent(Boolean sent) {
+<span class="nc" id="L154">        this.sent = sent;</span>
+<span class="nc" id="L155">    }</span>
+
+    @Parameter(escaped = true)
+    public String getMock() {
+<span class="nc" id="L159">        return mock;</span>
+    }
+
+    public void setMock(String mock) {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (mock == null) {</span>
+<span class="nc" id="L164">            return;</span>
+        }
+
+<span class="nc bnc" id="L167" title="All 4 branches missed.">        if (mock.startsWith(Constants.RETURN_PREFIX) || mock.startsWith(Constants.THROW_PREFIX + &quot; &quot;)) {</span>
+<span class="nc" id="L168">            checkLength(Constants.MOCK_KEY, mock);</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">        } else if (mock.startsWith(Constants.FAIL_PREFIX) || mock.startsWith(Constants.FORCE_PREFIX)) {</span>
+<span class="nc" id="L170">            checkNameHasSymbol(Constants.MOCK_KEY, mock);</span>
+        } else {
+<span class="nc" id="L172">            checkName(Constants.MOCK_KEY, mock);</span>
+        }
+<span class="nc" id="L174">        this.mock = mock;</span>
+<span class="nc" id="L175">    }</span>
+
+    public void setMock(Boolean mock) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (mock == null) {</span>
+<span class="nc" id="L179">            setMock((String) null);</span>
+        } else {
+<span class="nc" id="L181">            setMock(mock.toString());</span>
+        }
+<span class="nc" id="L183">    }</span>
+
+    public String getMerger() {
+<span class="nc" id="L186">        return merger;</span>
+    }
+
+    public void setMerger(String merger) {
+<span class="nc" id="L190">        this.merger = merger;</span>
+<span class="nc" id="L191">    }</span>
+
+    public String getCache() {
+<span class="nc" id="L194">        return cache;</span>
+    }
+
+    public void setCache(String cache) {
+<span class="nc" id="L198">        this.cache = cache;</span>
+<span class="nc" id="L199">    }</span>
+
+    public String getValidation() {
+<span class="nc" id="L202">        return validation;</span>
+    }
+
+    public void setValidation(String validation) {
+<span class="nc" id="L206">        this.validation = validation;</span>
+<span class="nc" id="L207">    }</span>
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L210">        return parameters;</span>
+    }
+
+    public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L214">        checkParameterName(parameters);</span>
+<span class="nc" id="L215">        this.parameters = parameters;</span>
+<span class="nc" id="L216">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

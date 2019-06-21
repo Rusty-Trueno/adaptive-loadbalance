@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ContextFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.filter</a> &gt; <span class="el_source">ContextFilter.java</span></div><h1>ContextFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.apache.dubbo.common.Constants.REMOTE_APPLICATION_KEY;
+
+/**
+ * ContextFilter set the provider RpcContext with invoker, invocation, local port it is using and host for
+ * current execution thread.
+ *
+ * @see RpcContext
+ */
+@Activate(group = Constants.PROVIDER, order = -10000)
+<span class="nc" id="L41">public class ContextFilter implements Filter {</span>
+
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+<span class="nc" id="L45">        Map&lt;String, String&gt; attachments = invocation.getAttachments();</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (attachments != null) {</span>
+<span class="nc" id="L47">            attachments = new HashMap&lt;&gt;(attachments);</span>
+<span class="nc" id="L48">            attachments.remove(Constants.PATH_KEY);</span>
+<span class="nc" id="L49">            attachments.remove(Constants.INTERFACE_KEY);</span>
+<span class="nc" id="L50">            attachments.remove(Constants.GROUP_KEY);</span>
+<span class="nc" id="L51">            attachments.remove(Constants.VERSION_KEY);</span>
+<span class="nc" id="L52">            attachments.remove(Constants.DUBBO_VERSION_KEY);</span>
+<span class="nc" id="L53">            attachments.remove(Constants.TOKEN_KEY);</span>
+<span class="nc" id="L54">            attachments.remove(Constants.TIMEOUT_KEY);</span>
+            // Remove async property to avoid being passed to the following invoke chain.
+<span class="nc" id="L56">            attachments.remove(Constants.ASYNC_KEY);</span>
+<span class="nc" id="L57">            attachments.remove(Constants.TAG_KEY);</span>
+<span class="nc" id="L58">            attachments.remove(Constants.FORCE_USE_TAG);</span>
+        }
+<span class="nc" id="L60">        RpcContext.getContext()</span>
+<span class="nc" id="L61">                .setInvoker(invoker)</span>
+<span class="nc" id="L62">                .setInvocation(invocation)</span>
+//                .setAttachments(attachments)  // merged from dubbox
+<span class="nc" id="L64">                .setLocalAddress(invoker.getUrl().getHost(), invoker.getUrl().getPort())</span>
+<span class="nc" id="L65">                .setRemoteApplicationName(invoker.getUrl().getParameter(REMOTE_APPLICATION_KEY));</span>
+
+        // merged from dubbox
+        // we may already added some attachments into RpcContext before this filter (e.g. in rest protocol)
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (attachments != null) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (RpcContext.getContext().getAttachments() != null) {</span>
+<span class="nc" id="L71">                RpcContext.getContext().getAttachments().putAll(attachments);</span>
+            } else {
+<span class="nc" id="L73">                RpcContext.getContext().setAttachments(attachments);</span>
+            }
+        }
+
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (invocation instanceof RpcInvocation) {</span>
+<span class="nc" id="L78">            ((RpcInvocation) invocation).setInvoker(invoker);</span>
+        }
+        try {
+<span class="nc" id="L81">            return invoker.invoke(invocation);</span>
+        } finally {
+            // IMPORTANT! For async scenario, we must remove context from current thread, so we always create a new RpcContext for the next invoke for the same thread.
+<span class="nc" id="L84">            RpcContext.removeContext();</span>
+<span class="nc" id="L85">            RpcContext.removeServerContext();</span>
+        }
+    }
+
+    @Override
+    public Result onResponse(Result result, Invoker&lt;?&gt; invoker, Invocation invocation) {
+        // pass attachments to result
+<span class="nc" id="L92">        result.addAttachments(RpcContext.getServerContext().getAttachments());</span>
+<span class="nc" id="L93">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

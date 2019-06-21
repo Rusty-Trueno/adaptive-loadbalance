@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SerializableClassRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.support</a> &gt; <span class="el_source">SerializableClassRegistry.java</span></div><h1>SerializableClassRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.serialize.support;
+
+import com.esotericsoftware.kryo.Serializer;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Provide a unified serialization registry, this class used for {@code dubbo-serialization-fst}
+ * and {@code dubbo-serialization-kryo}, it will register some classes at startup time (for example {@link AbstractKryoFactory#create})
+ */
+<span class="nc" id="L28">public abstract class SerializableClassRegistry {</span>
+
+
+<span class="nc" id="L31">    private static final Map&lt;Class, Object&gt; REGISTRATIONS = new LinkedHashMap&lt;&gt;();</span>
+
+    /**
+     * only supposed to be called at startup time
+     *
+     * @param clazz object type
+     */
+    public static void registerClass(Class clazz) {
+<span class="nc" id="L39">        registerClass(clazz, null);</span>
+<span class="nc" id="L40">    }</span>
+
+    /**
+     * only supposed to be called at startup time
+     *
+     * @param clazz object type
+     * @param serializer object serializer
+     */
+    public static void registerClass(Class clazz, Serializer serializer) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (clazz == null) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;Class registered to kryo cannot be null!&quot;);</span>
+        }
+<span class="nc" id="L52">        REGISTRATIONS.put(clazz, serializer);</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * get registered classes
+     *
+     * @return class serializer
+     * */
+    public static Map&lt;Class, Object&gt; getRegisteredClasses() {
+<span class="nc" id="L61">        return REGISTRATIONS;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

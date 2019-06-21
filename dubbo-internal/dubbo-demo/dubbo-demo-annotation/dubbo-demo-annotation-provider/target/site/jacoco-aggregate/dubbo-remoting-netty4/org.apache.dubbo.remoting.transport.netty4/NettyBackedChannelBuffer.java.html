@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyBackedChannelBuffer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4</a> &gt; <span class="el_source">NettyBackedChannelBuffer.java</span></div><h1>NettyBackedChannelBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4;
+
+import org.apache.dubbo.common.utils.Assert;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBufferFactory;
+import org.apache.dubbo.remoting.buffer.ChannelBuffers;
+
+import io.netty.buffer.ByteBuf;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+
+public class NettyBackedChannelBuffer implements ChannelBuffer {
+
+    private ByteBuf buffer;
+
+<span class="nc" id="L35">    public NettyBackedChannelBuffer(ByteBuf buffer) {</span>
+<span class="nc" id="L36">        Assert.notNull(buffer, &quot;buffer == null&quot;);</span>
+<span class="nc" id="L37">        this.buffer = buffer;</span>
+<span class="nc" id="L38">    }</span>
+
+
+    @Override
+    public int capacity() {
+<span class="nc" id="L43">        return buffer.capacity();</span>
+    }
+
+
+    @Override
+    public ChannelBuffer copy(int index, int length) {
+<span class="nc" id="L49">        return new NettyBackedChannelBuffer(buffer.copy(index, length));</span>
+    }
+
+    //has nothing use
+    @Override
+    public ChannelBufferFactory factory() {
+<span class="nc" id="L55">        return null;</span>
+    }
+
+
+    @Override
+    public byte getByte(int index) {
+<span class="nc" id="L61">        return buffer.getByte(index);</span>
+    }
+
+
+    @Override
+    public void getBytes(int index, byte[] dst, int dstIndex, int length) {
+<span class="nc" id="L67">        buffer.getBytes(index, dst, dstIndex, length);</span>
+<span class="nc" id="L68">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ByteBuffer dst) {
+<span class="nc" id="L73">        buffer.getBytes(index, dst);</span>
+<span class="nc" id="L74">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ChannelBuffer dst, int dstIndex, int length) {
+        // careful
+<span class="nc" id="L80">        byte[] data = new byte[length];</span>
+<span class="nc" id="L81">        buffer.getBytes(index, data, 0, length);</span>
+<span class="nc" id="L82">        dst.setBytes(dstIndex, data, 0, length);</span>
+<span class="nc" id="L83">    }</span>
+
+
+    @Override
+    public void getBytes(int index, OutputStream dst, int length) throws IOException {
+<span class="nc" id="L88">        buffer.getBytes(index, dst, length);</span>
+<span class="nc" id="L89">    }</span>
+
+
+    @Override
+    public boolean isDirect() {
+<span class="nc" id="L94">        return buffer.isDirect();</span>
+    }
+
+
+    @Override
+    public void setByte(int index, int value) {
+<span class="nc" id="L100">        buffer.setByte(index, value);</span>
+<span class="nc" id="L101">    }</span>
+
+
+    @Override
+    public void setBytes(int index, byte[] src, int srcIndex, int length) {
+<span class="nc" id="L106">        buffer.setBytes(index, src, srcIndex, length);</span>
+<span class="nc" id="L107">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ByteBuffer src) {
+<span class="nc" id="L112">        buffer.setBytes(index, src);</span>
+<span class="nc" id="L113">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ChannelBuffer src, int srcIndex, int length) {
+        // careful
+<span class="nc" id="L119">        byte[] data = new byte[length];</span>
+<span class="nc" id="L120">        buffer.getBytes(srcIndex, data, 0, length);</span>
+<span class="nc" id="L121">        setBytes(index, data, 0, length);</span>
+<span class="nc" id="L122">    }</span>
+
+
+    @Override
+    public int setBytes(int index, InputStream src, int length) throws IOException {
+<span class="nc" id="L127">        return buffer.setBytes(index, src, length);</span>
+    }
+
+
+    @Override
+    public ByteBuffer toByteBuffer(int index, int length) {
+<span class="nc" id="L133">        return buffer.nioBuffer(index, length);</span>
+    }
+
+
+    @Override
+    public byte[] array() {
+<span class="nc" id="L139">        return buffer.array();</span>
+    }
+
+
+    @Override
+    public boolean hasArray() {
+<span class="nc" id="L145">        return buffer.hasArray();</span>
+    }
+
+
+    @Override
+    public int arrayOffset() {
+<span class="nc" id="L151">        return buffer.arrayOffset();</span>
+    }
+
+
+    // AbstractChannelBuffer
+
+
+
+    @Override
+    public void clear() {
+<span class="nc" id="L161">        buffer.clear();</span>
+<span class="nc" id="L162">    }</span>
+
+
+    @Override
+    public ChannelBuffer copy() {
+<span class="nc" id="L167">        return new NettyBackedChannelBuffer(buffer.copy());</span>
+    }
+
+
+    @Override
+    public void discardReadBytes() {
+<span class="nc" id="L173">        buffer.discardReadBytes();</span>
+<span class="nc" id="L174">    }</span>
+
+
+    @Override
+    public void ensureWritableBytes(int writableBytes) {
+<span class="nc" id="L179">        buffer.ensureWritable(writableBytes);</span>
+<span class="nc" id="L180">    }</span>
+
+
+    @Override
+    public void getBytes(int index, byte[] dst) {
+<span class="nc" id="L185">        buffer.getBytes(index, dst);</span>
+<span class="nc" id="L186">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ChannelBuffer dst) {
+        // careful
+<span class="nc" id="L192">        getBytes(index, dst, dst.writableBytes());</span>
+<span class="nc" id="L193">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ChannelBuffer dst, int length) {
+        // careful
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (length &gt; dst.writableBytes()) {</span>
+<span class="nc" id="L200">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L202">        getBytes(index, dst, dst.writerIndex(), length);</span>
+<span class="nc" id="L203">        dst.writerIndex(dst.writerIndex() + length);</span>
+<span class="nc" id="L204">    }</span>
+
+
+    @Override
+    public void markReaderIndex() {
+<span class="nc" id="L209">        buffer.markReaderIndex();</span>
+<span class="nc" id="L210">    }</span>
+
+
+    @Override
+    public void markWriterIndex() {
+<span class="nc" id="L215">        buffer.markWriterIndex();</span>
+<span class="nc" id="L216">    }</span>
+
+
+    @Override
+    public boolean readable() {
+<span class="nc" id="L221">        return buffer.isReadable();</span>
+    }
+
+
+    @Override
+    public int readableBytes() {
+<span class="nc" id="L227">        return buffer.readableBytes();</span>
+    }
+
+
+    @Override
+    public byte readByte() {
+<span class="nc" id="L233">        return buffer.readByte();</span>
+    }
+
+
+    @Override
+    public void readBytes(byte[] dst) {
+<span class="nc" id="L239">        buffer.readBytes(dst);</span>
+<span class="nc" id="L240">    }</span>
+
+
+    @Override
+    public void readBytes(byte[] dst, int dstIndex, int length) {
+<span class="nc" id="L245">        buffer.readBytes(dst, dstIndex, length);</span>
+<span class="nc" id="L246">    }</span>
+
+
+    @Override
+    public void readBytes(ByteBuffer dst) {
+<span class="nc" id="L251">        buffer.readBytes(dst);</span>
+<span class="nc" id="L252">    }</span>
+
+
+    @Override
+    public void readBytes(ChannelBuffer dst) {
+        // careful
+<span class="nc" id="L258">        readBytes(dst, dst.writableBytes());</span>
+<span class="nc" id="L259">    }</span>
+
+
+    @Override
+    public void readBytes(ChannelBuffer dst, int length) {
+        // careful
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (length &gt; dst.writableBytes()) {</span>
+<span class="nc" id="L266">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L268">        readBytes(dst, dst.writerIndex(), length);</span>
+<span class="nc" id="L269">        dst.writerIndex(dst.writerIndex() + length);</span>
+<span class="nc" id="L270">    }</span>
+
+
+    @Override
+    public void readBytes(ChannelBuffer dst, int dstIndex, int length) {
+        // careful
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (readableBytes() &lt; length) {</span>
+<span class="nc" id="L277">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L279">        byte[] data = new byte[length];</span>
+<span class="nc" id="L280">        buffer.readBytes(data, 0, length);</span>
+<span class="nc" id="L281">        dst.setBytes(dstIndex, data, 0, length);</span>
+<span class="nc" id="L282">    }</span>
+
+
+    @Override
+    public ChannelBuffer readBytes(int length) {
+<span class="nc" id="L287">        return new NettyBackedChannelBuffer(buffer.readBytes(length));</span>
+    }
+
+
+    @Override
+    public void resetReaderIndex() {
+<span class="nc" id="L293">        buffer.resetReaderIndex();</span>
+<span class="nc" id="L294">    }</span>
+
+
+    @Override
+    public void resetWriterIndex() {
+<span class="nc" id="L299">        buffer.resetWriterIndex();</span>
+<span class="nc" id="L300">    }</span>
+
+
+    @Override
+    public int readerIndex() {
+<span class="nc" id="L305">        return buffer.readerIndex();</span>
+    }
+
+
+    @Override
+    public void readerIndex(int readerIndex) {
+<span class="nc" id="L311">        buffer.readerIndex(readerIndex);</span>
+<span class="nc" id="L312">    }</span>
+
+
+    @Override
+    public void readBytes(OutputStream dst, int length) throws IOException {
+<span class="nc" id="L317">        buffer.readBytes(dst, length);</span>
+<span class="nc" id="L318">    }</span>
+
+
+    @Override
+    public void setBytes(int index, byte[] src) {
+<span class="nc" id="L323">        buffer.setBytes(index, src);</span>
+<span class="nc" id="L324">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ChannelBuffer src) {
+        // careful
+<span class="nc" id="L330">        setBytes(index, src, src.readableBytes());</span>
+<span class="nc" id="L331">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ChannelBuffer src, int length) {
+        // careful
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (length &gt; src.readableBytes()) {</span>
+<span class="nc" id="L338">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L340">        setBytes(index, src, src.readerIndex(), length);</span>
+<span class="nc" id="L341">        src.readerIndex(src.readerIndex() + length);</span>
+<span class="nc" id="L342">    }</span>
+
+
+    @Override
+    public void setIndex(int readerIndex, int writerIndex) {
+<span class="nc" id="L347">        buffer.setIndex(readerIndex, writerIndex);</span>
+<span class="nc" id="L348">    }</span>
+
+
+    @Override
+    public void skipBytes(int length) {
+<span class="nc" id="L353">        buffer.skipBytes(length);</span>
+<span class="nc" id="L354">    }</span>
+
+
+    @Override
+    public ByteBuffer toByteBuffer() {
+<span class="nc" id="L359">        return buffer.nioBuffer();</span>
+    }
+
+
+    @Override
+    public boolean writable() {
+<span class="nc" id="L365">        return buffer.isWritable();</span>
+    }
+
+
+    @Override
+    public int writableBytes() {
+<span class="nc" id="L371">        return buffer.writableBytes();</span>
+    }
+
+
+    @Override
+    public void writeByte(int value) {
+<span class="nc" id="L377">        buffer.writeByte(value);</span>
+<span class="nc" id="L378">    }</span>
+
+
+    @Override
+    public void writeBytes(byte[] src) {
+<span class="nc" id="L383">        buffer.writeBytes(src);</span>
+<span class="nc" id="L384">    }</span>
+
+
+    @Override
+    public void writeBytes(byte[] src, int index, int length) {
+<span class="nc" id="L389">        buffer.writeBytes(src, index, length);</span>
+<span class="nc" id="L390">    }</span>
+
+
+    @Override
+    public void writeBytes(ByteBuffer src) {
+<span class="nc" id="L395">        buffer.writeBytes(src);</span>
+<span class="nc" id="L396">    }</span>
+
+
+    @Override
+    public void writeBytes(ChannelBuffer src) {
+        // careful
+<span class="nc" id="L402">        writeBytes(src, src.readableBytes());</span>
+<span class="nc" id="L403">    }</span>
+
+
+    @Override
+    public void writeBytes(ChannelBuffer src, int length) {
+        // careful
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        if (length &gt; src.readableBytes()) {</span>
+<span class="nc" id="L410">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L412">        writeBytes(src, src.readerIndex(), length);</span>
+<span class="nc" id="L413">        src.readerIndex(src.readerIndex() + length);</span>
+<span class="nc" id="L414">    }</span>
+
+
+    @Override
+    public void writeBytes(ChannelBuffer src, int srcIndex, int length) {
+        // careful
+<span class="nc" id="L420">        byte[] data = new byte[length];</span>
+<span class="nc" id="L421">        src.getBytes(srcIndex, data, 0, length);</span>
+<span class="nc" id="L422">        writeBytes(data, 0, length);</span>
+<span class="nc" id="L423">    }</span>
+
+
+    @Override
+    public int writeBytes(InputStream src, int length) throws IOException {
+<span class="nc" id="L428">        return buffer.writeBytes(src, length);</span>
+    }
+
+
+    @Override
+    public int writerIndex() {
+<span class="nc" id="L434">        return buffer.writerIndex();</span>
+    }
+
+
+    @Override
+    public void writerIndex(int writerIndex) {
+<span class="nc" id="L440">        buffer.writerIndex(writerIndex);</span>
+<span class="nc" id="L441">    }</span>
+
+
+    @Override
+    public int compareTo(ChannelBuffer o) {
+<span class="nc" id="L446">        return ChannelBuffers.compare(this, o);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

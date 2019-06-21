@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FutureFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo.filter</a> &gt; <span class="el_source">FutureFilter.java</span></div><h1>FutureFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ConsumerMethodModel;
+import org.apache.dubbo.rpc.model.ConsumerModel;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+/**
+ * EventFilter
+ */
+@Activate(group = Constants.CONSUMER)
+<span class="nc" id="L40">public class FutureFilter implements Filter {</span>
+
+<span class="nc" id="L42">    protected static final Logger logger = LoggerFactory.getLogger(FutureFilter.class);</span>
+
+    @Override
+    public Result invoke(final Invoker&lt;?&gt; invoker, final Invocation invocation) throws RpcException {
+<span class="nc" id="L46">        fireInvokeCallback(invoker, invocation);</span>
+        // need to configure if there's return value before the invocation in order to help invoker to judge if it's
+        // necessary to return future.
+<span class="nc" id="L49">        return invoker.invoke(invocation);</span>
+    }
+
+    @Override
+    public Result onResponse(Result result, Invoker&lt;?&gt; invoker, Invocation invocation) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (result instanceof AsyncRpcResult) {</span>
+<span class="nc" id="L55">            AsyncRpcResult asyncResult = (AsyncRpcResult) result;</span>
+<span class="nc" id="L56">            asyncResult.thenApplyWithContext(r -&gt; {</span>
+<span class="nc" id="L57">                asyncCallback(invoker, invocation, r);</span>
+<span class="nc" id="L58">                return r;</span>
+            });
+<span class="nc" id="L60">            return asyncResult;</span>
+        } else {
+<span class="nc" id="L62">            syncCallback(invoker, invocation, result);</span>
+<span class="nc" id="L63">            return result;</span>
+        }
+    }
+
+    private void syncCallback(final Invoker&lt;?&gt; invoker, final Invocation invocation, final Result result) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (result.hasException()) {</span>
+<span class="nc" id="L69">            fireThrowCallback(invoker, invocation, result.getException());</span>
+        } else {
+<span class="nc" id="L71">            fireReturnCallback(invoker, invocation, result.getValue());</span>
+        }
+<span class="nc" id="L73">    }</span>
+
+    private void asyncCallback(final Invoker&lt;?&gt; invoker, final Invocation invocation, Result result) {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (result.hasException()) {</span>
+<span class="nc" id="L77">            fireThrowCallback(invoker, invocation, result.getException());</span>
+        } else {
+<span class="nc" id="L79">            fireReturnCallback(invoker, invocation, result.getValue());</span>
+        }
+<span class="nc" id="L81">    }</span>
+
+    private void fireInvokeCallback(final Invoker&lt;?&gt; invoker, final Invocation invocation) {
+<span class="nc" id="L84">        final ConsumerMethodModel.AsyncMethodInfo asyncMethodInfo = getAsyncMethodInfo(invoker, invocation);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (asyncMethodInfo == null) {</span>
+<span class="nc" id="L86">            return;</span>
+        }
+<span class="nc" id="L88">        final Method onInvokeMethod = asyncMethodInfo.getOninvokeMethod();</span>
+<span class="nc" id="L89">        final Object onInvokeInst = asyncMethodInfo.getOninvokeInstance();</span>
+
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (onInvokeMethod == null &amp;&amp; onInvokeInst == null) {</span>
+<span class="nc" id="L92">            return;</span>
+        }
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (onInvokeMethod == null || onInvokeInst == null) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            throw new IllegalStateException(&quot;service:&quot; + invoker.getUrl().getServiceKey() + &quot; has a oninvoke callback config , but no such &quot; + (onInvokeMethod == null ? &quot;method&quot; : &quot;instance&quot;) + &quot; found. url:&quot; + invoker.getUrl());</span>
+        }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (!onInvokeMethod.isAccessible()) {</span>
+<span class="nc" id="L98">            onInvokeMethod.setAccessible(true);</span>
+        }
+
+<span class="nc" id="L101">        Object[] params = invocation.getArguments();</span>
+        try {
+<span class="nc" id="L103">            onInvokeMethod.invoke(onInvokeInst, params);</span>
+<span class="nc" id="L104">        } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L105">            fireThrowCallback(invoker, invocation, e.getTargetException());</span>
+<span class="nc" id="L106">        } catch (Throwable e) {</span>
+<span class="nc" id="L107">            fireThrowCallback(invoker, invocation, e);</span>
+<span class="nc" id="L108">        }</span>
+<span class="nc" id="L109">    }</span>
+
+    private void fireReturnCallback(final Invoker&lt;?&gt; invoker, final Invocation invocation, final Object result) {
+<span class="nc" id="L112">        final ConsumerMethodModel.AsyncMethodInfo asyncMethodInfo = getAsyncMethodInfo(invoker, invocation);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (asyncMethodInfo == null) {</span>
+<span class="nc" id="L114">            return;</span>
+        }
+
+<span class="nc" id="L117">        final Method onReturnMethod = asyncMethodInfo.getOnreturnMethod();</span>
+<span class="nc" id="L118">        final Object onReturnInst = asyncMethodInfo.getOnreturnInstance();</span>
+
+        //not set onreturn callback
+<span class="nc bnc" id="L121" title="All 4 branches missed.">        if (onReturnMethod == null &amp;&amp; onReturnInst == null) {</span>
+<span class="nc" id="L122">            return;</span>
+        }
+
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (onReturnMethod == null || onReturnInst == null) {</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            throw new IllegalStateException(&quot;service:&quot; + invoker.getUrl().getServiceKey() + &quot; has a onreturn callback config , but no such &quot; + (onReturnMethod == null ? &quot;method&quot; : &quot;instance&quot;) + &quot; found. url:&quot; + invoker.getUrl());</span>
+        }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (!onReturnMethod.isAccessible()) {</span>
+<span class="nc" id="L129">            onReturnMethod.setAccessible(true);</span>
+        }
+
+<span class="nc" id="L132">        Object[] args = invocation.getArguments();</span>
+        Object[] params;
+<span class="nc" id="L134">        Class&lt;?&gt;[] rParaTypes = onReturnMethod.getParameterTypes();</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (rParaTypes.length &gt; 1) {</span>
+<span class="nc bnc" id="L136" title="All 4 branches missed.">            if (rParaTypes.length == 2 &amp;&amp; rParaTypes[1].isAssignableFrom(Object[].class)) {</span>
+<span class="nc" id="L137">                params = new Object[2];</span>
+<span class="nc" id="L138">                params[0] = result;</span>
+<span class="nc" id="L139">                params[1] = args;</span>
+            } else {
+<span class="nc" id="L141">                params = new Object[args.length + 1];</span>
+<span class="nc" id="L142">                params[0] = result;</span>
+<span class="nc" id="L143">                System.arraycopy(args, 0, params, 1, args.length);</span>
+            }
+        } else {
+<span class="nc" id="L146">            params = new Object[]{result};</span>
+        }
+        try {
+<span class="nc" id="L149">            onReturnMethod.invoke(onReturnInst, params);</span>
+<span class="nc" id="L150">        } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L151">            fireThrowCallback(invoker, invocation, e.getTargetException());</span>
+<span class="nc" id="L152">        } catch (Throwable e) {</span>
+<span class="nc" id="L153">            fireThrowCallback(invoker, invocation, e);</span>
+<span class="nc" id="L154">        }</span>
+<span class="nc" id="L155">    }</span>
+
+    private void fireThrowCallback(final Invoker&lt;?&gt; invoker, final Invocation invocation, final Throwable exception) {
+<span class="nc" id="L158">        final ConsumerMethodModel.AsyncMethodInfo asyncMethodInfo = getAsyncMethodInfo(invoker, invocation);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (asyncMethodInfo == null) {</span>
+<span class="nc" id="L160">            return;</span>
+        }
+
+<span class="nc" id="L163">        final Method onthrowMethod = asyncMethodInfo.getOnthrowMethod();</span>
+<span class="nc" id="L164">        final Object onthrowInst = asyncMethodInfo.getOnthrowInstance();</span>
+
+        //onthrow callback not configured
+<span class="nc bnc" id="L167" title="All 4 branches missed.">        if (onthrowMethod == null &amp;&amp; onthrowInst == null) {</span>
+<span class="nc" id="L168">            return;</span>
+        }
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        if (onthrowMethod == null || onthrowInst == null) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            throw new IllegalStateException(&quot;service:&quot; + invoker.getUrl().getServiceKey() + &quot; has a onthrow callback config , but no such &quot; + (onthrowMethod == null ? &quot;method&quot; : &quot;instance&quot;) + &quot; found. url:&quot; + invoker.getUrl());</span>
+        }
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (!onthrowMethod.isAccessible()) {</span>
+<span class="nc" id="L174">            onthrowMethod.setAccessible(true);</span>
+        }
+<span class="nc" id="L176">        Class&lt;?&gt;[] rParaTypes = onthrowMethod.getParameterTypes();</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (rParaTypes[0].isAssignableFrom(exception.getClass())) {</span>
+            try {
+<span class="nc" id="L179">                Object[] args = invocation.getArguments();</span>
+                Object[] params;
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (rParaTypes.length &gt; 1) {</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">                    if (rParaTypes.length == 2 &amp;&amp; rParaTypes[1].isAssignableFrom(Object[].class)) {</span>
+<span class="nc" id="L184">                        params = new Object[2];</span>
+<span class="nc" id="L185">                        params[0] = exception;</span>
+<span class="nc" id="L186">                        params[1] = args;</span>
+                    } else {
+<span class="nc" id="L188">                        params = new Object[args.length + 1];</span>
+<span class="nc" id="L189">                        params[0] = exception;</span>
+<span class="nc" id="L190">                        System.arraycopy(args, 0, params, 1, args.length);</span>
+                    }
+                } else {
+<span class="nc" id="L193">                    params = new Object[]{exception};</span>
+                }
+<span class="nc" id="L195">                onthrowMethod.invoke(onthrowInst, params);</span>
+<span class="nc" id="L196">            } catch (Throwable e) {</span>
+<span class="nc" id="L197">                logger.error(invocation.getMethodName() + &quot;.call back method invoke error . callback method :&quot; + onthrowMethod + &quot;, url:&quot; + invoker.getUrl(), e);</span>
+<span class="nc" id="L198">            }</span>
+        } else {
+<span class="nc" id="L200">            logger.error(invocation.getMethodName() + &quot;.call back method invoke error . callback method :&quot; + onthrowMethod + &quot;, url:&quot; + invoker.getUrl(), exception);</span>
+        }
+<span class="nc" id="L202">    }</span>
+
+    private ConsumerMethodModel.AsyncMethodInfo getAsyncMethodInfo(Invoker&lt;?&gt; invoker, Invocation invocation) {
+<span class="nc" id="L205">        final ConsumerModel consumerModel = ApplicationModel.getConsumerModel(invoker.getUrl().getServiceKey());</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (consumerModel == null) {</span>
+<span class="nc" id="L207">            return null;</span>
+        }
+
+<span class="nc" id="L210">        String methodName = invocation.getMethodName();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (methodName.equals(Constants.$INVOKE)) {</span>
+<span class="nc" id="L212">            methodName = (String) invocation.getArguments()[0];</span>
+        }
+
+<span class="nc" id="L215">        ConsumerMethodModel methodModel = consumerModel.getMethodModel(methodName);</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (methodModel == null) {</span>
+<span class="nc" id="L217">            return null;</span>
+        }
+
+<span class="nc" id="L220">        final ConsumerMethodModel.AsyncMethodInfo asyncMethodInfo = methodModel.getAsyncInfo();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (asyncMethodInfo == null) {</span>
+<span class="nc" id="L222">            return null;</span>
+        }
+
+<span class="nc" id="L225">        return asyncMethodInfo;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

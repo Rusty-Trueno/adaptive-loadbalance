@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CodecSupport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport</a> &gt; <span class="el_source">CodecSupport.java</span></div><h1>CodecSupport.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.transport;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.Serialization;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+public class CodecSupport {
+
+<span class="nc" id="L36">    private static final Logger logger = LoggerFactory.getLogger(CodecSupport.class);</span>
+<span class="nc" id="L37">    private static Map&lt;Byte, Serialization&gt; ID_SERIALIZATION_MAP = new HashMap&lt;Byte, Serialization&gt;();</span>
+<span class="nc" id="L38">    private static Map&lt;Byte, String&gt; ID_SERIALIZATIONNAME_MAP = new HashMap&lt;Byte, String&gt;();</span>
+
+    static {
+<span class="nc" id="L41">        Set&lt;String&gt; supportedExtensions = ExtensionLoader.getExtensionLoader(Serialization.class).getSupportedExtensions();</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        for (String name : supportedExtensions) {</span>
+<span class="nc" id="L43">            Serialization serialization = ExtensionLoader.getExtensionLoader(Serialization.class).getExtension(name);</span>
+<span class="nc" id="L44">            byte idByte = serialization.getContentTypeId();</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            if (ID_SERIALIZATION_MAP.containsKey(idByte)) {</span>
+<span class="nc" id="L46">                logger.error(&quot;Serialization extension &quot; + serialization.getClass().getName()</span>
+                        + &quot; has duplicate id to Serialization extension &quot;
+<span class="nc" id="L48">                        + ID_SERIALIZATION_MAP.get(idByte).getClass().getName()</span>
+                        + &quot;, ignore this Serialization extension&quot;);
+<span class="nc" id="L50">                continue;</span>
+            }
+<span class="nc" id="L52">            ID_SERIALIZATION_MAP.put(idByte, serialization);</span>
+<span class="nc" id="L53">            ID_SERIALIZATIONNAME_MAP.put(idByte, name);</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">    }</span>
+
+    private CodecSupport() {
+    }
+
+    public static Serialization getSerializationById(Byte id) {
+<span class="nc" id="L61">        return ID_SERIALIZATION_MAP.get(id);</span>
+    }
+
+    public static Serialization getSerialization(URL url) {
+<span class="nc" id="L65">        return ExtensionLoader.getExtensionLoader(Serialization.class).getExtension(</span>
+<span class="nc" id="L66">                url.getParameter(Constants.SERIALIZATION_KEY, Constants.DEFAULT_REMOTING_SERIALIZATION));</span>
+    }
+
+    public static Serialization getSerialization(URL url, Byte id) throws IOException {
+<span class="nc" id="L70">        Serialization serialization = getSerializationById(id);</span>
+<span class="nc" id="L71">        String serializationName = url.getParameter(Constants.SERIALIZATION_KEY, Constants.DEFAULT_REMOTING_SERIALIZATION);</span>
+        // Check if &quot;serialization id&quot; passed from network matches the id on this side(only take effect for JDK serialization), for security purpose.
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (serialization == null</span>
+<span class="nc bnc" id="L74" title="All 6 branches missed.">                || ((id == Constants.JAVA_SERIALIZATION_ID || id == Constants.NATIVE_JAVA_SERIALIZATION_ID || id == Constants.COMPACTED_JAVA_SERIALIZATION_ID)</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                &amp;&amp; !(serializationName.equals(ID_SERIALIZATIONNAME_MAP.get(id))))) {</span>
+<span class="nc" id="L76">            throw new IOException(&quot;Unexpected serialization id:&quot; + id + &quot; received from network, please check if the peer send the right id.&quot;);</span>
+        }
+<span class="nc" id="L78">        return serialization;</span>
+    }
+
+    public static ObjectInput deserialize(URL url, InputStream is, byte proto) throws IOException {
+<span class="nc" id="L82">        Serialization s = getSerialization(url, proto);</span>
+<span class="nc" id="L83">        return s.deserialize(url, is);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

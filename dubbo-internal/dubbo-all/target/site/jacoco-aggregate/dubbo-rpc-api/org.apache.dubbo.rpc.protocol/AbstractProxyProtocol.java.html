@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractProxyProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol</a> &gt; <span class="el_source">AbstractProxyProtocol.java</span></div><h1>AbstractProxyProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.rpc.protocol;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * AbstractProxyProtocol
+ */
+public abstract class AbstractProxyProtocol extends AbstractProtocol {
+
+<span class="nc" id="L39">    private final List&lt;Class&lt;?&gt;&gt; rpcExceptions = new CopyOnWriteArrayList&lt;Class&lt;?&gt;&gt;();</span>
+
+    private ProxyFactory proxyFactory;
+
+<span class="nc" id="L43">    public AbstractProxyProtocol() {</span>
+<span class="nc" id="L44">    }</span>
+
+<span class="nc" id="L46">    public AbstractProxyProtocol(Class&lt;?&gt;... exceptions) {</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        for (Class&lt;?&gt; exception : exceptions) {</span>
+<span class="nc" id="L48">            addRpcException(exception);</span>
+        }
+<span class="nc" id="L50">    }</span>
+
+    public void addRpcException(Class&lt;?&gt; exception) {
+<span class="nc" id="L53">        this.rpcExceptions.add(exception);</span>
+<span class="nc" id="L54">    }</span>
+
+    public ProxyFactory getProxyFactory() {
+<span class="nc" id="L57">        return proxyFactory;</span>
+    }
+
+    public void setProxyFactory(ProxyFactory proxyFactory) {
+<span class="nc" id="L61">        this.proxyFactory = proxyFactory;</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; Exporter&lt;T&gt; export(final Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc" id="L67">        final String uri = serviceKey(invoker.getUrl());</span>
+<span class="nc" id="L68">        Exporter&lt;T&gt; exporter = (Exporter&lt;T&gt;) exporterMap.get(uri);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (exporter != null) {</span>
+            // When modifying the configuration through override, you need to re-expose the newly modified service.
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (Objects.equals(exporter.getInvoker().getUrl(), invoker.getUrl())) {</span>
+<span class="nc" id="L72">                return exporter;</span>
+            }
+        }
+<span class="nc" id="L75">        final Runnable runnable = doExport(proxyFactory.getProxy(invoker, true), invoker.getInterface(), invoker.getUrl());</span>
+<span class="nc" id="L76">        exporter = new AbstractExporter&lt;T&gt;(invoker) {</span>
+            @Override
+            public void unexport() {
+<span class="nc" id="L79">                super.unexport();</span>
+<span class="nc" id="L80">                exporterMap.remove(uri);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (runnable != null) {</span>
+                    try {
+<span class="nc" id="L83">                        runnable.run();</span>
+<span class="nc" id="L84">                    } catch (Throwable t) {</span>
+<span class="nc" id="L85">                        logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L86">                    }</span>
+                }
+<span class="nc" id="L88">            }</span>
+        };
+<span class="nc" id="L90">        exporterMap.put(uri, exporter);</span>
+<span class="nc" id="L91">        return exporter;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(final Class&lt;T&gt; type, final URL url) throws RpcException {
+<span class="nc" id="L96">        final Invoker&lt;T&gt; target = proxyFactory.getInvoker(doRefer(type, url), type, url);</span>
+<span class="nc" id="L97">        Invoker&lt;T&gt; invoker = new AbstractInvoker&lt;T&gt;(type, url) {</span>
+            @Override
+            protected Result doInvoke(Invocation invocation) throws Throwable {
+                try {
+<span class="nc" id="L101">                    Result result = target.invoke(invocation);</span>
+<span class="nc" id="L102">                    Throwable e = result.getException();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                    if (e != null) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                        for (Class&lt;?&gt; rpcException : rpcExceptions) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                            if (rpcException.isAssignableFrom(e.getClass())) {</span>
+<span class="nc" id="L106">                                throw getRpcException(type, url, invocation, e);</span>
+                            }
+<span class="nc" id="L108">                        }</span>
+                    }
+<span class="nc" id="L110">                    return result;</span>
+<span class="nc" id="L111">                } catch (RpcException e) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    if (e.getCode() == RpcException.UNKNOWN_EXCEPTION) {</span>
+<span class="nc" id="L113">                        e.setCode(getErrorCode(e.getCause()));</span>
+                    }
+<span class="nc" id="L115">                    throw e;</span>
+<span class="nc" id="L116">                } catch (Throwable e) {</span>
+<span class="nc" id="L117">                    throw getRpcException(type, url, invocation, e);</span>
+                }
+            }
+        };
+<span class="nc" id="L121">        invokers.add(invoker);</span>
+<span class="nc" id="L122">        return invoker;</span>
+    }
+
+    protected RpcException getRpcException(Class&lt;?&gt; type, URL url, Invocation invocation, Throwable e) {
+<span class="nc" id="L126">        RpcException re = new RpcException(&quot;Failed to invoke remote service: &quot; + type + &quot;, method: &quot;</span>
+<span class="nc" id="L127">                + invocation.getMethodName() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L128">        re.setCode(getErrorCode(e));</span>
+<span class="nc" id="L129">        return re;</span>
+    }
+
+    protected String getAddr(URL url) {
+<span class="nc" id="L133">        String bindIp = url.getParameter(Constants.BIND_IP_KEY, url.getHost());</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (url.getParameter(Constants.ANYHOST_KEY, false)) {</span>
+<span class="nc" id="L135">            bindIp = Constants.ANYHOST_VALUE;</span>
+        }
+<span class="nc" id="L137">        return NetUtils.getIpByHost(bindIp) + &quot;:&quot; + url.getParameter(Constants.BIND_PORT_KEY, url.getPort());</span>
+    }
+
+    protected int getErrorCode(Throwable e) {
+<span class="nc" id="L141">        return RpcException.UNKNOWN_EXCEPTION;</span>
+    }
+
+    protected abstract &lt;T&gt; Runnable doExport(T impl, Class&lt;T&gt; type, URL url) throws RpcException;
+
+    protected abstract &lt;T&gt; T doRefer(Class&lt;T&gt; type, URL url) throws RpcException;
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

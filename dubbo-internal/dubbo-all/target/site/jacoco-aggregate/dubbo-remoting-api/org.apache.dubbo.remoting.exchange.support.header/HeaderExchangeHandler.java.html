@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HeaderExchangeHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support.header</a> &gt; <span class="el_source">HeaderExchangeHandler.java</span></div><h1>HeaderExchangeHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.support.header;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.ExecutionException;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.exchange.support.DefaultFuture;
+import org.apache.dubbo.remoting.transport.ChannelHandlerDelegate;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+
+
+/**
+ * ExchangeReceiver
+ */
+public class HeaderExchangeHandler implements ChannelHandlerDelegate {
+
+<span class="nc" id="L45">    protected static final Logger logger = LoggerFactory.getLogger(HeaderExchangeHandler.class);</span>
+
+    public static final String KEY_READ_TIMESTAMP = HeartbeatHandler.KEY_READ_TIMESTAMP;
+
+    public static final String KEY_WRITE_TIMESTAMP = HeartbeatHandler.KEY_WRITE_TIMESTAMP;
+
+    private final ExchangeHandler handler;
+
+<span class="nc" id="L53">    public HeaderExchangeHandler(ExchangeHandler handler) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (handler == null) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;handler == null&quot;);</span>
+        }
+<span class="nc" id="L57">        this.handler = handler;</span>
+<span class="nc" id="L58">    }</span>
+
+    static void handleResponse(Channel channel, Response response) throws RemotingException {
+<span class="nc bnc" id="L61" title="All 4 branches missed.">        if (response != null &amp;&amp; !response.isHeartbeat()) {</span>
+<span class="nc" id="L62">            DefaultFuture.received(channel, response);</span>
+        }
+<span class="nc" id="L64">    }</span>
+
+    private static boolean isClientSide(Channel channel) {
+<span class="nc" id="L67">        InetSocketAddress address = channel.getRemoteAddress();</span>
+<span class="nc" id="L68">        URL url = channel.getUrl();</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        return url.getPort() == address.getPort() &amp;&amp;</span>
+<span class="nc" id="L70">                NetUtils.filterLocalHost(url.getIp())</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                        .equals(NetUtils.filterLocalHost(address.getAddress().getHostAddress()));</span>
+    }
+
+    void handlerEvent(Channel channel, Request req) throws RemotingException {
+<span class="nc bnc" id="L75" title="All 4 branches missed.">        if (req.getData() != null &amp;&amp; req.getData().equals(Request.READONLY_EVENT)) {</span>
+<span class="nc" id="L76">            channel.setAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY, Boolean.TRUE);</span>
+        }
+<span class="nc" id="L78">    }</span>
+
+    void handleRequest(final ExchangeChannel channel, Request req) throws RemotingException {
+<span class="nc" id="L81">        Response res = new Response(req.getId(), req.getVersion());</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (req.isBroken()) {</span>
+<span class="nc" id="L83">            Object data = req.getData();</span>
+
+            String msg;
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (data == null) {</span>
+<span class="nc" id="L87">                msg = null;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            } else if (data instanceof Throwable) {</span>
+<span class="nc" id="L89">                msg = StringUtils.toString((Throwable) data);</span>
+            } else {
+<span class="nc" id="L91">                msg = data.toString();</span>
+            }
+<span class="nc" id="L93">            res.setErrorMessage(&quot;Fail to decode request due to: &quot; + msg);</span>
+<span class="nc" id="L94">            res.setStatus(Response.BAD_REQUEST);</span>
+
+<span class="nc" id="L96">            channel.send(res);</span>
+<span class="nc" id="L97">            return;</span>
+        }
+        // find handler by message class.
+<span class="nc" id="L100">        Object msg = req.getData();</span>
+        try {
+            // handle data.
+<span class="nc" id="L103">            CompletableFuture&lt;Object&gt; future = handler.reply(channel, msg);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (future.isDone()) {</span>
+<span class="nc" id="L105">                res.setStatus(Response.OK);</span>
+<span class="nc" id="L106">                res.setResult(future.get());</span>
+<span class="nc" id="L107">                channel.send(res);</span>
+<span class="nc" id="L108">                return;</span>
+            }
+<span class="nc" id="L110">            future.whenComplete((result, t) -&gt; {</span>
+                try {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    if (t == null) {</span>
+<span class="nc" id="L113">                        res.setStatus(Response.OK);</span>
+<span class="nc" id="L114">                        res.setResult(result);</span>
+                    } else {
+<span class="nc" id="L116">                        res.setStatus(Response.SERVICE_ERROR);</span>
+<span class="nc" id="L117">                        res.setErrorMessage(StringUtils.toString(t));</span>
+                    }
+<span class="nc" id="L119">                    channel.send(res);</span>
+<span class="nc" id="L120">                } catch (RemotingException e) {</span>
+<span class="nc" id="L121">                    logger.warn(&quot;Send result to consumer failed, channel is &quot; + channel + &quot;, msg is &quot; + e);</span>
+<span class="nc" id="L122">                } finally {</span>
+                    // HeaderExchangeChannel.removeChannelIfDisconnected(channel);
+<span class="nc" id="L124">                }</span>
+<span class="nc" id="L125">            });</span>
+<span class="nc" id="L126">        } catch (Throwable e) {</span>
+<span class="nc" id="L127">            res.setStatus(Response.SERVICE_ERROR);</span>
+<span class="nc" id="L128">            res.setErrorMessage(StringUtils.toString(e));</span>
+<span class="nc" id="L129">            channel.send(res);</span>
+<span class="nc" id="L130">        }</span>
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    public void connected(Channel channel) throws RemotingException {
+<span class="nc" id="L135">        channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L136">        channel.setAttribute(KEY_WRITE_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L137">        ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);</span>
+        try {
+<span class="nc" id="L139">            handler.connected(exchangeChannel);</span>
+        } finally {
+<span class="nc" id="L141">            HeaderExchangeChannel.removeChannelIfDisconnected(channel);</span>
+        }
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public void disconnected(Channel channel) throws RemotingException {
+<span class="nc" id="L147">        channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L148">        channel.setAttribute(KEY_WRITE_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L149">        ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);</span>
+        try {
+<span class="nc" id="L151">            handler.disconnected(exchangeChannel);</span>
+        } finally {
+<span class="nc" id="L153">            DefaultFuture.closeChannel(channel);</span>
+<span class="nc" id="L154">            HeaderExchangeChannel.removeChannelIfDisconnected(channel);</span>
+        }
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    public void sent(Channel channel, Object message) throws RemotingException {
+<span class="nc" id="L160">        Throwable exception = null;</span>
+        try {
+<span class="nc" id="L162">            channel.setAttribute(KEY_WRITE_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L163">            ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);</span>
+            try {
+<span class="nc" id="L165">                handler.sent(exchangeChannel, message);</span>
+            } finally {
+<span class="nc" id="L167">                HeaderExchangeChannel.removeChannelIfDisconnected(channel);</span>
+            }
+<span class="nc" id="L169">        } catch (Throwable t) {</span>
+<span class="nc" id="L170">            exception = t;</span>
+<span class="nc" id="L171">        }</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (message instanceof Request) {</span>
+<span class="nc" id="L173">            Request request = (Request) message;</span>
+<span class="nc" id="L174">            DefaultFuture.sent(channel, request);</span>
+        }
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (exception != null) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (exception instanceof RuntimeException) {</span>
+<span class="nc" id="L178">                throw (RuntimeException) exception;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            } else if (exception instanceof RemotingException) {</span>
+<span class="nc" id="L180">                throw (RemotingException) exception;</span>
+            } else {
+<span class="nc" id="L182">                throw new RemotingException(channel.getLocalAddress(), channel.getRemoteAddress(),</span>
+<span class="nc" id="L183">                        exception.getMessage(), exception);</span>
+            }
+        }
+<span class="nc" id="L186">    }</span>
+
+    @Override
+    public void received(Channel channel, Object message) throws RemotingException {
+<span class="nc" id="L190">        channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());</span>
+<span class="nc" id="L191">        final ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);</span>
+        try {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (message instanceof Request) {</span>
+                // handle request.
+<span class="nc" id="L195">                Request request = (Request) message;</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (request.isEvent()) {</span>
+<span class="nc" id="L197">                    handlerEvent(channel, request);</span>
+                } else {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                    if (request.isTwoWay()) {</span>
+<span class="nc" id="L200">                        handleRequest(exchangeChannel, request);</span>
+                    } else {
+<span class="nc" id="L202">                        handler.received(exchangeChannel, request.getData());</span>
+                    }
+                }
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            } else if (message instanceof Response) {</span>
+<span class="nc" id="L206">                handleResponse(channel, (Response) message);</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            } else if (message instanceof String) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (isClientSide(channel)) {</span>
+<span class="nc" id="L209">                    Exception e = new Exception(&quot;Dubbo client can not supported string message: &quot; + message + &quot; in channel: &quot; + channel + &quot;, url: &quot; + channel.getUrl());</span>
+<span class="nc" id="L210">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L211">                } else {</span>
+<span class="nc" id="L212">                    String echo = handler.telnet(channel, (String) message);</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">                    if (echo != null &amp;&amp; echo.length() &gt; 0) {</span>
+<span class="nc" id="L214">                        channel.send(echo);</span>
+                    }
+<span class="nc" id="L216">                }</span>
+            } else {
+<span class="nc" id="L218">                handler.received(exchangeChannel, message);</span>
+            }
+        } finally {
+<span class="nc" id="L221">            HeaderExchangeChannel.removeChannelIfDisconnected(channel);</span>
+        }
+<span class="nc" id="L223">    }</span>
+
+    @Override
+    public void caught(Channel channel, Throwable exception) throws RemotingException {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (exception instanceof ExecutionException) {</span>
+<span class="nc" id="L228">            ExecutionException e = (ExecutionException) exception;</span>
+<span class="nc" id="L229">            Object msg = e.getRequest();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (msg instanceof Request) {</span>
+<span class="nc" id="L231">                Request req = (Request) msg;</span>
+<span class="nc bnc" id="L232" title="All 4 branches missed.">                if (req.isTwoWay() &amp;&amp; !req.isHeartbeat()) {</span>
+<span class="nc" id="L233">                    Response res = new Response(req.getId(), req.getVersion());</span>
+<span class="nc" id="L234">                    res.setStatus(Response.SERVER_ERROR);</span>
+<span class="nc" id="L235">                    res.setErrorMessage(StringUtils.toString(e));</span>
+<span class="nc" id="L236">                    channel.send(res);</span>
+<span class="nc" id="L237">                    return;</span>
+                }
+            }
+        }
+<span class="nc" id="L241">        ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);</span>
+        try {
+<span class="nc" id="L243">            handler.caught(exchangeChannel, exception);</span>
+        } finally {
+<span class="nc" id="L245">            HeaderExchangeChannel.removeChannelIfDisconnected(channel);</span>
+        }
+<span class="nc" id="L247">    }</span>
+
+    @Override
+    public ChannelHandler getHandler() {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (handler instanceof ChannelHandlerDelegate) {</span>
+<span class="nc" id="L252">            return ((ChannelHandlerDelegate) handler).getHandler();</span>
+        } else {
+<span class="nc" id="L254">            return handler;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

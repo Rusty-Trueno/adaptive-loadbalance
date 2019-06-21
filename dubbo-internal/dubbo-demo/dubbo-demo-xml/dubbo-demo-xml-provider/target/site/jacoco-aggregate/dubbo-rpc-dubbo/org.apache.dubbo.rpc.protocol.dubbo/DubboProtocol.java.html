@@ -1,0 +1,652 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">DubboProtocol.java</span></div><h1>DubboProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.config.ConfigurationUtils;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.serialize.support.SerializableClassRegistry;
+import org.apache.dubbo.common.serialize.support.SerializationOptimizer;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Transporter;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.exchange.ExchangeServer;
+import org.apache.dubbo.remoting.exchange.Exchangers;
+import org.apache.dubbo.remoting.exchange.support.ExchangeHandlerAdapter;
+import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.protocol.AbstractProtocol;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * dubbo protocol support.
+ */
+public class DubboProtocol extends AbstractProtocol {
+
+    public static final String NAME = &quot;dubbo&quot;;
+
+    public static final int DEFAULT_PORT = 20880;
+    private static final String IS_CALLBACK_SERVICE_INVOKE = &quot;_isCallBackServiceInvoke&quot;;
+    private static DubboProtocol INSTANCE;
+
+    /**
+     * &lt;host:port,Exchanger&gt;
+     */
+<span class="nc" id="L77">    private final Map&lt;String, ExchangeServer&gt; serverMap = new ConcurrentHashMap&lt;&gt;();</span>
+    /**
+     * &lt;host:port,Exchanger&gt;
+     */
+<span class="nc" id="L81">    private final Map&lt;String, List&lt;ReferenceCountExchangeClient&gt;&gt; referenceClientMap = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L82">    private final ConcurrentMap&lt;String, Object&gt; locks = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L83">    private final Set&lt;String&gt; optimizers = new ConcurrentHashSet&lt;&gt;();</span>
+    /**
+     * consumer side export a stub service for dispatching event
+     * servicekey-stubmethods
+     */
+<span class="nc" id="L88">    private final ConcurrentMap&lt;String, String&gt; stubServiceMethodsMap = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L90">    private ExchangeHandler requestHandler = new ExchangeHandlerAdapter() {</span>
+
+        @Override
+        public CompletableFuture&lt;Object&gt; reply(ExchangeChannel channel, Object message) throws RemotingException {
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (!(message instanceof Invocation)) {</span>
+<span class="nc" id="L96">                throw new RemotingException(channel, &quot;Unsupported request: &quot;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                        + (message == null ? null : (message.getClass().getName() + &quot;: &quot; + message))</span>
+<span class="nc" id="L98">                        + &quot;, channel: consumer: &quot; + channel.getRemoteAddress() + &quot; --&gt; provider: &quot; + channel.getLocalAddress());</span>
+            }
+
+<span class="nc" id="L101">            Invocation inv = (Invocation) message;</span>
+<span class="nc" id="L102">            Invoker&lt;?&gt; invoker = getInvoker(channel, inv);</span>
+            // need to consider backward-compatibility if it's a callback
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (Boolean.TRUE.toString().equals(inv.getAttachments().get(IS_CALLBACK_SERVICE_INVOKE))) {</span>
+<span class="nc" id="L105">                String methodsStr = invoker.getUrl().getParameters().get(&quot;methods&quot;);</span>
+<span class="nc" id="L106">                boolean hasMethod = false;</span>
+<span class="nc bnc" id="L107" title="All 4 branches missed.">                if (methodsStr == null || !methodsStr.contains(&quot;,&quot;)) {</span>
+<span class="nc" id="L108">                    hasMethod = inv.getMethodName().equals(methodsStr);</span>
+                } else {
+<span class="nc" id="L110">                    String[] methods = methodsStr.split(&quot;,&quot;);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                    for (String method : methods) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                        if (inv.getMethodName().equals(method)) {</span>
+<span class="nc" id="L113">                            hasMethod = true;</span>
+<span class="nc" id="L114">                            break;</span>
+                        }
+                    }
+                }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (!hasMethod) {</span>
+<span class="nc" id="L119">                    logger.warn(new IllegalStateException(&quot;The methodName &quot; + inv.getMethodName()</span>
+                            + &quot; not found in callback service interface ,invoke will be ignored.&quot;
+                            + &quot; please update the api interface. url is:&quot;
+<span class="nc" id="L122">                            + invoker.getUrl()) + &quot; ,invocation is :&quot; + inv);</span>
+<span class="nc" id="L123">                    return null;</span>
+                }
+            }
+<span class="nc" id="L126">            RpcContext rpcContext = RpcContext.getContext();</span>
+<span class="nc" id="L127">            rpcContext.setRemoteAddress(channel.getRemoteAddress());</span>
+<span class="nc" id="L128">            Result result = invoker.invoke(inv);</span>
+
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (result instanceof AsyncRpcResult) {</span>
+<span class="nc" id="L131">                return ((AsyncRpcResult) result).getResultFuture().thenApply(r -&gt; (Object) r);</span>
+
+            } else {
+<span class="nc" id="L134">                return CompletableFuture.completedFuture(result);</span>
+            }
+        }
+
+        @Override
+        public void received(Channel channel, Object message) throws RemotingException {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (message instanceof Invocation) {</span>
+<span class="nc" id="L141">                reply((ExchangeChannel) channel, message);</span>
+
+            } else {
+<span class="nc" id="L144">                super.received(channel, message);</span>
+            }
+<span class="nc" id="L146">        }</span>
+
+        @Override
+        public void connected(Channel channel) throws RemotingException {
+<span class="nc" id="L150">            invoke(channel, Constants.ON_CONNECT_KEY);</span>
+<span class="nc" id="L151">        }</span>
+
+        @Override
+        public void disconnected(Channel channel) throws RemotingException {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L156">                logger.debug(&quot;disconnected from &quot; + channel.getRemoteAddress() + &quot;,url:&quot; + channel.getUrl());</span>
+            }
+<span class="nc" id="L158">            invoke(channel, Constants.ON_DISCONNECT_KEY);</span>
+<span class="nc" id="L159">        }</span>
+
+        private void invoke(Channel channel, String methodKey) {
+<span class="nc" id="L162">            Invocation invocation = createInvocation(channel, channel.getUrl(), methodKey);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (invocation != null) {</span>
+                try {
+<span class="nc" id="L165">                    received(channel, invocation);</span>
+<span class="nc" id="L166">                } catch (Throwable t) {</span>
+<span class="nc" id="L167">                    logger.warn(&quot;Failed to invoke event method &quot; + invocation.getMethodName() + &quot;(), cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L168">                }</span>
+            }
+<span class="nc" id="L170">        }</span>
+
+        private Invocation createInvocation(Channel channel, URL url, String methodKey) {
+<span class="nc" id="L173">            String method = url.getParameter(methodKey);</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            if (method == null || method.length() == 0) {</span>
+<span class="nc" id="L175">                return null;</span>
+            }
+
+<span class="nc" id="L178">            RpcInvocation invocation = new RpcInvocation(method, new Class&lt;?&gt;[0], new Object[0]);</span>
+<span class="nc" id="L179">            invocation.setAttachment(Constants.PATH_KEY, url.getPath());</span>
+<span class="nc" id="L180">            invocation.setAttachment(Constants.GROUP_KEY, url.getParameter(Constants.GROUP_KEY));</span>
+<span class="nc" id="L181">            invocation.setAttachment(Constants.INTERFACE_KEY, url.getParameter(Constants.INTERFACE_KEY));</span>
+<span class="nc" id="L182">            invocation.setAttachment(Constants.VERSION_KEY, url.getParameter(Constants.VERSION_KEY));</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (url.getParameter(Constants.STUB_EVENT_KEY, false)) {</span>
+<span class="nc" id="L184">                invocation.setAttachment(Constants.STUB_EVENT_KEY, Boolean.TRUE.toString());</span>
+            }
+
+<span class="nc" id="L187">            return invocation;</span>
+        }
+    };
+
+<span class="nc" id="L191">    public DubboProtocol() {</span>
+<span class="nc" id="L192">        INSTANCE = this;</span>
+<span class="nc" id="L193">    }</span>
+
+    public static DubboProtocol getDubboProtocol() {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (INSTANCE == null) {</span>
+            // load
+<span class="nc" id="L198">            ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(DubboProtocol.NAME);</span>
+        }
+
+<span class="nc" id="L201">        return INSTANCE;</span>
+    }
+
+    public Collection&lt;ExchangeServer&gt; getServers() {
+<span class="nc" id="L205">        return Collections.unmodifiableCollection(serverMap.values());</span>
+    }
+
+    public Collection&lt;Exporter&lt;?&gt;&gt; getExporters() {
+<span class="nc" id="L209">        return Collections.unmodifiableCollection(exporterMap.values());</span>
+    }
+
+    Map&lt;String, Exporter&lt;?&gt;&gt; getExporterMap() {
+<span class="nc" id="L213">        return exporterMap;</span>
+    }
+
+    private boolean isClientSide(Channel channel) {
+<span class="nc" id="L217">        InetSocketAddress address = channel.getRemoteAddress();</span>
+<span class="nc" id="L218">        URL url = channel.getUrl();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        return url.getPort() == address.getPort() &amp;&amp;</span>
+<span class="nc" id="L220">                NetUtils.filterLocalHost(channel.getUrl().getIp())</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                        .equals(NetUtils.filterLocalHost(address.getAddress().getHostAddress()));</span>
+    }
+
+    Invoker&lt;?&gt; getInvoker(Channel channel, Invocation inv) throws RemotingException {
+<span class="nc" id="L225">        boolean isCallBackServiceInvoke = false;</span>
+<span class="nc" id="L226">        boolean isStubServiceInvoke = false;</span>
+<span class="nc" id="L227">        int port = channel.getLocalAddress().getPort();</span>
+<span class="nc" id="L228">        String path = inv.getAttachments().get(Constants.PATH_KEY);</span>
+
+        // if it's callback service on client side
+<span class="nc" id="L231">        isStubServiceInvoke = Boolean.TRUE.toString().equals(inv.getAttachments().get(Constants.STUB_EVENT_KEY));</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (isStubServiceInvoke) {</span>
+<span class="nc" id="L233">            port = channel.getRemoteAddress().getPort();</span>
+        }
+
+        //callback
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        isCallBackServiceInvoke = isClientSide(channel) &amp;&amp; !isStubServiceInvoke;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (isCallBackServiceInvoke) {</span>
+<span class="nc" id="L239">            path += &quot;.&quot; + inv.getAttachments().get(Constants.CALLBACK_SERVICE_KEY);</span>
+<span class="nc" id="L240">            inv.getAttachments().put(IS_CALLBACK_SERVICE_INVOKE, Boolean.TRUE.toString());</span>
+        }
+
+<span class="nc" id="L243">        String serviceKey = serviceKey(port, path, inv.getAttachments().get(Constants.VERSION_KEY), inv.getAttachments().get(Constants.GROUP_KEY));</span>
+<span class="nc" id="L244">        DubboExporter&lt;?&gt; exporter = (DubboExporter&lt;?&gt;) exporterMap.get(serviceKey);</span>
+
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (exporter == null) {</span>
+<span class="nc" id="L247">            throw new RemotingException(channel, &quot;Not found exported service: &quot; + serviceKey + &quot; in &quot; + exporterMap.keySet() + &quot;, may be version or group mismatch &quot; +</span>
+<span class="nc" id="L248">                    &quot;, channel: consumer: &quot; + channel.getRemoteAddress() + &quot; --&gt; provider: &quot; + channel.getLocalAddress() + &quot;, message:&quot; + inv);</span>
+        }
+
+<span class="nc" id="L251">        return exporter.getInvoker();</span>
+    }
+
+    public Collection&lt;Invoker&lt;?&gt;&gt; getInvokers() {
+<span class="nc" id="L255">        return Collections.unmodifiableCollection(invokers);</span>
+    }
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L260">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc" id="L265">        URL url = invoker.getUrl();</span>
+
+        // export service.
+<span class="nc" id="L268">        String key = serviceKey(url);</span>
+<span class="nc" id="L269">        DubboExporter&lt;T&gt; exporter = new DubboExporter&lt;T&gt;(invoker, key, exporterMap);</span>
+<span class="nc" id="L270">        exporterMap.put(key, exporter);</span>
+
+        //export an stub service for dispatching event
+<span class="nc" id="L273">        Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY, Constants.DEFAULT_STUB_EVENT);</span>
+<span class="nc" id="L274">        Boolean isCallbackservice = url.getParameter(Constants.IS_CALLBACK_SERVICE, false);</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">        if (isStubSupportEvent &amp;&amp; !isCallbackservice) {</span>
+<span class="nc" id="L276">            String stubServiceMethods = url.getParameter(Constants.STUB_EVENT_METHODS_KEY);</span>
+<span class="nc bnc" id="L277" title="All 4 branches missed.">            if (stubServiceMethods == null || stubServiceMethods.length() == 0) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L279">                    logger.warn(new IllegalStateException(&quot;consumer [&quot; + url.getParameter(Constants.INTERFACE_KEY) +</span>
+                            &quot;], has set stubproxy support event ,but no stub methods founded.&quot;));
+                }
+
+            } else {
+<span class="nc" id="L284">                stubServiceMethodsMap.put(url.getServiceKey(), stubServiceMethods);</span>
+            }
+        }
+
+<span class="nc" id="L288">        openServer(url);</span>
+<span class="nc" id="L289">        optimizeSerialization(url);</span>
+
+<span class="nc" id="L291">        return exporter;</span>
+    }
+
+    private void openServer(URL url) {
+        // find server.
+<span class="nc" id="L296">        String key = url.getAddress();</span>
+        //client can export a service which's only for server to invoke
+<span class="nc" id="L298">        boolean isServer = url.getParameter(Constants.IS_SERVER_KEY, true);</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (isServer) {</span>
+<span class="nc" id="L300">            ExchangeServer server = serverMap.get(key);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            if (server == null) {</span>
+<span class="nc" id="L302">                synchronized (this) {</span>
+<span class="nc" id="L303">                    server = serverMap.get(key);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                    if (server == null) {</span>
+<span class="nc" id="L305">                        serverMap.put(key, createServer(url));</span>
+                    }
+<span class="nc" id="L307">                }</span>
+            } else {
+                // server supports reset, use together with override
+<span class="nc" id="L310">                server.reset(url);</span>
+            }
+        }
+<span class="nc" id="L313">    }</span>
+
+    private ExchangeServer createServer(URL url) {
+<span class="nc" id="L316">        url = URLBuilder.from(url)</span>
+                // send readonly event when server closes, it's enabled by default
+<span class="nc" id="L318">                .addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString())</span>
+                // enable heartbeat by default
+<span class="nc" id="L320">                .addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT))</span>
+<span class="nc" id="L321">                .addParameter(Constants.CODEC_KEY, DubboCodec.NAME)</span>
+<span class="nc" id="L322">                .build();</span>
+<span class="nc" id="L323">        String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);</span>
+
+<span class="nc bnc" id="L325" title="All 6 branches missed.">        if (str != null &amp;&amp; str.length() &gt; 0 &amp;&amp; !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {</span>
+<span class="nc" id="L326">            throw new RpcException(&quot;Unsupported server type: &quot; + str + &quot;, url: &quot; + url);</span>
+        }
+
+        ExchangeServer server;
+        try {
+<span class="nc" id="L331">            server = Exchangers.bind(url, requestHandler);</span>
+<span class="nc" id="L332">        } catch (RemotingException e) {</span>
+<span class="nc" id="L333">            throw new RpcException(&quot;Fail to start server(url: &quot; + url + &quot;) &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L334">        }</span>
+
+<span class="nc" id="L336">        str = url.getParameter(Constants.CLIENT_KEY);</span>
+<span class="nc bnc" id="L337" title="All 4 branches missed.">        if (str != null &amp;&amp; str.length() &gt; 0) {</span>
+<span class="nc" id="L338">            Set&lt;String&gt; supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">            if (!supportedTypes.contains(str)) {</span>
+<span class="nc" id="L340">                throw new RpcException(&quot;Unsupported client type: &quot; + str);</span>
+            }
+        }
+
+<span class="nc" id="L344">        return server;</span>
+    }
+
+    private void optimizeSerialization(URL url) throws RpcException {
+<span class="nc" id="L348">        String className = url.getParameter(Constants.OPTIMIZER_KEY, &quot;&quot;);</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">        if (StringUtils.isEmpty(className) || optimizers.contains(className)) {</span>
+<span class="nc" id="L350">            return;</span>
+        }
+
+<span class="nc" id="L353">        logger.info(&quot;Optimizing the serialization process for Kryo, FST, etc...&quot;);</span>
+
+        try {
+<span class="nc" id="L356">            Class clazz = Thread.currentThread().getContextClassLoader().loadClass(className);</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (!SerializationOptimizer.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L358">                throw new RpcException(&quot;The serialization optimizer &quot; + className + &quot; isn't an instance of &quot; + SerializationOptimizer.class.getName());</span>
+            }
+
+<span class="nc" id="L361">            SerializationOptimizer optimizer = (SerializationOptimizer) clazz.newInstance();</span>
+
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (optimizer.getSerializableClasses() == null) {</span>
+<span class="nc" id="L364">                return;</span>
+            }
+
+<span class="nc bnc" id="L367" title="All 2 branches missed.">            for (Class c : optimizer.getSerializableClasses()) {</span>
+<span class="nc" id="L368">                SerializableClassRegistry.registerClass(c);</span>
+<span class="nc" id="L369">            }</span>
+
+<span class="nc" id="L371">            optimizers.add(className);</span>
+
+<span class="nc" id="L373">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L374">            throw new RpcException(&quot;Cannot find the serialization optimizer class: &quot; + className, e);</span>
+
+<span class="nc" id="L376">        } catch (InstantiationException e) {</span>
+<span class="nc" id="L377">            throw new RpcException(&quot;Cannot instantiate the serialization optimizer class: &quot; + className, e);</span>
+
+<span class="nc" id="L379">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L380">            throw new RpcException(&quot;Cannot instantiate the serialization optimizer class: &quot; + className, e);</span>
+<span class="nc" id="L381">        }</span>
+<span class="nc" id="L382">    }</span>
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(Class&lt;T&gt; serviceType, URL url) throws RpcException {
+<span class="nc" id="L386">        optimizeSerialization(url);</span>
+
+        // create rpc invoker.
+<span class="nc" id="L389">        DubboInvoker&lt;T&gt; invoker = new DubboInvoker&lt;T&gt;(serviceType, url, getClients(url), invokers);</span>
+<span class="nc" id="L390">        invokers.add(invoker);</span>
+
+<span class="nc" id="L392">        return invoker;</span>
+    }
+
+    private ExchangeClient[] getClients(URL url) {
+        // whether to share connection
+
+<span class="nc" id="L398">        boolean useShareConnect = false;</span>
+
+<span class="nc" id="L400">        int connections = url.getParameter(Constants.CONNECTIONS_KEY, 0);</span>
+<span class="nc" id="L401">        List&lt;ReferenceCountExchangeClient&gt; shareClients = null;</span>
+        // if not configured, connection is shared, otherwise, one connection for one service
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (connections == 0) {</span>
+<span class="nc" id="L404">            useShareConnect = true;</span>
+
+            /**
+             * The xml configuration should have a higher priority than properties.
+             */
+<span class="nc" id="L409">            String shareConnectionsStr = url.getParameter(Constants.SHARE_CONNECTIONS_KEY, (String) null);</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">            connections = Integer.parseInt(StringUtils.isBlank(shareConnectionsStr) ? ConfigUtils.getProperty(Constants.SHARE_CONNECTIONS_KEY,</span>
+<span class="nc" id="L411">                    Constants.DEFAULT_SHARE_CONNECTIONS) : shareConnectionsStr);</span>
+<span class="nc" id="L412">            shareClients = getSharedClient(url, connections);</span>
+        }
+
+<span class="nc" id="L415">        ExchangeClient[] clients = new ExchangeClient[connections];</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        for (int i = 0; i &lt; clients.length; i++) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            if (useShareConnect) {</span>
+<span class="nc" id="L418">                clients[i] = shareClients.get(i);</span>
+
+            } else {
+<span class="nc" id="L421">                clients[i] = initClient(url);</span>
+            }
+        }
+
+<span class="nc" id="L425">        return clients;</span>
+    }
+
+    /**
+     * Get shared connection
+     *
+     * @param url
+     * @param connectNum connectNum must be greater than or equal to 1
+     */
+    private List&lt;ReferenceCountExchangeClient&gt; getSharedClient(URL url, int connectNum) {
+<span class="nc" id="L435">        String key = url.getAddress();</span>
+<span class="nc" id="L436">        List&lt;ReferenceCountExchangeClient&gt; clients = referenceClientMap.get(key);</span>
+
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (checkClientCanUse(clients)) {</span>
+<span class="nc" id="L439">            batchClientRefIncr(clients);</span>
+<span class="nc" id="L440">            return clients;</span>
+        }
+
+<span class="nc" id="L443">        locks.putIfAbsent(key, new Object());</span>
+<span class="nc" id="L444">        synchronized (locks.get(key)) {</span>
+<span class="nc" id="L445">            clients = referenceClientMap.get(key);</span>
+            // dubbo check
+<span class="nc bnc" id="L447" title="All 2 branches missed.">            if (checkClientCanUse(clients)) {</span>
+<span class="nc" id="L448">                batchClientRefIncr(clients);</span>
+<span class="nc" id="L449">                return clients;</span>
+            }
+
+            // connectNum must be greater than or equal to 1
+<span class="nc" id="L453">            connectNum = Math.max(connectNum, 1);</span>
+
+            // If the clients is empty, then the first initialization is
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            if (CollectionUtils.isEmpty(clients)) {</span>
+<span class="nc" id="L457">                clients = buildReferenceCountExchangeClientList(url, connectNum);</span>
+<span class="nc" id="L458">                referenceClientMap.put(key, clients);</span>
+
+            } else {
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                for (int i = 0; i &lt; clients.size(); i++) {</span>
+<span class="nc" id="L462">                    ReferenceCountExchangeClient referenceCountExchangeClient = clients.get(i);</span>
+                    // If there is a client in the list that is no longer available, create a new one to replace him.
+<span class="nc bnc" id="L464" title="All 4 branches missed.">                    if (referenceCountExchangeClient == null || referenceCountExchangeClient.isClosed()) {</span>
+<span class="nc" id="L465">                        clients.set(i, buildReferenceCountExchangeClient(url));</span>
+<span class="nc" id="L466">                        continue;</span>
+                    }
+
+<span class="nc" id="L469">                    referenceCountExchangeClient.incrementAndGetCount();</span>
+                }
+            }
+
+            /**
+             * I understand that the purpose of the remove operation here is to avoid the expired url key
+             * always occupying this memory space.
+             */
+<span class="nc" id="L477">            locks.remove(key);</span>
+
+<span class="nc" id="L479">            return clients;</span>
+        }
+    }
+
+    /**
+     * Check if the client list is all available
+     *
+     * @param referenceCountExchangeClients
+     * @return true-available，false-unavailable
+     */
+    private boolean checkClientCanUse(List&lt;ReferenceCountExchangeClient&gt; referenceCountExchangeClients) {
+<span class="nc bnc" id="L490" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(referenceCountExchangeClients)) {</span>
+<span class="nc" id="L491">            return false;</span>
+        }
+
+<span class="nc bnc" id="L494" title="All 2 branches missed.">        for (ReferenceCountExchangeClient referenceCountExchangeClient : referenceCountExchangeClients) {</span>
+            // As long as one client is not available, you need to replace the unavailable client with the available one.
+<span class="nc bnc" id="L496" title="All 4 branches missed.">            if (referenceCountExchangeClient == null || referenceCountExchangeClient.isClosed()) {</span>
+<span class="nc" id="L497">                return false;</span>
+            }
+<span class="nc" id="L499">        }</span>
+
+<span class="nc" id="L501">        return true;</span>
+    }
+
+    /**
+     * Add client references in bulk
+     *
+     * @param referenceCountExchangeClients
+     */
+    private void batchClientRefIncr(List&lt;ReferenceCountExchangeClient&gt; referenceCountExchangeClients) {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(referenceCountExchangeClients)) {</span>
+<span class="nc" id="L511">            return;</span>
+        }
+
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        for (ReferenceCountExchangeClient referenceCountExchangeClient : referenceCountExchangeClients) {</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">            if (referenceCountExchangeClient != null) {</span>
+<span class="nc" id="L516">                referenceCountExchangeClient.incrementAndGetCount();</span>
+            }
+<span class="nc" id="L518">        }</span>
+<span class="nc" id="L519">    }</span>
+
+    /**
+     * Bulk build client
+     *
+     * @param url
+     * @param connectNum
+     * @return
+     */
+    private List&lt;ReferenceCountExchangeClient&gt; buildReferenceCountExchangeClientList(URL url, int connectNum) {
+<span class="nc" id="L529">        List&lt;ReferenceCountExchangeClient&gt; clients = new CopyOnWriteArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        for (int i = 0; i &lt; connectNum; i++) {</span>
+<span class="nc" id="L532">            clients.add(buildReferenceCountExchangeClient(url));</span>
+        }
+
+<span class="nc" id="L535">        return clients;</span>
+    }
+
+    /**
+     * Build a single client
+     *
+     * @param url
+     * @return
+     */
+    private ReferenceCountExchangeClient buildReferenceCountExchangeClient(URL url) {
+<span class="nc" id="L545">        ExchangeClient exchangeClient = initClient(url);</span>
+
+<span class="nc" id="L547">        return new ReferenceCountExchangeClient(exchangeClient);</span>
+    }
+
+    /**
+     * Create new connection
+     *
+     * @param url
+     */
+    private ExchangeClient initClient(URL url) {
+
+        // client type setting.
+<span class="nc" id="L558">        String str = url.getParameter(Constants.CLIENT_KEY, url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_CLIENT));</span>
+
+<span class="nc" id="L560">        url = url.addParameter(Constants.CODEC_KEY, DubboCodec.NAME);</span>
+        // enable heartbeat by default
+<span class="nc" id="L562">        url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));</span>
+
+        // BIO is not allowed since it has severe performance issue.
+<span class="nc bnc" id="L565" title="All 6 branches missed.">        if (str != null &amp;&amp; str.length() &gt; 0 &amp;&amp; !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {</span>
+<span class="nc" id="L566">            throw new RpcException(&quot;Unsupported client type: &quot; + str + &quot;,&quot; +</span>
+<span class="nc" id="L567">                    &quot; supported client type is &quot; + StringUtils.join(ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions(), &quot; &quot;));</span>
+        }
+
+        ExchangeClient client;
+        try {
+            // connection should be lazy
+<span class="nc bnc" id="L573" title="All 2 branches missed.">            if (url.getParameter(Constants.LAZY_CONNECT_KEY, false)) {</span>
+<span class="nc" id="L574">                client = new LazyConnectExchangeClient(url, requestHandler);</span>
+
+            } else {
+<span class="nc" id="L577">                client = Exchangers.connect(url, requestHandler);</span>
+            }
+
+<span class="nc" id="L580">        } catch (RemotingException e) {</span>
+<span class="nc" id="L581">            throw new RpcException(&quot;Fail to create remoting client for service(&quot; + url + &quot;): &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L582">        }</span>
+
+<span class="nc" id="L584">        return client;</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc bnc" id="L589" title="All 2 branches missed.">        for (String key : new ArrayList&lt;&gt;(serverMap.keySet())) {</span>
+<span class="nc" id="L590">            ExchangeServer server = serverMap.remove(key);</span>
+
+<span class="nc bnc" id="L592" title="All 2 branches missed.">            if (server == null) {</span>
+<span class="nc" id="L593">                continue;</span>
+            }
+
+            try {
+<span class="nc bnc" id="L597" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L598">                    logger.info(&quot;Close dubbo server: &quot; + server.getLocalAddress());</span>
+                }
+
+<span class="nc" id="L601">                server.close(ConfigurationUtils.getServerShutdownTimeout());</span>
+
+<span class="nc" id="L603">            } catch (Throwable t) {</span>
+<span class="nc" id="L604">                logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L605">            }</span>
+<span class="nc" id="L606">        }</span>
+
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        for (String key : new ArrayList&lt;&gt;(referenceClientMap.keySet())) {</span>
+<span class="nc" id="L609">            List&lt;ReferenceCountExchangeClient&gt; clients = referenceClientMap.remove(key);</span>
+
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            if (CollectionUtils.isEmpty(clients)) {</span>
+<span class="nc" id="L612">                continue;</span>
+            }
+
+<span class="nc bnc" id="L615" title="All 2 branches missed.">            for (ReferenceCountExchangeClient client : clients) {</span>
+<span class="nc" id="L616">                closeReferenceCountExchangeClient(client);</span>
+<span class="nc" id="L617">            }</span>
+<span class="nc" id="L618">        }</span>
+
+<span class="nc" id="L620">        stubServiceMethodsMap.clear();</span>
+<span class="nc" id="L621">        super.destroy();</span>
+<span class="nc" id="L622">    }</span>
+
+    /**
+     * close ReferenceCountExchangeClient
+     *
+     * @param client
+     */
+    private void closeReferenceCountExchangeClient(ReferenceCountExchangeClient client) {
+<span class="nc bnc" id="L630" title="All 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L631">            return;</span>
+        }
+
+        try {
+<span class="nc bnc" id="L635" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L636">                logger.info(&quot;Close dubbo connect: &quot; + client.getLocalAddress() + &quot;--&gt;&quot; + client.getRemoteAddress());</span>
+            }
+
+<span class="nc" id="L639">            client.close(ConfigurationUtils.getServerShutdownTimeout());</span>
+
+            // TODO
+            /**
+             * At this time, ReferenceCountExchangeClient#client has been replaced with LazyConnectExchangeClient.
+             * Do you need to call client.close again to ensure that LazyConnectExchangeClient is also closed?
+             */
+
+<span class="nc" id="L647">        } catch (Throwable t) {</span>
+<span class="nc" id="L648">            logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L649">        }</span>
+<span class="nc" id="L650">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AdaptiveClassCodeGenerator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.extension</a> &gt; <span class="el_source">AdaptiveClassCodeGenerator.java</span></div><h1>AdaptiveClassCodeGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.extension;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+
+/**
+ * Code generator for Adaptive class
+ */
+public class AdaptiveClassCodeGenerator {
+    
+<span class="nc" id="L36">    private static final Logger logger = LoggerFactory.getLogger(AdaptiveClassCodeGenerator.class);</span>
+
+    private static final String CLASSNAME_INVOCATION = &quot;org.apache.dubbo.rpc.Invocation&quot;;
+    
+    private static final String CODE_PACKAGE = &quot;package %s;\n&quot;;
+    
+    private static final String CODE_IMPORTS = &quot;import %s;\n&quot;;
+    
+    private static final String CODE_CLASS_DECLARATION = &quot;public class %s$Adaptive implements %s {\n&quot;;
+    
+    private static final String CODE_METHOD_DECLARATION = &quot;public %s %s(%s) %s {\n%s}\n&quot;;
+    
+    private static final String CODE_METHOD_ARGUMENT = &quot;%s arg%d&quot;;
+    
+    private static final String CODE_METHOD_THROWS = &quot;throws %s&quot;;
+    
+    private static final String CODE_UNSUPPORTED = &quot;throw new UnsupportedOperationException(\&quot;The method %s of interface %s is not adaptive method!\&quot;);\n&quot;;
+    
+    private static final String CODE_URL_NULL_CHECK = &quot;if (arg%d == null) throw new IllegalArgumentException(\&quot;url == null\&quot;);\n%s url = arg%d;\n&quot;;
+    
+    private static final String CODE_EXT_NAME_ASSIGNMENT = &quot;String extName = %s;\n&quot;;
+    
+    private static final String CODE_EXT_NAME_NULL_CHECK = &quot;if(extName == null) &quot;
+                    + &quot;throw new IllegalStateException(\&quot;Failed to get extension (%s) name from url (\&quot; + url.toString() + \&quot;) use keys(%s)\&quot;);\n&quot;;
+    
+    private static final String CODE_INVOCATION_ARGUMENT_NULL_CHECK = &quot;if (arg%d == null) throw new IllegalArgumentException(\&quot;invocation == null\&quot;); &quot;
+                    + &quot;String methodName = arg%d.getMethodName();\n&quot;;
+    
+    
+    private static final String CODE_EXTENSION_ASSIGNMENT = &quot;%s extension = (%&lt;s)%s.getExtensionLoader(%s.class).getExtension(extName);\n&quot;;
+    
+    private final Class&lt;?&gt; type;
+    
+    private String defaultExtName;
+    
+<span class="nc" id="L71">    public AdaptiveClassCodeGenerator(Class&lt;?&gt; type, String defaultExtName) {</span>
+<span class="nc" id="L72">        this.type = type;</span>
+<span class="nc" id="L73">        this.defaultExtName = defaultExtName;</span>
+<span class="nc" id="L74">    }</span>
+    
+    /**
+     * test if given type has at least one method annotated with &lt;code&gt;SPI&lt;/code&gt;
+     */
+    private boolean hasAdaptiveMethod() {
+<span class="nc" id="L80">        return Arrays.stream(type.getMethods()).anyMatch(m -&gt; m.isAnnotationPresent(Adaptive.class));</span>
+    }
+    
+    /**
+     * generate and return class code
+     */
+    public String generate() {
+        // no need to generate adaptive class since there's no adaptive method found.
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (!hasAdaptiveMethod()) {</span>
+<span class="nc" id="L89">            throw new IllegalStateException(&quot;No adaptive method exist on extension &quot; + type.getName() + &quot;, refuse to create the adaptive class!&quot;);</span>
+        }
+
+<span class="nc" id="L92">        StringBuilder code = new StringBuilder();</span>
+<span class="nc" id="L93">        code.append(generatePackageInfo());</span>
+<span class="nc" id="L94">        code.append(generateImports());</span>
+<span class="nc" id="L95">        code.append(generateClassDeclaration());</span>
+        
+<span class="nc" id="L97">        Method[] methods = type.getMethods();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc" id="L99">            code.append(generateMethod(method));</span>
+        }
+<span class="nc" id="L101">        code.append(&quot;}&quot;);</span>
+        
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L104">            logger.debug(code.toString());</span>
+        }
+<span class="nc" id="L106">        return code.toString();</span>
+    }
+
+    /**
+     * generate package info
+     */
+    private String generatePackageInfo() {
+<span class="nc" id="L113">        return String.format(CODE_PACKAGE, type.getPackage().getName());</span>
+    }
+
+    /**
+     * generate imports
+     */
+    private String generateImports() {
+<span class="nc" id="L120">        return String.format(CODE_IMPORTS, ExtensionLoader.class.getName());</span>
+    }
+
+    /**
+     * generate class declaration
+     */
+    private String generateClassDeclaration() {
+<span class="nc" id="L127">        return String.format(CODE_CLASS_DECLARATION, type.getSimpleName(), type.getCanonicalName());</span>
+    }
+    
+    /**
+     * generate method not annotated with Adaptive with throwing unsupported exception 
+     */
+    private String generateUnsupported(Method method) {
+<span class="nc" id="L134">        return String.format(CODE_UNSUPPORTED, method, type.getName());</span>
+    }
+    
+    /**
+     * get index of parameter with type URL
+     */
+    private int getUrlTypeIndex(Method method) {            
+<span class="nc" id="L141">        int urlTypeIndex = -1;</span>
+<span class="nc" id="L142">        Class&lt;?&gt;[] pts = method.getParameterTypes();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        for (int i = 0; i &lt; pts.length; ++i) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (pts[i].equals(URL.class)) {</span>
+<span class="nc" id="L145">                urlTypeIndex = i;</span>
+<span class="nc" id="L146">                break;</span>
+            }
+        }
+<span class="nc" id="L149">        return urlTypeIndex;</span>
+    }
+    
+    /**
+     * generate method declaration
+     */
+    private String generateMethod(Method method) {
+<span class="nc" id="L156">        String methodReturnType = method.getReturnType().getCanonicalName();</span>
+<span class="nc" id="L157">        String methodName = method.getName();</span>
+<span class="nc" id="L158">        String methodContent = generateMethodContent(method);</span>
+<span class="nc" id="L159">        String methodArgs = generateMethodArguments(method);</span>
+<span class="nc" id="L160">        String methodThrows = generateMethodThrows(method);</span>
+<span class="nc" id="L161">        return String.format(CODE_METHOD_DECLARATION, methodReturnType, methodName, methodArgs, methodThrows, methodContent);</span>
+    }
+
+    /**
+     * generate method arguments
+     */
+    private String generateMethodArguments(Method method) {
+<span class="nc" id="L168">        Class&lt;?&gt;[] pts = method.getParameterTypes();</span>
+<span class="nc" id="L169">        return IntStream.range(0, pts.length)</span>
+<span class="nc" id="L170">                        .mapToObj(i -&gt; String.format(CODE_METHOD_ARGUMENT, pts[i].getCanonicalName(), i))</span>
+<span class="nc" id="L171">                        .collect(Collectors.joining(&quot;, &quot;));</span>
+    }
+    
+    /**
+     * generate method throws 
+     */
+    private String generateMethodThrows(Method method) {
+<span class="nc" id="L178">        Class&lt;?&gt;[] ets = method.getExceptionTypes();</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (ets.length &gt; 0) {</span>
+<span class="nc" id="L180">            String list = Arrays.stream(ets).map(Class::getCanonicalName).collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="nc" id="L181">            return String.format(CODE_METHOD_THROWS, list);</span>
+        } else {
+<span class="nc" id="L183">            return &quot;&quot;;</span>
+        }
+    }
+    
+    /**
+     * generate method URL argument null check 
+     */
+    private String generateUrlNullCheck(int index) {
+<span class="nc" id="L191">        return String.format(CODE_URL_NULL_CHECK, index, URL.class.getName(), index);</span>
+    }
+    
+    /**
+     * generate method content
+     */
+    private String generateMethodContent(Method method) {
+<span class="nc" id="L198">        Adaptive adaptiveAnnotation = method.getAnnotation(Adaptive.class);</span>
+<span class="nc" id="L199">        StringBuilder code = new StringBuilder(512);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (adaptiveAnnotation == null) {</span>
+<span class="nc" id="L201">            return generateUnsupported(method);</span>
+        } else {
+<span class="nc" id="L203">            int urlTypeIndex = getUrlTypeIndex(method);</span>
+            
+            // found parameter in URL type
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (urlTypeIndex != -1) {</span>
+                // Null Point check
+<span class="nc" id="L208">                code.append(generateUrlNullCheck(urlTypeIndex));</span>
+            } else {
+                // did not find parameter in URL type
+<span class="nc" id="L211">                code.append(generateUrlAssignmentIndirectly(method));</span>
+            }
+
+<span class="nc" id="L214">            String[] value = getMethodAdaptiveValue(adaptiveAnnotation);</span>
+
+<span class="nc" id="L216">            boolean hasInvocation = hasInvocationArgument(method);</span>
+            
+<span class="nc" id="L218">            code.append(generateInvocationArgumentNullCheck(method));</span>
+            
+<span class="nc" id="L220">            code.append(generateExtNameAssignment(value, hasInvocation));</span>
+            // check extName == null?
+<span class="nc" id="L222">            code.append(generateExtNameNullCheck(value));</span>
+            
+<span class="nc" id="L224">            code.append(generateExtensionAssignment());</span>
+
+            // return statement
+<span class="nc" id="L227">            code.append(generateReturnAndInvocation(method));</span>
+        }
+        
+<span class="nc" id="L230">        return code.toString();</span>
+    }
+
+    /**
+     * generate code for variable extName null check
+     */
+    private String generateExtNameNullCheck(String[] value) {
+<span class="nc" id="L237">        return String.format(CODE_EXT_NAME_NULL_CHECK, type.getName(), Arrays.toString(value));</span>
+    }
+
+    /**
+     * generate extName assigment code
+     */
+    private String generateExtNameAssignment(String[] value, boolean hasInvocation) {
+        // TODO: refactor it
+<span class="nc" id="L245">        String getNameCode = null;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        for (int i = value.length - 1; i &gt;= 0; --i) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (i == value.length - 1) {</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                if (null != defaultExtName) {</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                    if (!&quot;protocol&quot;.equals(value[i])) {</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                        if (hasInvocation) {</span>
+<span class="nc" id="L251">                            getNameCode = String.format(&quot;url.getMethodParameter(methodName, \&quot;%s\&quot;, \&quot;%s\&quot;)&quot;, value[i], defaultExtName);</span>
+                        } else {
+<span class="nc" id="L253">                            getNameCode = String.format(&quot;url.getParameter(\&quot;%s\&quot;, \&quot;%s\&quot;)&quot;, value[i], defaultExtName);</span>
+                        }
+                    } else {
+<span class="nc" id="L256">                        getNameCode = String.format(&quot;( url.getProtocol() == null ? \&quot;%s\&quot; : url.getProtocol() )&quot;, defaultExtName);</span>
+                    }
+                } else {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                    if (!&quot;protocol&quot;.equals(value[i])) {</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                        if (hasInvocation) {</span>
+<span class="nc" id="L261">                            getNameCode = String.format(&quot;url.getMethodParameter(methodName, \&quot;%s\&quot;, \&quot;%s\&quot;)&quot;, value[i], defaultExtName);</span>
+                        } else {
+<span class="nc" id="L263">                            getNameCode = String.format(&quot;url.getParameter(\&quot;%s\&quot;)&quot;, value[i]);</span>
+                        }
+                    } else {
+<span class="nc" id="L266">                        getNameCode = &quot;url.getProtocol()&quot;;</span>
+                    }
+                }
+            } else {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                if (!&quot;protocol&quot;.equals(value[i])) {</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                    if (hasInvocation) {</span>
+<span class="nc" id="L272">                        getNameCode = String.format(&quot;url.getMethodParameter(methodName, \&quot;%s\&quot;, \&quot;%s\&quot;)&quot;, value[i], defaultExtName);</span>
+                    } else {
+<span class="nc" id="L274">                        getNameCode = String.format(&quot;url.getParameter(\&quot;%s\&quot;, %s)&quot;, value[i], getNameCode);</span>
+                    }
+                } else {
+<span class="nc" id="L277">                    getNameCode = String.format(&quot;url.getProtocol() == null ? (%s) : url.getProtocol()&quot;, getNameCode);</span>
+                }
+            }
+        }
+        
+<span class="nc" id="L282">        return String.format(CODE_EXT_NAME_ASSIGNMENT, getNameCode);</span>
+    }
+
+    /**
+     * @return
+     */
+    private String generateExtensionAssignment() {
+<span class="nc" id="L289">        return String.format(CODE_EXTENSION_ASSIGNMENT, type.getName(), ExtensionLoader.class.getSimpleName(), type.getName());</span>
+    }
+
+    /**
+     * generate method invocation statement and return it if necessary
+     */
+    private String generateReturnAndInvocation(Method method) {
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        String returnStatement = method.getReturnType().equals(void.class) ? &quot;&quot; : &quot;return &quot;;</span>
+        
+<span class="nc" id="L298">        String args = Arrays.stream(method.getParameters()).map(Parameter::getName).collect(Collectors.joining(&quot;, &quot;));</span>
+
+<span class="nc" id="L300">        return returnStatement + String.format(&quot;extension.%s(%s);\n&quot;, method.getName(), args);</span>
+    }
+    
+    /**
+     * test if method has argument of type &lt;code&gt;Invocation&lt;/code&gt;
+     */
+    private boolean hasInvocationArgument(Method method) {
+<span class="nc" id="L307">        Class&lt;?&gt;[] pts = method.getParameterTypes();</span>
+<span class="nc" id="L308">        return Arrays.stream(pts).anyMatch(p -&gt; CLASSNAME_INVOCATION.equals(p.getName()));</span>
+    }
+    
+    /**
+     * generate code to test argument of type &lt;code&gt;Invocation&lt;/code&gt; is null
+     */
+    private String generateInvocationArgumentNullCheck(Method method) {
+<span class="nc" id="L315">        Class&lt;?&gt;[] pts = method.getParameterTypes();</span>
+<span class="nc" id="L316">        return IntStream.range(0, pts.length).filter(i -&gt; CLASSNAME_INVOCATION.equals(pts[i].getName()))</span>
+<span class="nc" id="L317">                        .mapToObj(i -&gt; String.format(CODE_INVOCATION_ARGUMENT_NULL_CHECK, i, i))</span>
+<span class="nc" id="L318">                        .findFirst().orElse(&quot;&quot;);</span>
+    }
+
+    /**
+     * get value of adaptive annotation or if empty return splitted simple name
+     */
+    private String[] getMethodAdaptiveValue(Adaptive adaptiveAnnotation) {
+<span class="nc" id="L325">        String[] value = adaptiveAnnotation.value();</span>
+        // value is not set, use the value generated from class name as the key
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (value.length == 0) {</span>
+<span class="nc" id="L328">            String splitName = StringUtils.camelToSplitName(type.getSimpleName(), &quot;.&quot;);</span>
+<span class="nc" id="L329">            value = new String[]{splitName};</span>
+        }
+<span class="nc" id="L331">        return value;</span>
+    }
+
+    /**
+     * get parameter with type &lt;code&gt;URL&lt;/code&gt; from method parameter:
+     * &lt;p&gt;
+     * test if parameter has method which returns type &lt;code&gt;URL&lt;/code&gt;
+     * &lt;p&gt;
+     * if not found, throws IllegalStateException
+     */
+    private String generateUrlAssignmentIndirectly(Method method) {
+<span class="nc" id="L342">        Class&lt;?&gt;[] pts = method.getParameterTypes();</span>
+        
+        // find URL getter method
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        for (int i = 0; i &lt; pts.length; ++i) {</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            for (Method m : pts[i].getMethods()) {</span>
+<span class="nc" id="L347">                String name = m.getName();</span>
+<span class="nc bnc" id="L348" title="All 4 branches missed.">                if ((name.startsWith(&quot;get&quot;) || name.length() &gt; 3)</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                        &amp;&amp; Modifier.isPublic(m.getModifiers())</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                        &amp;&amp; !Modifier.isStatic(m.getModifiers())</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                        &amp;&amp; m.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                        &amp;&amp; m.getReturnType() == URL.class) {</span>
+<span class="nc" id="L353">                    return generateGetUrlNullCheck(i, pts[i], name);</span>
+                }
+            }
+        }
+        
+        // getter method not found, throw
+<span class="nc" id="L359">        throw new IllegalStateException(&quot;Failed to create adaptive class for interface &quot; + type.getName()</span>
+<span class="nc" id="L360">                        + &quot;: not found url parameter or url attribute in parameters of method &quot; + method.getName());</span>
+
+    }
+
+    /**
+     * 1, test if argi is null
+     * 2, test if argi.getXX() returns null
+     * 3, assign url with argi.getXX()
+     */
+    private String generateGetUrlNullCheck(int index, Class&lt;?&gt; type, String method) {
+        // Null point check
+<span class="nc" id="L371">        StringBuilder code = new StringBuilder();</span>
+<span class="nc" id="L372">        code.append(String.format(&quot;if (arg%d == null) throw new IllegalArgumentException(\&quot;%s argument == null\&quot;);\n&quot;,</span>
+<span class="nc" id="L373">                index, type.getName()));</span>
+<span class="nc" id="L374">        code.append(String.format(&quot;if (arg%d.%s() == null) throw new IllegalArgumentException(\&quot;%s argument %s() == null\&quot;);\n&quot;,</span>
+<span class="nc" id="L375">                index, method, type.getName(), method));</span>
+
+<span class="nc" id="L377">        code.append(String.format(&quot;%s url = arg%d.%s();\n&quot;, URL.class.getName(), index, method));</span>
+<span class="nc" id="L378">        return code.toString();</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

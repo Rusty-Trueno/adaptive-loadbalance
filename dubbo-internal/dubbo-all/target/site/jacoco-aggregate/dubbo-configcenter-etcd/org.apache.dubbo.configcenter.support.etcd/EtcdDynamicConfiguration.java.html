@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EtcdDynamicConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-configcenter-etcd</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.configcenter.support.etcd</a> &gt; <span class="el_source">EtcdDynamicConfiguration.java</span></div><h1>EtcdDynamicConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.configcenter.support.etcd;
+
+import com.google.protobuf.ByteString;
+import io.etcd.jetcd.api.Event;
+import io.etcd.jetcd.api.WatchCancelRequest;
+import io.etcd.jetcd.api.WatchCreateRequest;
+import io.etcd.jetcd.api.WatchGrpc;
+import io.etcd.jetcd.api.WatchRequest;
+import io.etcd.jetcd.api.WatchResponse;
+import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.configcenter.ConfigChangeEvent;
+import org.apache.dubbo.configcenter.ConfigChangeType;
+import org.apache.dubbo.configcenter.ConfigurationListener;
+import org.apache.dubbo.configcenter.DynamicConfiguration;
+import org.apache.dubbo.remoting.etcd.StateListener;
+import org.apache.dubbo.remoting.etcd.jetcd.JEtcdClient;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.dubbo.common.Constants.CONFIG_NAMESPACE_KEY;
+import static org.apache.dubbo.common.Constants.PATH_SEPARATOR;
+
+/**
+ * The etcd implementation of {@link DynamicConfiguration}
+ */
+public class EtcdDynamicConfiguration implements DynamicConfiguration {
+
+    /**
+     * The final root path would be: /$NAME_SPACE/config
+     */
+    private String rootPath;
+
+    /**
+     * The etcd client
+     */
+    private final JEtcdClient etcdClient;
+
+    /**
+     * The map store the key to {@link EtcdConfigWatcher} mapping
+     */
+    private final ConcurrentMap&lt;ConfigurationListener, EtcdConfigWatcher&gt; watchListenerMap;
+
+<span class="nc" id="L65">    EtcdDynamicConfiguration(URL url) {</span>
+<span class="nc" id="L66">        rootPath = &quot;/&quot; + url.getParameter(CONFIG_NAMESPACE_KEY, DEFAULT_GROUP) + &quot;/config&quot;;</span>
+<span class="nc" id="L67">        etcdClient = new JEtcdClient(url);</span>
+<span class="nc" id="L68">        etcdClient.addStateListener(state -&gt; {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (state == StateListener.CONNECTED) {</span>
+                try {
+<span class="nc" id="L71">                    recover();</span>
+<span class="nc" id="L72">                } catch (Exception e) {</span>
+                    // ignore
+<span class="nc" id="L74">                }</span>
+            }
+<span class="nc" id="L76">        });</span>
+<span class="nc" id="L77">        watchListenerMap = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void addListener(String key, String group, ConfigurationListener listener) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (watchListenerMap.get(listener) == null) {</span>
+<span class="nc" id="L83">            String normalizedKey = convertKey(key);</span>
+<span class="nc" id="L84">            EtcdConfigWatcher watcher = new EtcdConfigWatcher(normalizedKey, listener);</span>
+<span class="nc" id="L85">            watchListenerMap.put(listener, watcher);</span>
+<span class="nc" id="L86">            watcher.watch();</span>
+        }
+<span class="nc" id="L88">    }</span>
+
+    @Override
+    public void removeListener(String key, String group, ConfigurationListener listener) {
+<span class="nc" id="L92">        EtcdConfigWatcher watcher = watchListenerMap.get(listener);</span>
+<span class="nc" id="L93">        watcher.cancelWatch();</span>
+<span class="nc" id="L94">    }</span>
+
+    // TODO Abstract the logic into super class
+    @Override
+    public String getConfig(String key, String group, long timeout) throws IllegalStateException {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(group)) {</span>
+<span class="nc" id="L100">            key = group + PATH_SEPARATOR + key;</span>
+        } else {
+<span class="nc" id="L102">            int i = key.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc" id="L103">            key = key.substring(0, i) + PATH_SEPARATOR + key.substring(i + 1);</span>
+        }
+<span class="nc" id="L105">        return (String) getInternalProperty(rootPath + PATH_SEPARATOR + key);</span>
+    }
+
+    @Override
+    public Object getInternalProperty(String key) {
+<span class="nc" id="L110">        return etcdClient.getKVValue(key);</span>
+    }
+
+
+    private String convertKey(String key) {
+<span class="nc" id="L115">        int index = key.lastIndexOf('.');</span>
+<span class="nc" id="L116">        return rootPath + PATH_SEPARATOR + key.substring(0, index) + PATH_SEPARATOR + key.substring(index + 1);</span>
+    }
+
+    private void recover() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        for (EtcdConfigWatcher watcher: watchListenerMap.values()) {</span>
+<span class="nc" id="L121">            watcher.watch();</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc" id="L123">    }</span>
+
+    public class EtcdConfigWatcher implements StreamObserver&lt;WatchResponse&gt; {
+
+        private ConfigurationListener listener;
+        protected WatchGrpc.WatchStub watchStub;
+        private StreamObserver&lt;WatchRequest&gt; observer;
+        protected long watchId;
+        private ManagedChannel channel;
+        private String key;
+
+<span class="nc" id="L134">        public EtcdConfigWatcher(String key, ConfigurationListener listener) {</span>
+<span class="nc" id="L135">            this.key = key;</span>
+<span class="nc" id="L136">            this.listener = listener;</span>
+<span class="nc" id="L137">            this.channel = etcdClient.getChannel();</span>
+<span class="nc" id="L138">        }</span>
+
+        @Override
+        public void onNext(WatchResponse watchResponse) {
+<span class="nc" id="L142">            this.watchId = watchResponse.getWatchId();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            for (Event etcdEvent : watchResponse.getEventsList()) {</span>
+<span class="nc" id="L144">                ConfigChangeType type = ConfigChangeType.MODIFIED;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (etcdEvent.getType() == Event.EventType.DELETE) {</span>
+<span class="nc" id="L146">                    type = ConfigChangeType.DELETED;</span>
+                }
+<span class="nc" id="L148">                ConfigChangeEvent event = new ConfigChangeEvent(</span>
+<span class="nc" id="L149">                        etcdEvent.getKv().getKey().toString(UTF_8),</span>
+<span class="nc" id="L150">                        etcdEvent.getKv().getValue().toString(UTF_8), type);</span>
+<span class="nc" id="L151">                listener.process(event);</span>
+<span class="nc" id="L152">            }</span>
+<span class="nc" id="L153">        }</span>
+
+        @Override
+        public void onError(Throwable throwable) {
+            // ignore
+<span class="nc" id="L158">        }</span>
+
+        @Override
+        public void onCompleted() {
+            // ignore
+<span class="nc" id="L163">        }</span>
+
+        public long getWatchId() {
+<span class="nc" id="L166">            return watchId;</span>
+        }
+
+        private void watch() {
+<span class="nc" id="L170">            watchStub = WatchGrpc.newStub(channel);</span>
+<span class="nc" id="L171">            observer = watchStub.watch(this);</span>
+<span class="nc" id="L172">            WatchCreateRequest.Builder builder = WatchCreateRequest.newBuilder()</span>
+<span class="nc" id="L173">                    .setKey(ByteString.copyFromUtf8(key))</span>
+<span class="nc" id="L174">                    .setProgressNotify(true);</span>
+<span class="nc" id="L175">            WatchRequest req = WatchRequest.newBuilder().setCreateRequest(builder).build();</span>
+<span class="nc" id="L176">            observer.onNext(req);</span>
+<span class="nc" id="L177">        }</span>
+
+        private void cancelWatch() {
+            WatchCancelRequest watchCancelRequest =
+<span class="nc" id="L181">                    WatchCancelRequest.newBuilder().setWatchId(watchId).build();</span>
+<span class="nc" id="L182">            WatchRequest cancelRequest = WatchRequest.newBuilder()</span>
+<span class="nc" id="L183">                    .setCancelRequest(watchCancelRequest).build();</span>
+<span class="nc" id="L184">            observer.onNext(cancelRequest);</span>
+<span class="nc" id="L185">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

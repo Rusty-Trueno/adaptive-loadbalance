@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ActivateComparator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.extension.support</a> &gt; <span class="el_source">ActivateComparator.java</span></div><h1>ActivateComparator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.extension.support;
+
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.extension.SPI;
+import org.apache.dubbo.common.utils.ArrayUtils;
+
+import java.util.Arrays;
+import java.util.Comparator;
+
+/**
+ * OrderComparator
+ */
+<span class="nc" id="L30">public class ActivateComparator implements Comparator&lt;Object&gt; {</span>
+
+<span class="nc" id="L32">    public static final Comparator&lt;Object&gt; COMPARATOR = new ActivateComparator();</span>
+
+    @Override
+    public int compare(Object o1, Object o2) {
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (o1 == null &amp;&amp; o2 == null) {</span>
+<span class="nc" id="L37">            return 0;</span>
+        }
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (o1 == null) {</span>
+<span class="nc" id="L40">            return -1;</span>
+        }
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (o2 == null) {</span>
+<span class="nc" id="L43">            return 1;</span>
+        }
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (o1.equals(o2)) {</span>
+<span class="nc" id="L46">            return 0;</span>
+        }
+
+<span class="nc" id="L49">        Class&lt;?&gt; inf = findSpi(o1.getClass());</span>
+
+<span class="nc" id="L51">        ActivateInfo a1 = parseActivate(o1.getClass());</span>
+<span class="nc" id="L52">        ActivateInfo a2 = parseActivate(o2.getClass());</span>
+
+<span class="nc bnc" id="L54" title="All 6 branches missed.">        if ((a1.applicableToCompare() || a2.applicableToCompare()) &amp;&amp; inf != null) {</span>
+<span class="nc" id="L55">            ExtensionLoader&lt;?&gt; extensionLoader = ExtensionLoader.getExtensionLoader(inf);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (a1.applicableToCompare()) {</span>
+<span class="nc" id="L57">                String n2 = extensionLoader.getExtensionName(o2.getClass());</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                if (a1.isLess(n2)) {</span>
+<span class="nc" id="L59">                    return -1;</span>
+                }
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                if (a1.isMore(n2)) {</span>
+<span class="nc" id="L63">                    return 1;</span>
+                }
+            }
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (a2.applicableToCompare()) {</span>
+<span class="nc" id="L68">                String n1 = extensionLoader.getExtensionName(o1.getClass());</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if (a2.isLess(n1)) {</span>
+<span class="nc" id="L70">                    return 1;</span>
+                }
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                if (a2.isMore(n1)) {</span>
+<span class="nc" id="L74">                    return -1;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        int n1 = a1 == null ? 0 : a1.order;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        int n2 = a2 == null ? 0 : a2.order;</span>
+        // never return 0 even if n1 equals n2, otherwise, o1 and o2 will override each other in collection like HashSet
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        return n1 &gt; n2 ? 1 : -1;</span>
+    }
+
+    private Class&lt;?&gt; findSpi(Class clazz) {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (clazz.getInterfaces().length &lt;= 0) {</span>
+<span class="nc" id="L86">            return null;</span>
+        }
+
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (Class&lt;?&gt; intf : clazz.getInterfaces()) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (intf.isAnnotationPresent(SPI.class)) {</span>
+<span class="nc" id="L91">                return intf;</span>
+            } else {
+<span class="nc" id="L93">                Class result = findSpi(intf);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                if (result != null) {</span>
+<span class="nc" id="L95">                    return result;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L100">        return null;</span>
+    }
+
+    private ActivateInfo parseActivate(Class&lt;?&gt; clazz) {
+<span class="nc" id="L104">        ActivateInfo info = new ActivateInfo();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (clazz.isAnnotationPresent(Activate.class)) {</span>
+<span class="nc" id="L106">            Activate activate = clazz.getAnnotation(Activate.class);</span>
+<span class="nc" id="L107">            info.before = activate.before();</span>
+<span class="nc" id="L108">            info.after = activate.after();</span>
+<span class="nc" id="L109">            info.order = activate.order();</span>
+<span class="nc" id="L110">        } else {</span>
+<span class="nc" id="L111">            com.alibaba.dubbo.common.extension.Activate activate = clazz.getAnnotation(</span>
+                    com.alibaba.dubbo.common.extension.Activate.class);
+<span class="nc" id="L113">            info.before = activate.before();</span>
+<span class="nc" id="L114">            info.after = activate.after();</span>
+<span class="nc" id="L115">            info.order = activate.order();</span>
+        }
+<span class="nc" id="L117">        return info;</span>
+    }
+
+    private static class ActivateInfo {
+        private String[] before;
+        private String[] after;
+        private int order;
+
+        private boolean applicableToCompare() {
+<span class="nc bnc" id="L126" title="All 4 branches missed.">            return ArrayUtils.isNotEmpty(before) || ArrayUtils.isNotEmpty(after);</span>
+        }
+
+        private boolean isLess(String name) {
+<span class="nc" id="L130">            return Arrays.asList(before).contains(name);</span>
+        }
+
+        private boolean isMore(String name) {
+<span class="nc" id="L134">            return Arrays.asList(after).contains(name);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

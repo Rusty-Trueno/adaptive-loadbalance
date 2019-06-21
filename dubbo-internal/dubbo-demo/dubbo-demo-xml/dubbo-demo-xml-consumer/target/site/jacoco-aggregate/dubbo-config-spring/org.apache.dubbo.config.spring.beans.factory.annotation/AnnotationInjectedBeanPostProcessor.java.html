@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnnotationInjectedBeanPostProcessor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">AnnotationInjectedBeanPostProcessor.java</span></div><h1>AnnotationInjectedBeanPostProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.PropertyValues;
+import org.springframework.beans.factory.BeanClassLoaderAware;
+import org.springframework.beans.factory.BeanCreationException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.InjectionMetadata;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessorAdapter;
+import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
+import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.context.EnvironmentAware;
+import org.springframework.core.Ordered;
+import org.springframework.core.PriorityOrdered;
+import org.springframework.core.env.Environment;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
+
+import java.beans.PropertyDescriptor;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.apache.dubbo.config.spring.util.ClassUtils.resolveGenericType;
+import static org.springframework.core.BridgeMethodResolver.findBridgedMethod;
+import static org.springframework.core.BridgeMethodResolver.isVisibilityBridgeMethodPair;
+import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
+import static org.springframework.core.annotation.AnnotationUtils.getAnnotation;
+
+/**
+ * Abstract generic {@link BeanPostProcessor} implementation for customized annotation that annotated injected-object.
+ *
+ * The source code is cloned from https://github.com/alibaba/spring-context-support/blob/1.0.2/src/main/java/com/alibaba/spring/beans/factory/annotation/AnnotationInjectedBeanPostProcessor.java
+ *
+ * @since 2.6.6
+ */
+public abstract class AnnotationInjectedBeanPostProcessor&lt;A extends Annotation&gt; extends
+        InstantiationAwareBeanPostProcessorAdapter implements MergedBeanDefinitionPostProcessor, PriorityOrdered,
+        BeanFactoryAware, BeanClassLoaderAware, EnvironmentAware, DisposableBean {
+
+<span class="nc" id="L76">    private final static int CACHE_SIZE = Integer.getInteger(&quot;&quot;, 32);</span>
+
+<span class="nc" id="L78">    private final Log logger = LogFactory.getLog(getClass());</span>
+
+    private final Class&lt;A&gt; annotationType;
+
+<span class="nc" id="L82">    private final ConcurrentMap&lt;String, AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata&gt; injectionMetadataCache =</span>
+            new ConcurrentHashMap&lt;String, AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata&gt;(CACHE_SIZE);
+
+<span class="nc" id="L85">    private final ConcurrentMap&lt;String, Object&gt; injectedObjectsCache = new ConcurrentHashMap&lt;&gt;(CACHE_SIZE);</span>
+
+    private ConfigurableListableBeanFactory beanFactory;
+
+    private Environment environment;
+
+    private ClassLoader classLoader;
+
+<span class="nc" id="L93">    private int order = Ordered.LOWEST_PRECEDENCE;</span>
+
+<span class="nc" id="L95">    public AnnotationInjectedBeanPostProcessor() {</span>
+<span class="nc" id="L96">        this.annotationType = resolveGenericType(getClass());</span>
+<span class="nc" id="L97">    }</span>
+
+    @SafeVarargs
+    private static &lt;T&gt; Collection&lt;T&gt; combine(Collection&lt;? extends T&gt;... elements) {
+<span class="nc" id="L101">        List&lt;T&gt; allElements = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (Collection&lt;? extends T&gt; e : elements) {</span>
+<span class="nc" id="L103">            allElements.addAll(e);</span>
+        }
+<span class="nc" id="L105">        return allElements;</span>
+    }
+
+    /**
+     * Annotation type
+     *
+     * @return non-null
+     */
+    public final Class&lt;A&gt; getAnnotationType() {
+<span class="nc" id="L114">        return annotationType;</span>
+    }
+
+    @Override
+    public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+<span class="nc" id="L119">        Assert.isInstanceOf(ConfigurableListableBeanFactory.class, beanFactory,</span>
+                &quot;AnnotationInjectedBeanPostProcessor requires a ConfigurableListableBeanFactory&quot;);
+<span class="nc" id="L121">        this.beanFactory = (ConfigurableListableBeanFactory) beanFactory;</span>
+<span class="nc" id="L122">    }</span>
+
+    @Override
+    public PropertyValues postProcessPropertyValues(
+            PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeanCreationException {
+
+<span class="nc" id="L128">        InjectionMetadata metadata = findInjectionMetadata(beanName, bean.getClass(), pvs);</span>
+        try {
+<span class="nc" id="L130">            metadata.inject(bean, beanName, pvs);</span>
+<span class="nc" id="L131">        } catch (BeanCreationException ex) {</span>
+<span class="nc" id="L132">            throw ex;</span>
+<span class="nc" id="L133">        } catch (Throwable ex) {</span>
+<span class="nc" id="L134">            throw new BeanCreationException(beanName, &quot;Injection of @&quot; + getAnnotationType().getName()</span>
+                    + &quot; dependencies is failed&quot;, ex);
+<span class="nc" id="L136">        }</span>
+<span class="nc" id="L137">        return pvs;</span>
+    }
+
+
+    /**
+     * Finds {@link InjectionMetadata.InjectedElement} Metadata from annotated {@link A} fields
+     *
+     * @param beanClass The {@link Class} of Bean
+     * @return non-null {@link List}
+     */
+    private List&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; findFieldAnnotationMetadata(final Class&lt;?&gt; beanClass) {
+
+<span class="nc" id="L149">        final List&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; elements = new LinkedList&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt;();</span>
+
+<span class="nc" id="L151">        ReflectionUtils.doWithFields(beanClass, field -&gt; {</span>
+
+<span class="nc" id="L153">            A annotation = getAnnotation(field, getAnnotationType());</span>
+
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (annotation != null) {</span>
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (Modifier.isStatic(field.getModifiers())) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L159">                        logger.warn(&quot;@&quot; + getAnnotationType().getName() + &quot; is not supported on static fields: &quot; + field);</span>
+                    }
+<span class="nc" id="L161">                    return;</span>
+                }
+
+<span class="nc" id="L164">                elements.add(new AnnotatedFieldElement(field, annotation));</span>
+            }
+
+<span class="nc" id="L167">        });</span>
+
+<span class="nc" id="L169">        return elements;</span>
+
+    }
+
+    /**
+     * Finds {@link InjectionMetadata.InjectedElement} Metadata from annotated {@link A @A} methods
+     *
+     * @param beanClass The {@link Class} of Bean
+     * @return non-null {@link List}
+     */
+    private List&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; findAnnotatedMethodMetadata(final Class&lt;?&gt; beanClass) {
+
+<span class="nc" id="L181">        final List&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; elements = new LinkedList&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt;();</span>
+
+<span class="nc" id="L183">        ReflectionUtils.doWithMethods(beanClass, method -&gt; {</span>
+
+<span class="nc" id="L185">            Method bridgedMethod = findBridgedMethod(method);</span>
+
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (!isVisibilityBridgeMethodPair(method, bridgedMethod)) {</span>
+<span class="nc" id="L188">                return;</span>
+            }
+
+<span class="nc" id="L191">            A annotation = findAnnotation(bridgedMethod, getAnnotationType());</span>
+
+<span class="nc bnc" id="L193" title="All 4 branches missed.">            if (annotation != null &amp;&amp; method.equals(ClassUtils.getMostSpecificMethod(method, beanClass))) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                if (Modifier.isStatic(method.getModifiers())) {</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L196">                        logger.warn(&quot;@&quot; + getAnnotationType().getSimpleName() + &quot; annotation is not supported on static methods: &quot; + method);</span>
+                    }
+<span class="nc" id="L198">                    return;</span>
+                }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (method.getParameterTypes().length == 0) {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                    if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L202">                        logger.warn(&quot;@&quot; + getAnnotationType().getSimpleName() + &quot; annotation should only be used on methods with parameters: &quot; +</span>
+                                method);
+                    }
+                }
+<span class="nc" id="L206">                PropertyDescriptor pd = BeanUtils.findPropertyForMethod(bridgedMethod, beanClass);</span>
+<span class="nc" id="L207">                elements.add(new AnnotatedMethodElement(method, pd, annotation));</span>
+            }
+<span class="nc" id="L209">        });</span>
+
+<span class="nc" id="L211">        return elements;</span>
+
+    }
+
+
+    private AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata buildAnnotatedMetadata(final Class&lt;?&gt; beanClass) {
+<span class="nc" id="L217">        Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; fieldElements = findFieldAnnotationMetadata(beanClass);</span>
+<span class="nc" id="L218">        Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; methodElements = findAnnotatedMethodMetadata(beanClass);</span>
+<span class="nc" id="L219">        return new AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata(beanClass, fieldElements, methodElements);</span>
+
+    }
+
+    private InjectionMetadata findInjectionMetadata(String beanName, Class&lt;?&gt; clazz, PropertyValues pvs) {
+        // Fall back to class name as cache key, for backwards compatibility with custom callers.
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        String cacheKey = (StringUtils.hasLength(beanName) ? beanName : clazz.getName());</span>
+        // Quick check on the concurrent map first, with minimal locking.
+<span class="nc" id="L227">        AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata metadata = this.injectionMetadataCache.get(cacheKey);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (InjectionMetadata.needsRefresh(metadata, clazz)) {</span>
+<span class="nc" id="L229">            synchronized (this.injectionMetadataCache) {</span>
+<span class="nc" id="L230">                metadata = this.injectionMetadataCache.get(cacheKey);</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                if (InjectionMetadata.needsRefresh(metadata, clazz)) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                    if (metadata != null) {</span>
+<span class="nc" id="L233">                        metadata.clear(pvs);</span>
+                    }
+                    try {
+<span class="nc" id="L236">                        metadata = buildAnnotatedMetadata(clazz);</span>
+<span class="nc" id="L237">                        this.injectionMetadataCache.put(cacheKey, metadata);</span>
+<span class="nc" id="L238">                    } catch (NoClassDefFoundError err) {</span>
+<span class="nc" id="L239">                        throw new IllegalStateException(&quot;Failed to introspect object class [&quot; + clazz.getName() +</span>
+                                &quot;] for annotation metadata: could not find class that it depends on&quot;, err);
+<span class="nc" id="L241">                    }</span>
+                }
+<span class="nc" id="L243">            }</span>
+        }
+<span class="nc" id="L245">        return metadata;</span>
+    }
+
+    @Override
+    public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class&lt;?&gt; beanType, String beanName) {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (beanType != null) {</span>
+<span class="nc" id="L251">            InjectionMetadata metadata = findInjectionMetadata(beanName, beanType, null);</span>
+<span class="nc" id="L252">            metadata.checkConfigMembers(beanDefinition);</span>
+        }
+<span class="nc" id="L254">    }</span>
+
+    @Override
+    public int getOrder() {
+<span class="nc" id="L258">        return order;</span>
+    }
+
+    public void setOrder(int order) {
+<span class="nc" id="L262">        this.order = order;</span>
+<span class="nc" id="L263">    }</span>
+
+    @Override
+    public void destroy() throws Exception {
+
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        for (Object object : injectedObjectsCache.values()) {</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L270">                logger.info(object + &quot; was destroying!&quot;);</span>
+            }
+
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            if (object instanceof DisposableBean) {</span>
+<span class="nc" id="L274">                ((DisposableBean) object).destroy();</span>
+            }
+<span class="nc" id="L276">        }</span>
+
+<span class="nc" id="L278">        injectionMetadataCache.clear();</span>
+<span class="nc" id="L279">        injectedObjectsCache.clear();</span>
+
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L282">            logger.info(getClass() + &quot; was destroying!&quot;);</span>
+        }
+
+<span class="nc" id="L285">    }</span>
+
+    @Override
+    public void setBeanClassLoader(ClassLoader classLoader) {
+<span class="nc" id="L289">        this.classLoader = classLoader;</span>
+<span class="nc" id="L290">    }</span>
+
+    @Override
+    public void setEnvironment(Environment environment) {
+<span class="nc" id="L294">        this.environment = environment;</span>
+<span class="nc" id="L295">    }</span>
+
+    protected Environment getEnvironment() {
+<span class="nc" id="L298">        return environment;</span>
+    }
+
+    protected ClassLoader getClassLoader() {
+<span class="nc" id="L302">        return classLoader;</span>
+    }
+
+    protected ConfigurableListableBeanFactory getBeanFactory() {
+<span class="nc" id="L306">        return beanFactory;</span>
+    }
+
+    /**
+     * Gets all injected-objects.
+     *
+     * @return non-null {@link Collection}
+     */
+    protected Collection&lt;Object&gt; getInjectedObjects() {
+<span class="nc" id="L315">        return this.injectedObjectsCache.values();</span>
+    }
+
+    /**
+     * Get injected-object from specified {@link A annotation} and Bean Class
+     *
+     * @param annotation      {@link A annotation}
+     * @param bean            Current bean that will be injected
+     * @param beanName        Current bean name that will be injected
+     * @param injectedType    the type of injected-object
+     * @param injectedElement {@link InjectionMetadata.InjectedElement}
+     * @return An injected object
+     * @throws Exception If getting is failed
+     */
+    protected Object getInjectedObject(A annotation, Object bean, String beanName, Class&lt;?&gt; injectedType,
+                                       InjectionMetadata.InjectedElement injectedElement) throws Exception {
+
+<span class="nc" id="L332">        String cacheKey = buildInjectedObjectCacheKey(annotation, bean, beanName, injectedType, injectedElement);</span>
+
+<span class="nc" id="L334">        Object injectedObject = injectedObjectsCache.get(cacheKey);</span>
+
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (injectedObject == null) {</span>
+<span class="nc" id="L337">            injectedObject = doGetInjectedBean(annotation, bean, beanName, injectedType, injectedElement);</span>
+            // Customized inject-object if necessary
+<span class="nc" id="L339">            injectedObjectsCache.putIfAbsent(cacheKey, injectedObject);</span>
+        }
+
+<span class="nc" id="L342">        return injectedObject;</span>
+
+    }
+
+    /**
+     * Subclass must implement this method to get injected-object. The context objects could help this method if
+     * necessary :
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #getBeanFactory() BeanFactory}&lt;/li&gt;
+     * &lt;li&gt;{@link #getClassLoader() ClassLoader}&lt;/li&gt;
+     * &lt;li&gt;{@link #getEnvironment() Environment}&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param annotation      {@link A annotation}
+     * @param bean            Current bean that will be injected
+     * @param beanName        Current bean name that will be injected
+     * @param injectedType    the type of injected-object
+     * @param injectedElement {@link InjectionMetadata.InjectedElement}
+     * @return The injected object
+     * @throws Exception If resolving an injected object is failed.
+     */
+    protected abstract Object doGetInjectedBean(A annotation, Object bean, String beanName, Class&lt;?&gt; injectedType,
+                                                InjectionMetadata.InjectedElement injectedElement) throws Exception;
+
+    /**
+     * Build a cache key for injected-object. The context objects could help this method if
+     * necessary :
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #getBeanFactory() BeanFactory}&lt;/li&gt;
+     * &lt;li&gt;{@link #getClassLoader() ClassLoader}&lt;/li&gt;
+     * &lt;li&gt;{@link #getEnvironment() Environment}&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param annotation      {@link A annotation}
+     * @param bean            Current bean that will be injected
+     * @param beanName        Current bean name that will be injected
+     * @param injectedType    the type of injected-object
+     * @param injectedElement {@link InjectionMetadata.InjectedElement}
+     * @return Bean cache key
+     */
+    protected abstract String buildInjectedObjectCacheKey(A annotation, Object bean, String beanName,
+                                                          Class&lt;?&gt; injectedType,
+                                                          InjectionMetadata.InjectedElement injectedElement);
+
+    /**
+     * Get {@link Map} in injected field.
+     *
+     * @return non-null ready-only {@link Map}
+     */
+    protected Map&lt;InjectionMetadata.InjectedElement, Object&gt; getInjectedFieldObjectsMap() {
+
+<span class="nc" id="L393">        Map&lt;InjectionMetadata.InjectedElement, Object&gt; injectedElementBeanMap =</span>
+                new LinkedHashMap&lt;InjectionMetadata.InjectedElement, Object&gt;();
+
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        for (AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata metadata : injectionMetadataCache.values()) {</span>
+
+<span class="nc" id="L398">            Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; fieldElements = metadata.getFieldElements();</span>
+
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            for (AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement fieldElement : fieldElements) {</span>
+
+<span class="nc" id="L402">                injectedElementBeanMap.put(fieldElement, fieldElement.bean);</span>
+
+<span class="nc" id="L404">            }</span>
+
+<span class="nc" id="L406">        }</span>
+
+<span class="nc" id="L408">        return Collections.unmodifiableMap(injectedElementBeanMap);</span>
+
+    }
+
+    /**
+     * Get {@link Map} in injected method.
+     *
+     * @return non-null {@link Map}
+     */
+    protected Map&lt;InjectionMetadata.InjectedElement, Object&gt; getInjectedMethodObjectsMap() {
+
+<span class="nc" id="L419">        Map&lt;InjectionMetadata.InjectedElement, Object&gt; injectedElementBeanMap =</span>
+                new LinkedHashMap&lt;InjectionMetadata.InjectedElement, Object&gt;();
+
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        for (AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata metadata : injectionMetadataCache.values()) {</span>
+
+<span class="nc" id="L424">            Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; methodElements = metadata.getMethodElements();</span>
+
+<span class="nc bnc" id="L426" title="All 2 branches missed.">            for (AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement methodElement : methodElements) {</span>
+
+<span class="nc" id="L428">                injectedElementBeanMap.put(methodElement, methodElement.object);</span>
+
+<span class="nc" id="L430">            }</span>
+
+<span class="nc" id="L432">        }</span>
+
+<span class="nc" id="L434">        return Collections.unmodifiableMap(injectedElementBeanMap);</span>
+
+    }
+
+    /**
+     * {@link A} {@link InjectionMetadata} implementation
+     */
+    private class AnnotatedInjectionMetadata extends InjectionMetadata {
+
+        private final Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; fieldElements;
+
+        private final Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; methodElements;
+
+        public AnnotatedInjectionMetadata(Class&lt;?&gt; targetClass, Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; fieldElements,
+<span class="nc" id="L448">                                          Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; methodElements) {</span>
+<span class="nc" id="L449">            super(targetClass, combine(fieldElements, methodElements));</span>
+<span class="nc" id="L450">            this.fieldElements = fieldElements;</span>
+<span class="nc" id="L451">            this.methodElements = methodElements;</span>
+<span class="nc" id="L452">        }</span>
+
+        public Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement&gt; getFieldElements() {
+<span class="nc" id="L455">            return fieldElements;</span>
+        }
+
+        public Collection&lt;AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement&gt; getMethodElements() {
+<span class="nc" id="L459">            return methodElements;</span>
+        }
+    }
+
+    /**
+     * {@link A} {@link Method} {@link InjectionMetadata.InjectedElement}
+     */
+    private class AnnotatedMethodElement extends InjectionMetadata.InjectedElement {
+
+        private final Method method;
+
+        private final A annotation;
+
+        private volatile Object object;
+
+<span class="nc" id="L474">        protected AnnotatedMethodElement(Method method, PropertyDescriptor pd, A annotation) {</span>
+<span class="nc" id="L475">            super(method, pd);</span>
+<span class="nc" id="L476">            this.method = method;</span>
+<span class="nc" id="L477">            this.annotation = annotation;</span>
+<span class="nc" id="L478">        }</span>
+
+        @Override
+        protected void inject(Object bean, String beanName, PropertyValues pvs) throws Throwable {
+
+<span class="nc" id="L483">            Class&lt;?&gt; injectedType = pd.getPropertyType();</span>
+
+<span class="nc" id="L485">            Object injectedObject = getInjectedObject(annotation, bean, beanName, injectedType, this);</span>
+
+<span class="nc" id="L487">            ReflectionUtils.makeAccessible(method);</span>
+
+<span class="nc" id="L489">            method.invoke(bean, injectedObject);</span>
+
+<span class="nc" id="L491">        }</span>
+
+    }
+
+    /**
+     * {@link A} {@link Field} {@link InjectionMetadata.InjectedElement}
+     */
+    public class AnnotatedFieldElement extends InjectionMetadata.InjectedElement {
+
+        private final Field field;
+
+        private final A annotation;
+
+        private volatile Object bean;
+
+<span class="nc" id="L506">        protected AnnotatedFieldElement(Field field, A annotation) {</span>
+<span class="nc" id="L507">            super(field, null);</span>
+<span class="nc" id="L508">            this.field = field;</span>
+<span class="nc" id="L509">            this.annotation = annotation;</span>
+<span class="nc" id="L510">        }</span>
+
+        @Override
+        protected void inject(Object bean, String beanName, PropertyValues pvs) throws Throwable {
+
+<span class="nc" id="L515">            Class&lt;?&gt; injectedType = field.getType();</span>
+
+<span class="nc" id="L517">            Object injectedObject = getInjectedObject(annotation, bean, beanName, injectedType, this);</span>
+
+<span class="nc" id="L519">            ReflectionUtils.makeAccessible(field);</span>
+
+<span class="nc" id="L521">            field.set(bean, injectedObject);</span>
+
+<span class="nc" id="L523">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

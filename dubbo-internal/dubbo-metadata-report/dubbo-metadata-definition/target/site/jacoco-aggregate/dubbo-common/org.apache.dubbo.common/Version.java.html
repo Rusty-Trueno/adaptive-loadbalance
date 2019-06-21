@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Version.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-definition</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common</a> &gt; <span class="el_source">Version.java</span></div><h1>Version.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.io.IOException;
+import java.net.URL;
+import java.security.CodeSource;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Version
+ */
+public final class Version {
+<span class="nc" id="L39">    private static final Logger logger = LoggerFactory.getLogger(Version.class);</span>
+    
+<span class="nc" id="L41">    private static final Pattern PREFIX_DIGITS_PATTERN = Pattern.compile(&quot;^([0-9]*).*&quot;);</span>
+
+    // Dubbo RPC protocol version, for compatibility, it must not be between 2.0.10 ~ 2.6.2
+    public static final String DEFAULT_DUBBO_PROTOCOL_VERSION = &quot;2.0.2&quot;;
+    // Dubbo implementation version, usually is jar version.
+<span class="nc" id="L46">    private static final String VERSION = getVersion(Version.class, &quot;&quot;);</span>
+
+    /**
+     * For protocol compatibility purpose.
+     * Because {@link #isSupportResponseAttachment} is checked for every call, int compare expect to has higher
+     * performance than string.
+     */
+    private static final int LOWEST_VERSION_FOR_RESPONSE_ATTACHMENT = 2000200; // 2.0.2
+<span class="nc" id="L54">    private static final Map&lt;String, Integer&gt; VERSION2INT = new HashMap&lt;String, Integer&gt;();</span>
+
+    static {
+        // check if there's duplicated jar
+<span class="nc" id="L58">        Version.checkDuplicate(Version.class);</span>
+<span class="nc" id="L59">    }</span>
+
+    private Version() {
+    }
+
+    public static String getProtocolVersion() {
+<span class="nc" id="L65">        return DEFAULT_DUBBO_PROTOCOL_VERSION;</span>
+    }
+
+    public static String getVersion() {
+<span class="nc" id="L69">        return VERSION;</span>
+    }
+
+    /**
+     * Check the framework release version number to decide if it's 2.7.0 or higher
+     */
+    public static boolean isRelease270OrHigher(String version) {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L77">            return false;</span>
+        }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (getIntVersion(version) &gt;= 2070000) {</span>
+<span class="nc" id="L80">            return true;</span>
+        }
+<span class="nc" id="L82">        return false;</span>
+    }
+
+    /**
+     * Check the framework release version number to decide if it's 2.6.3 or higher
+     *
+     * Because response attachments feature is firstly introduced in 2.6.3
+     * and moreover we have no other approach to know the framework's version, so we use
+     * isSupportResponseAttachment to decide if it's v2.6.3.
+     */
+    public static boolean isRelease263OrHigher(String version) {
+<span class="nc" id="L93">        return isSupportResponseAttachment(version);</span>
+    }
+
+    public static boolean isSupportResponseAttachment(String version) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L98">            return false;</span>
+        }
+        // for previous dubbo version(2.0.10/020010~2.6.2/020602), this version is the jar's version, so they need to
+        // be ignore
+<span class="nc" id="L102">        int iVersion = getIntVersion(version);</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (iVersion &gt;= 2001000 &amp;&amp; iVersion &lt;= 2060200) {</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        return iVersion &gt;= LOWEST_VERSION_FOR_RESPONSE_ATTACHMENT;</span>
+    }
+
+    public static int getIntVersion(String version) {
+<span class="nc" id="L111">        Integer v = VERSION2INT.get(version);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L113">            v = parseInt(version);</span>
+            // e.g., version number 2.6.3 will convert to 2060300
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (version.split(&quot;\\.&quot;).length == 3) {</span>
+<span class="nc" id="L116">                v = v * 100;</span>
+            }
+<span class="nc" id="L118">            VERSION2INT.put(version, v);</span>
+        }
+<span class="nc" id="L120">        return v;</span>
+    }
+
+    private static int parseInt(String version) {
+<span class="nc" id="L124">        int v = 0;</span>
+<span class="nc" id="L125">        String[] vArr = version.split(&quot;\\.&quot;);</span>
+<span class="nc" id="L126">        int len = vArr.length;</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L128">            v += Integer.parseInt(getPrefixDigits(vArr[i])) * Math.pow(10, (len - i - 1) * 2);</span>
+        }
+<span class="nc" id="L130">        return v;</span>
+    }
+
+    /**
+     * get prefix digits from given version string
+     */
+    private static String getPrefixDigits(String v) {
+<span class="nc" id="L137">        Matcher matcher = PREFIX_DIGITS_PATTERN.matcher(v);</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (matcher.find()) {</span>
+<span class="nc" id="L139">            return matcher.group(1);</span>
+        }
+<span class="nc" id="L141">        return &quot;&quot;;</span>
+    }
+
+    public static String getVersion(Class&lt;?&gt; cls, String defaultVersion) {
+        try {
+            // find version info from MANIFEST.MF first
+<span class="nc" id="L147">            Package pkg = cls.getPackage();</span>
+<span class="nc" id="L148">            String version = null;</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (pkg != null) {</span>
+<span class="nc" id="L150">                version = pkg.getImplementationVersion();</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (!StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L152">                    return version;</span>
+                }
+
+<span class="nc" id="L155">                version = pkg.getSpecificationVersion();</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (!StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L157">                    return version;</span>
+                }
+            }
+            
+            // guess version fro jar file name if nothing's found from MANIFEST.MF
+<span class="nc" id="L162">            CodeSource codeSource = cls.getProtectionDomain().getCodeSource();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (codeSource == null) {</span>
+<span class="nc" id="L164">                logger.info(&quot;No codeSource for class &quot; + cls.getName() + &quot; when getVersion, use default version &quot; + defaultVersion);</span>
+<span class="nc" id="L165">                return defaultVersion;</span>
+            } 
+            
+<span class="nc" id="L168">            String file = codeSource.getLocation().getFile();</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">            if (!StringUtils.isEmpty(file) &amp;&amp; file.endsWith(&quot;.jar&quot;)) {</span>
+<span class="nc" id="L170">                version = getFromFile(file);</span>
+            }
+            
+            // return default version if no version info is found
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            return StringUtils.isEmpty(version) ? defaultVersion : version;</span>
+<span class="nc" id="L175">        } catch (Throwable e) {</span>
+            // return default version when any exception is thrown
+<span class="nc" id="L177">            logger.error(&quot;return default version, ignore exception &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L178">            return defaultVersion;</span>
+        }
+    }
+
+    /**
+     * get version from file: path/to/group-module-x.y.z.jar, returns x.y.z
+     */
+    private static String getFromFile(String file) {
+        // remove suffix &quot;.jar&quot;: &quot;path/to/group-module-x.y.z&quot;
+<span class="nc" id="L187">        file = file.substring(0, file.length() - 4);</span>
+        
+        // remove path: &quot;group-module-x.y.z&quot;
+<span class="nc" id="L190">        int i = file.lastIndexOf('/');</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L192">            file = file.substring(i + 1);</span>
+        }
+        
+        // remove group: &quot;module-x.y.z&quot;
+<span class="nc" id="L196">        i = file.indexOf(&quot;-&quot;);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L198">            file = file.substring(i + 1);</span>
+        }
+        
+        // remove module: &quot;x.y.z&quot;
+<span class="nc bnc" id="L202" title="All 4 branches missed.">        while (file.length() &gt; 0 &amp;&amp; !Character.isDigit(file.charAt(0))) {</span>
+<span class="nc" id="L203">            i = file.indexOf(&quot;-&quot;);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (i &gt;= 0) {</span>
+<span class="nc" id="L205">                file = file.substring(i + 1);</span>
+            } else {
+                break;
+            }
+        }
+<span class="nc" id="L210">        return file;</span>
+    }
+
+    public static void checkDuplicate(Class&lt;?&gt; cls, boolean failOnError) {
+<span class="nc" id="L214">        checkDuplicate(cls.getName().replace('.', '/') + &quot;.class&quot;, failOnError);</span>
+<span class="nc" id="L215">    }</span>
+
+    public static void checkDuplicate(Class&lt;?&gt; cls) {
+<span class="nc" id="L218">        checkDuplicate(cls, false);</span>
+<span class="nc" id="L219">    }</span>
+
+    public static void checkDuplicate(String path, boolean failOnError) {
+        try {
+            // search in caller's classloader
+<span class="nc" id="L224">            Set&lt;String&gt; files = getResources(path);</span>
+            // duplicated jar is found
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (files.size() &gt; 1) {</span>
+<span class="nc" id="L227">                String error = &quot;Duplicate class &quot; + path + &quot; in &quot; + files.size() + &quot; jar &quot; + files;</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (failOnError) {</span>
+<span class="nc" id="L229">                    throw new IllegalStateException(error);</span>
+                } else {
+<span class="nc" id="L231">                    logger.error(error);</span>
+                }
+            }
+<span class="nc" id="L234">        } catch (Throwable e) {</span>
+<span class="nc" id="L235">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L236">        }</span>
+<span class="nc" id="L237">    }</span>
+
+    /**
+     * search resources in caller's classloader
+     */
+    private static Set&lt;String&gt; getResources(String path) throws IOException {
+<span class="nc" id="L243">        Enumeration&lt;URL&gt; urls = ClassUtils.getCallerClassLoader(Version.class).getResources(path);</span>
+<span class="nc" id="L244">        Set&lt;String&gt; files = new HashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        while (urls.hasMoreElements()) {</span>
+<span class="nc" id="L246">            URL url = urls.nextElement();</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (url != null) {</span>
+<span class="nc" id="L248">                String file = url.getFile();</span>
+<span class="nc bnc" id="L249" title="All 4 branches missed.">                if (file != null &amp;&amp; file.length() &gt; 0) {</span>
+<span class="nc" id="L250">                    files.add(file);</span>
+                }
+            }
+<span class="nc" id="L253">        }</span>
+<span class="nc" id="L254">        return files;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

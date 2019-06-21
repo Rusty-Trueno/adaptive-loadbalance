@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractProxyInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.proxy</a> &gt; <span class="el_source">AbstractProxyInvoker.java</span></div><h1>AbstractProxyInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.proxy;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.rpc.AsyncContextImpl;
+import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * InvokerWrapper
+ */
+public abstract class AbstractProxyInvoker&lt;T&gt; implements Invoker&lt;T&gt; {
+<span class="nc" id="L39">    Logger logger = LoggerFactory.getLogger(AbstractProxyInvoker.class);</span>
+
+    private final T proxy;
+
+    private final Class&lt;T&gt; type;
+
+    private final URL url;
+
+<span class="nc" id="L47">    public AbstractProxyInvoker(T proxy, Class&lt;T&gt; type, URL url) {</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (proxy == null) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;proxy == null&quot;);</span>
+        }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;interface == null&quot;);</span>
+        }
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (!type.isInstance(proxy)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(proxy.getClass().getName() + &quot; not implement interface &quot; + type);</span>
+        }
+<span class="nc" id="L57">        this.proxy = proxy;</span>
+<span class="nc" id="L58">        this.type = type;</span>
+<span class="nc" id="L59">        this.url = url;</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public Class&lt;T&gt; getInterface() {
+<span class="nc" id="L64">        return type;</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L69">        return url;</span>
+    }
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L74">        return true;</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L79">    }</span>
+
+    // TODO Unified to AsyncResult?
+    @Override
+    public Result invoke(Invocation invocation) throws RpcException {
+<span class="nc" id="L84">        RpcContext rpcContext = RpcContext.getContext();</span>
+        try {
+<span class="nc" id="L86">            Object obj = doInvoke(proxy, invocation.getMethodName(), invocation.getParameterTypes(), invocation.getArguments());</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (RpcUtils.isReturnTypeFuture(invocation)) {</span>
+<span class="nc" id="L88">                return new AsyncRpcResult((CompletableFuture&lt;Object&gt;) obj);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            } else if (rpcContext.isAsyncStarted()) { // ignore obj in case of RpcContext.startAsync()? always rely on user to write back.</span>
+<span class="nc" id="L90">                return new AsyncRpcResult(((AsyncContextImpl)(rpcContext.getAsyncContext())).getInternalFuture());</span>
+            } else {
+<span class="nc" id="L92">                return new RpcResult(obj);</span>
+            }
+<span class="nc" id="L94">        } catch (InvocationTargetException e) {</span>
+            // TODO async throw exception before async thread write back, should stop asyncContext
+<span class="nc bnc" id="L96" title="All 4 branches missed.">            if (rpcContext.isAsyncStarted() &amp;&amp; !rpcContext.stopAsync()) {</span>
+<span class="nc" id="L97">                logger.error(&quot;Provider async started, but got an exception from the original method, cannot write the exception back to consumer because an async result may have returned the new thread.&quot;, e);</span>
+            }
+<span class="nc" id="L99">            return new RpcResult(e.getTargetException());</span>
+<span class="nc" id="L100">        } catch (Throwable e) {</span>
+<span class="nc" id="L101">            throw new RpcException(&quot;Failed to invoke remote proxy method &quot; + invocation.getMethodName() + &quot; to &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    protected abstract Object doInvoke(T proxy, String methodName, Class&lt;?&gt;[] parameterTypes, Object[] arguments) throws Throwable;
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        return getInterface() + &quot; -&gt; &quot; + (getUrl() == null ? &quot; &quot; : getUrl().toString());</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

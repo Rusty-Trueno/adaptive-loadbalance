@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceBean.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring</a> &gt; <span class="el_source">ReferenceBean.java</span></div><h1>ReferenceBean.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.ApplicationConfig;
+import org.apache.dubbo.config.ConfigCenterConfig;
+import org.apache.dubbo.config.ConsumerConfig;
+import org.apache.dubbo.config.MetadataReportConfig;
+import org.apache.dubbo.config.ModuleConfig;
+import org.apache.dubbo.config.MonitorConfig;
+import org.apache.dubbo.config.ReferenceConfig;
+import org.apache.dubbo.config.RegistryConfig;
+import org.apache.dubbo.config.MetricsConfig;
+import org.apache.dubbo.config.annotation.Reference;
+import org.apache.dubbo.config.spring.extension.SpringExtensionFactory;
+import org.apache.dubbo.config.support.Parameter;
+
+import org.springframework.beans.factory.BeanFactoryUtils;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * ReferenceFactoryBean
+ */
+public class ReferenceBean&lt;T&gt; extends ReferenceConfig&lt;T&gt; implements FactoryBean, ApplicationContextAware, InitializingBean, DisposableBean {
+
+    private static final long serialVersionUID = 213195494150089726L;
+
+    private transient ApplicationContext applicationContext;
+
+    public ReferenceBean() {
+<span class="nc" id="L57">        super();</span>
+<span class="nc" id="L58">    }</span>
+
+    public ReferenceBean(Reference reference) {
+<span class="nc" id="L61">        super(reference);</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) {
+<span class="nc" id="L66">        this.applicationContext = applicationContext;</span>
+<span class="nc" id="L67">        SpringExtensionFactory.addApplicationContext(applicationContext);</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public Object getObject() {
+<span class="nc" id="L72">        return get();</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getObjectType() {
+<span class="nc" id="L77">        return getInterfaceClass();</span>
+    }
+
+    @Override
+    @Parameter(excluded = true)
+    public boolean isSingleton() {
+<span class="nc" id="L83">        return true;</span>
+    }
+
+    @Override
+    @SuppressWarnings({&quot;unchecked&quot;})
+    public void afterPropertiesSet() throws Exception {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (applicationContext != null) {</span>
+<span class="nc" id="L90">            BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ConfigCenterBean.class, false, false);</span>
+        }
+
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (getConsumer() == null) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            Map&lt;String, ConsumerConfig&gt; consumerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ConsumerConfig.class, false, false);</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">            if (consumerConfigMap != null &amp;&amp; consumerConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L96">                ConsumerConfig consumerConfig = null;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                for (ConsumerConfig config : consumerConfigMap.values()) {</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">                    if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                        if (consumerConfig != null) {</span>
+<span class="nc" id="L100">                            throw new IllegalStateException(&quot;Duplicate consumer configs: &quot; + consumerConfig + &quot; and &quot; + config);</span>
+                        }
+<span class="nc" id="L102">                        consumerConfig = config;</span>
+                    }
+<span class="nc" id="L104">                }</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                if (consumerConfig != null) {</span>
+<span class="nc" id="L106">                    setConsumer(consumerConfig);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (getApplication() == null</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">                &amp;&amp; (getConsumer() == null || getConsumer().getApplication() == null)) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            Map&lt;String, ApplicationConfig&gt; applicationConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ApplicationConfig.class, false, false);</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">            if (applicationConfigMap != null &amp;&amp; applicationConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L114">                ApplicationConfig applicationConfig = null;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                for (ApplicationConfig config : applicationConfigMap.values()) {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                    if (applicationConfig != null) {</span>
+<span class="nc" id="L117">                        throw new IllegalStateException(&quot;Duplicate application configs: &quot; + applicationConfig + &quot; and &quot; + config);</span>
+                    }
+<span class="nc" id="L119">                    applicationConfig = config;</span>
+<span class="nc" id="L120">                }</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (applicationConfig != null) {</span>
+<span class="nc" id="L122">                    setApplication(applicationConfig);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (getModule() == null</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">                &amp;&amp; (getConsumer() == null || getConsumer().getModule() == null)) {</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            Map&lt;String, ModuleConfig&gt; moduleConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ModuleConfig.class, false, false);</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">            if (moduleConfigMap != null &amp;&amp; moduleConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L130">                ModuleConfig moduleConfig = null;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                for (ModuleConfig config : moduleConfigMap.values()) {</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                    if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                        if (moduleConfig != null) {</span>
+<span class="nc" id="L134">                            throw new IllegalStateException(&quot;Duplicate module configs: &quot; + moduleConfig + &quot; and &quot; + config);</span>
+                        }
+<span class="nc" id="L136">                        moduleConfig = config;</span>
+                    }
+<span class="nc" id="L138">                }</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                if (moduleConfig != null) {</span>
+<span class="nc" id="L140">                    setModule(moduleConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (StringUtils.isEmpty(getRegistryIds())) {</span>
+<span class="nc bnc" id="L146" title="All 4 branches missed.">            if (getApplication() != null &amp;&amp; StringUtils.isNotEmpty(getApplication().getRegistryIds())) {</span>
+<span class="nc" id="L147">                setRegistryIds(getApplication().getRegistryIds());</span>
+            }
+<span class="nc bnc" id="L149" title="All 4 branches missed.">            if (getConsumer() != null &amp;&amp; StringUtils.isNotEmpty(getConsumer().getRegistryIds())) {</span>
+<span class="nc" id="L150">                setRegistryIds(getConsumer().getRegistryIds());</span>
+            }
+        }
+
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(getRegistries())</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">                &amp;&amp; (getConsumer() == null || CollectionUtils.isEmpty(getConsumer().getRegistries()))</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                &amp;&amp; (getApplication() == null || CollectionUtils.isEmpty(getApplication().getRegistries()))) {</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            Map&lt;String, RegistryConfig&gt; registryConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, RegistryConfig.class, false, false);</span>
+<span class="nc bnc" id="L158" title="All 4 branches missed.">            if (registryConfigMap != null &amp;&amp; registryConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L159">                List&lt;RegistryConfig&gt; registryConfigs = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(registryIds)) {</span>
+<span class="nc" id="L161">                    Arrays.stream(Constants.COMMA_SPLIT_PATTERN.split(registryIds)).forEach(id -&gt; {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                        if (registryConfigMap.containsKey(id)) {</span>
+<span class="nc" id="L163">                            registryConfigs.add(registryConfigMap.get(id));</span>
+                        }
+<span class="nc" id="L165">                    });</span>
+                }
+
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                if (registryConfigs.isEmpty()) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                    for (RegistryConfig config : registryConfigMap.values()) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                        if (StringUtils.isEmpty(registryIds)) {</span>
+<span class="nc" id="L171">                            registryConfigs.add(config);</span>
+                        }
+<span class="nc" id="L173">                    }</span>
+                }
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                if (!registryConfigs.isEmpty()) {</span>
+<span class="nc" id="L176">                    super.setRegistries(registryConfigs);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (getMetadataReportConfig() == null) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            Map&lt;String, MetadataReportConfig&gt; metadataReportConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MetadataReportConfig.class, false, false);</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">            if (metadataReportConfigMap != null &amp;&amp; metadataReportConfigMap.size() == 1) {</span>
+                // first elements
+<span class="nc" id="L185">                super.setMetadataReportConfig(metadataReportConfigMap.values().iterator().next());</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">            } else if (metadataReportConfigMap != null &amp;&amp; metadataReportConfigMap.size() &gt; 1) {</span>
+<span class="nc" id="L187">                throw new IllegalStateException(&quot;Multiple MetadataReport configs: &quot; + metadataReportConfigMap);</span>
+            }
+        }
+
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (getConfigCenter() == null) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            Map&lt;String, ConfigCenterConfig&gt; configenterMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ConfigCenterConfig.class, false, false);</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">            if (configenterMap != null &amp;&amp; configenterMap.size() == 1) {</span>
+<span class="nc" id="L194">                super.setConfigCenter(configenterMap.values().iterator().next());</span>
+<span class="nc bnc" id="L195" title="All 4 branches missed.">            } else if (configenterMap != null &amp;&amp; configenterMap.size() &gt; 1) {</span>
+<span class="nc" id="L196">                throw new IllegalStateException(&quot;Multiple ConfigCenter found:&quot; + configenterMap);</span>
+            }
+        }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (getMonitor() == null</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                &amp;&amp; (getConsumer() == null || getConsumer().getMonitor() == null)</span>
+<span class="nc bnc" id="L202" title="All 4 branches missed.">                &amp;&amp; (getApplication() == null || getApplication().getMonitor() == null)) {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            Map&lt;String, MonitorConfig&gt; monitorConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MonitorConfig.class, false, false);</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">            if (monitorConfigMap != null &amp;&amp; monitorConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L205">                MonitorConfig monitorConfig = null;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                for (MonitorConfig config : monitorConfigMap.values()) {</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">                    if (config.isDefault() == null || config.isDefault()) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                        if (monitorConfig != null) {</span>
+<span class="nc" id="L209">                            throw new IllegalStateException(&quot;Duplicate monitor configs: &quot; + monitorConfig + &quot; and &quot; + config);</span>
+                        }
+<span class="nc" id="L211">                        monitorConfig = config;</span>
+                    }
+<span class="nc" id="L213">                }</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                if (monitorConfig != null) {</span>
+<span class="nc" id="L215">                    setMonitor(monitorConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (getMetrics() == null) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            Map&lt;String, MetricsConfig&gt; metricsConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MetricsConfig.class, false, false);</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">            if (metricsConfigMap != null &amp;&amp; metricsConfigMap.size() &gt; 0) {</span>
+<span class="nc" id="L223">                MetricsConfig metricsConfig = null;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                for (MetricsConfig config : metricsConfigMap.values()) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                    if (metricsConfig != null) {</span>
+<span class="nc" id="L226">                        throw new IllegalStateException(&quot;Duplicate metrics configs: &quot; + metricsConfig + &quot; and &quot; + config);</span>
+                    }
+<span class="nc" id="L228">                    metricsConfig = config;</span>
+<span class="nc" id="L229">                }</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                if (metricsConfig != null) {</span>
+<span class="nc" id="L231">                    setMetrics(metricsConfig);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (shouldInit()) {</span>
+<span class="nc" id="L237">            getObject();</span>
+        }
+<span class="nc" id="L239">    }</span>
+
+    @Override
+    public void destroy() {
+        // do nothing
+<span class="nc" id="L244">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

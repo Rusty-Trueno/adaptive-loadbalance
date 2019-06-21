@@ -1,0 +1,716 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ThriftCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift</a> &gt; <span class="el_source">ThriftCodec.java</span></div><h1>ThriftCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBufferInputStream;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.protocol.thrift.io.RandomAccessByteArrayOutputStream;
+import org.apache.thrift.TApplicationException;
+import org.apache.thrift.TBase;
+import org.apache.thrift.TException;
+import org.apache.thrift.TFieldIdEnum;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TMessage;
+import org.apache.thrift.protocol.TMessageType;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TFramedTransport;
+import org.apache.thrift.transport.TIOStreamTransport;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Thrift framed protocol codec.
+ *
+ * &lt;pre&gt;
+ * |&lt;-                                  message header                                  -&gt;|&lt;- message body -&gt;|
+ * +----------------+----------------------+------------------+---------------------------+------------------+
+ * | magic (2 bytes)|message size (4 bytes)|head size(2 bytes)| version (1 byte) | header |   message body   |
+ * +----------------+----------------------+------------------+---------------------------+------------------+
+ * |&lt;-                                               message size                                          -&gt;|
+ * &lt;/pre&gt;
+ *
+ * &lt;p&gt;
+ * &lt;b&gt;header fields in version 1&lt;/b&gt;
+ * &lt;ol&gt;
+ * &lt;li&gt;string - service name&lt;/li&gt;
+ * &lt;li&gt;long   - dubbo request id&lt;/li&gt;
+ * &lt;/ol&gt;
+ * &lt;/p&gt;
+ */
+
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift instead
+ */
+@Deprecated
+<span class="nc" id="L78">public class ThriftCodec implements Codec2 {</span>
+
+    public static final int MESSAGE_LENGTH_INDEX = 2;
+    public static final int MESSAGE_HEADER_LENGTH_INDEX = 6;
+    public static final int MESSAGE_SHORTEST_LENGTH = 10;
+    public static final String NAME = &quot;thrift&quot;;
+    public static final String PARAMETER_CLASS_NAME_GENERATOR = &quot;class.name.generator&quot;;
+    public static final byte VERSION = (byte) 1;
+    public static final short MAGIC = (short) 0xdabc;
+<span class="nc" id="L87">    static final ConcurrentMap&lt;Long, RequestData&gt; CACHED_REQUEST =</span>
+            new ConcurrentHashMap&lt;Long, RequestData&gt;();
+<span class="nc" id="L89">    private static final AtomicInteger THRIFT_SEQ_ID = new AtomicInteger(0);</span>
+<span class="nc" id="L90">    private static final ConcurrentMap&lt;String, Class&lt;?&gt;&gt; CACHED_CLASS =</span>
+            new ConcurrentHashMap&lt;String, Class&lt;?&gt;&gt;();
+
+    private static int nextSeqId() {
+<span class="nc" id="L94">        return THRIFT_SEQ_ID.incrementAndGet();</span>
+    }
+
+    // just for test
+    static int getSeqId() {
+<span class="nc" id="L99">        return THRIFT_SEQ_ID.get();</span>
+    }
+
+    @Override
+    public void encode(Channel channel, ChannelBuffer buffer, Object message)
+            throws IOException {
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (message instanceof Request) {</span>
+<span class="nc" id="L107">            encodeRequest(channel, buffer, (Request) message);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        } else if (message instanceof Response) {</span>
+<span class="nc" id="L109">            encodeResponse(channel, buffer, (Response) message);</span>
+        } else {
+<span class="nc" id="L111">            throw new UnsupportedOperationException(&quot;Thrift codec only support encode &quot;</span>
+<span class="nc" id="L112">                    + Request.class.getName() + &quot; and &quot; + Response.class.getName());</span>
+        }
+
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+
+<span class="nc" id="L120">        int available = buffer.readableBytes();</span>
+
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (available &lt; MESSAGE_SHORTEST_LENGTH) {</span>
+
+<span class="nc" id="L124">            return DecodeResult.NEED_MORE_INPUT;</span>
+
+        } else {
+
+<span class="nc" id="L128">            TIOStreamTransport transport = new TIOStreamTransport(new ChannelBufferInputStream(buffer));</span>
+
+<span class="nc" id="L130">            TBinaryProtocol protocol = new TBinaryProtocol(transport);</span>
+
+            short magic;
+            int messageLength;
+
+            try {
+//                protocol.readI32(); // skip the first message length
+<span class="nc" id="L137">                byte[] bytes = new byte[4];</span>
+<span class="nc" id="L138">                transport.read(bytes, 0, 4);</span>
+<span class="nc" id="L139">                magic = protocol.readI16();</span>
+<span class="nc" id="L140">                messageLength = protocol.readI32();</span>
+
+<span class="nc" id="L142">            } catch (TException e) {</span>
+<span class="nc" id="L143">                throw new IOException(e.getMessage(), e);</span>
+<span class="nc" id="L144">            }</span>
+
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (MAGIC != magic) {</span>
+<span class="nc" id="L147">                throw new IOException(&quot;Unknown magic code &quot; + magic);</span>
+            }
+
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (available &lt; messageLength) {</span>
+<span class="nc" id="L151">                return DecodeResult.NEED_MORE_INPUT;</span>
+            }
+
+<span class="nc" id="L154">            return decode(protocol);</span>
+
+        }
+
+    }
+
+    private Object decode(TProtocol protocol)
+            throws IOException {
+
+        // version
+        String serviceName;
+        String path;
+        long id;
+
+        TMessage message;
+
+        try {
+<span class="nc" id="L171">            protocol.readI16();</span>
+<span class="nc" id="L172">            protocol.readByte();</span>
+<span class="nc" id="L173">            serviceName = protocol.readString();</span>
+<span class="nc" id="L174">            path = protocol.readString();</span>
+<span class="nc" id="L175">            id = protocol.readI64();</span>
+<span class="nc" id="L176">            message = protocol.readMessageBegin();</span>
+<span class="nc" id="L177">        } catch (TException e) {</span>
+<span class="nc" id="L178">            throw new IOException(e.getMessage(), e);</span>
+<span class="nc" id="L179">        }</span>
+
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (message.type == TMessageType.CALL) {</span>
+
+<span class="nc" id="L183">            RpcInvocation result = new RpcInvocation();</span>
+<span class="nc" id="L184">            result.setAttachment(Constants.INTERFACE_KEY, serviceName);</span>
+<span class="nc" id="L185">            result.setAttachment(Constants.PATH_KEY, path);</span>
+<span class="nc" id="L186">            result.setMethodName(message.name);</span>
+
+<span class="nc" id="L188">            String argsClassName = ExtensionLoader.getExtensionLoader(ClassNameGenerator.class)</span>
+<span class="nc" id="L189">                    .getExtension(ThriftClassNameGenerator.NAME).generateArgsClassName(serviceName, message.name);</span>
+
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            if (StringUtils.isEmpty(argsClassName)) {</span>
+<span class="nc" id="L192">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION,</span>
+                        &quot;The specified interface name incorrect.&quot;);
+            }
+
+<span class="nc" id="L196">            Class clazz = CACHED_CLASS.get(argsClassName);</span>
+
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (clazz == null) {</span>
+                try {
+
+<span class="nc" id="L201">                    clazz = ClassUtils.forNameWithThreadContextClassLoader(argsClassName);</span>
+
+<span class="nc" id="L203">                    CACHED_CLASS.putIfAbsent(argsClassName, clazz);</span>
+
+<span class="nc" id="L205">                } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L206">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L207">                }</span>
+            }
+
+            TBase args;
+
+            try {
+<span class="nc" id="L213">                args = (TBase) clazz.newInstance();</span>
+<span class="nc" id="L214">            } catch (InstantiationException e) {</span>
+<span class="nc" id="L215">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L216">            } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L217">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L218">            }</span>
+
+            try {
+<span class="nc" id="L221">                args.read(protocol);</span>
+<span class="nc" id="L222">                protocol.readMessageEnd();</span>
+<span class="nc" id="L223">            } catch (TException e) {</span>
+<span class="nc" id="L224">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L225">            }</span>
+
+<span class="nc" id="L227">            List&lt;Object&gt; parameters = new ArrayList&lt;Object&gt;();</span>
+<span class="nc" id="L228">            List&lt;Class&lt;?&gt;&gt; parameterTypes = new ArrayList&lt;Class&lt;?&gt;&gt;();</span>
+<span class="nc" id="L229">            int index = 1;</span>
+
+            while (true) {
+
+<span class="nc" id="L233">                TFieldIdEnum fieldIdEnum = args.fieldForId(index++);</span>
+
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                if (fieldIdEnum == null) {</span>
+<span class="nc" id="L236">                    break;</span>
+                }
+
+<span class="nc" id="L239">                String fieldName = fieldIdEnum.getFieldName();</span>
+
+<span class="nc" id="L241">                String getMethodName = ThriftUtils.generateGetMethodName(fieldName);</span>
+
+                Method getMethod;
+
+                try {
+<span class="nc" id="L246">                    getMethod = clazz.getMethod(getMethodName);</span>
+<span class="nc" id="L247">                } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L248">                    throw new RpcException(</span>
+<span class="nc" id="L249">                            RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L250">                }</span>
+
+<span class="nc" id="L252">                parameterTypes.add(getMethod.getReturnType());</span>
+                try {
+<span class="nc" id="L254">                    parameters.add(getMethod.invoke(args));</span>
+<span class="nc" id="L255">                } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L256">                    throw new RpcException(</span>
+<span class="nc" id="L257">                            RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L258">                } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L259">                    throw new RpcException(</span>
+<span class="nc" id="L260">                            RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L261">                }</span>
+
+<span class="nc" id="L263">            }</span>
+
+<span class="nc" id="L265">            result.setArguments(parameters.toArray());</span>
+<span class="nc" id="L266">            result.setParameterTypes(parameterTypes.toArray(new Class[parameterTypes.size()]));</span>
+
+<span class="nc" id="L268">            Request request = new Request(id);</span>
+<span class="nc" id="L269">            request.setData(result);</span>
+
+<span class="nc" id="L271">            CACHED_REQUEST.putIfAbsent(id,</span>
+<span class="nc" id="L272">                    RequestData.create(message.seqid, serviceName, message.name));</span>
+
+<span class="nc" id="L274">            return request;</span>
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        } else if (message.type == TMessageType.EXCEPTION) {</span>
+
+            TApplicationException exception;
+
+            try {
+<span class="nc" id="L281">                exception = TApplicationException.read(protocol);</span>
+<span class="nc" id="L282">                protocol.readMessageEnd();</span>
+<span class="nc" id="L283">            } catch (TException e) {</span>
+<span class="nc" id="L284">                throw new IOException(e.getMessage(), e);</span>
+<span class="nc" id="L285">            }</span>
+
+<span class="nc" id="L287">            RpcResult result = new RpcResult();</span>
+
+<span class="nc" id="L289">            result.setException(new RpcException(exception.getMessage()));</span>
+
+<span class="nc" id="L291">            Response response = new Response();</span>
+
+<span class="nc" id="L293">            response.setResult(result);</span>
+
+<span class="nc" id="L295">            response.setId(id);</span>
+
+<span class="nc" id="L297">            return response;</span>
+
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        } else if (message.type == TMessageType.REPLY) {</span>
+
+<span class="nc" id="L301">            String resultClassName = ExtensionLoader.getExtensionLoader(ClassNameGenerator.class)</span>
+<span class="nc" id="L302">                    .getExtension(ThriftClassNameGenerator.NAME).generateResultClassName(serviceName, message.name);</span>
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            if (StringUtils.isEmpty(resultClassName)) {</span>
+<span class="nc" id="L305">                throw new IllegalArgumentException(&quot;Could not infer service result class name from service name &quot;</span>
+                        + serviceName + &quot;, the service name you specified may not generated by thrift idl compiler&quot;);
+            }
+
+<span class="nc" id="L309">            Class&lt;?&gt; clazz = CACHED_CLASS.get(resultClassName);</span>
+
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            if (clazz == null) {</span>
+
+                try {
+
+<span class="nc" id="L315">                    clazz = ClassUtils.forNameWithThreadContextClassLoader(resultClassName);</span>
+
+<span class="nc" id="L317">                    CACHED_CLASS.putIfAbsent(resultClassName, clazz);</span>
+
+<span class="nc" id="L319">                } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L320">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L321">                }</span>
+
+            }
+
+            TBase&lt;?, ? extends TFieldIdEnum&gt; result;
+            try {
+<span class="nc" id="L327">                result = (TBase&lt;?, ?&gt;) clazz.newInstance();</span>
+<span class="nc" id="L328">            } catch (InstantiationException e) {</span>
+<span class="nc" id="L329">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L330">            } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L331">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L332">            }</span>
+
+            try {
+<span class="nc" id="L335">                result.read(protocol);</span>
+<span class="nc" id="L336">                protocol.readMessageEnd();</span>
+<span class="nc" id="L337">            } catch (TException e) {</span>
+<span class="nc" id="L338">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L339">            }</span>
+
+<span class="nc" id="L341">            Object realResult = null;</span>
+
+<span class="nc" id="L343">            int index = 0;</span>
+
+            while (true) {
+
+<span class="nc" id="L347">                TFieldIdEnum fieldIdEnum = result.fieldForId(index++);</span>
+
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                if (fieldIdEnum == null) {</span>
+<span class="nc" id="L350">                    break;</span>
+                }
+
+                Field field;
+
+                try {
+<span class="nc" id="L356">                    field = clazz.getDeclaredField(fieldIdEnum.getFieldName());</span>
+<span class="nc" id="L357">                    field.setAccessible(true);</span>
+<span class="nc" id="L358">                } catch (NoSuchFieldException e) {</span>
+<span class="nc" id="L359">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L360">                }</span>
+
+                try {
+<span class="nc" id="L363">                    realResult = field.get(result);</span>
+<span class="nc" id="L364">                } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L365">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L366">                }</span>
+
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                if (realResult != null) {</span>
+<span class="nc" id="L369">                    break;</span>
+                }
+
+<span class="nc" id="L372">            }</span>
+
+<span class="nc" id="L374">            Response response = new Response();</span>
+
+<span class="nc" id="L376">            response.setId(id);</span>
+
+<span class="nc" id="L378">            RpcResult rpcResult = new RpcResult();</span>
+
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            if (realResult instanceof Throwable) {</span>
+<span class="nc" id="L381">                rpcResult.setException((Throwable) realResult);</span>
+            } else {
+<span class="nc" id="L383">                rpcResult.setValue(realResult);</span>
+            }
+
+<span class="nc" id="L386">            response.setResult(rpcResult);</span>
+
+<span class="nc" id="L388">            return response;</span>
+
+        } else {
+            // Impossible
+<span class="nc" id="L392">            throw new IOException();</span>
+        }
+
+    }
+
+    private void encodeRequest(Channel channel, ChannelBuffer buffer, Request request)
+            throws IOException {
+
+<span class="nc" id="L400">        RpcInvocation inv = (RpcInvocation) request.getData();</span>
+
+<span class="nc" id="L402">        int seqId = nextSeqId();</span>
+
+<span class="nc" id="L404">        String serviceName = inv.getAttachment(Constants.INTERFACE_KEY);</span>
+
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (StringUtils.isEmpty(serviceName)) {</span>
+<span class="nc" id="L407">            throw new IllegalArgumentException(&quot;Could not find service name in attachment with key &quot;</span>
+                    + Constants.INTERFACE_KEY);
+        }
+
+<span class="nc" id="L411">        TMessage message = new TMessage(</span>
+<span class="nc" id="L412">                inv.getMethodName(),</span>
+                TMessageType.CALL,
+                seqId);
+
+<span class="nc" id="L416">        String methodArgs = ExtensionLoader.getExtensionLoader(ClassNameGenerator.class)</span>
+<span class="nc" id="L417">                .getExtension(channel.getUrl().getParameter(ThriftConstants.CLASS_NAME_GENERATOR_KEY, ThriftClassNameGenerator.NAME))</span>
+<span class="nc" id="L418">                .generateArgsClassName(serviceName, inv.getMethodName());</span>
+
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (StringUtils.isEmpty(methodArgs)) {</span>
+<span class="nc" id="L421">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION,</span>
+                    &quot;Could not encode request, the specified interface may be incorrect.&quot;);
+        }
+
+<span class="nc" id="L425">        Class&lt;?&gt; clazz = CACHED_CLASS.get(methodArgs);</span>
+
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (clazz == null) {</span>
+
+            try {
+
+<span class="nc" id="L431">                clazz = ClassUtils.forNameWithThreadContextClassLoader(methodArgs);</span>
+
+<span class="nc" id="L433">                CACHED_CLASS.putIfAbsent(methodArgs, clazz);</span>
+
+<span class="nc" id="L435">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L436">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L437">            }</span>
+
+        }
+
+        TBase args;
+
+        try {
+<span class="nc" id="L444">            args = (TBase) clazz.newInstance();</span>
+<span class="nc" id="L445">        } catch (InstantiationException e) {</span>
+<span class="nc" id="L446">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L447">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L448">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L449">        }</span>
+
+<span class="nc bnc" id="L451" title="All 2 branches missed.">        for (int i = 0; i &lt; inv.getArguments().length; i++) {</span>
+
+<span class="nc" id="L453">            Object obj = inv.getArguments()[i];</span>
+
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            if (obj == null) {</span>
+<span class="nc" id="L456">                continue;</span>
+            }
+
+<span class="nc" id="L459">            TFieldIdEnum field = args.fieldForId(i + 1);</span>
+
+<span class="nc" id="L461">            String setMethodName = ThriftUtils.generateSetMethodName(field.getFieldName());</span>
+
+            Method method;
+
+            try {
+<span class="nc" id="L466">                method = clazz.getMethod(setMethodName, inv.getParameterTypes()[i]);</span>
+<span class="nc" id="L467">            } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L468">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L469">            }</span>
+
+            try {
+<span class="nc" id="L472">                method.invoke(args, obj);</span>
+<span class="nc" id="L473">            } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L474">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L475">            } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L476">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L477">            }</span>
+
+        }
+
+<span class="nc" id="L481">        RandomAccessByteArrayOutputStream bos = new RandomAccessByteArrayOutputStream(1024);</span>
+
+<span class="nc" id="L483">        TIOStreamTransport transport = new TIOStreamTransport(bos);</span>
+
+<span class="nc" id="L485">        TBinaryProtocol protocol = new TBinaryProtocol(transport);</span>
+
+        int headerLength, messageLength;
+
+<span class="nc" id="L489">        byte[] bytes = new byte[4];</span>
+        try {
+            // magic
+<span class="nc" id="L492">            protocol.writeI16(MAGIC);</span>
+            // message length placeholder
+<span class="nc" id="L494">            protocol.writeI32(Integer.MAX_VALUE);</span>
+            // message header length placeholder
+<span class="nc" id="L496">            protocol.writeI16(Short.MAX_VALUE);</span>
+            // version
+<span class="nc" id="L498">            protocol.writeByte(VERSION);</span>
+            // service name
+<span class="nc" id="L500">            protocol.writeString(serviceName);</span>
+            // path
+<span class="nc" id="L502">            protocol.writeString(inv.getAttachment(Constants.PATH_KEY));</span>
+            // dubbo request id
+<span class="nc" id="L504">            protocol.writeI64(request.getId());</span>
+<span class="nc" id="L505">            protocol.getTransport().flush();</span>
+            // header size
+<span class="nc" id="L507">            headerLength = bos.size();</span>
+
+            // message body
+<span class="nc" id="L510">            protocol.writeMessageBegin(message);</span>
+<span class="nc" id="L511">            args.write(protocol);</span>
+<span class="nc" id="L512">            protocol.writeMessageEnd();</span>
+<span class="nc" id="L513">            protocol.getTransport().flush();</span>
+<span class="nc" id="L514">            int oldIndex = messageLength = bos.size();</span>
+
+            // fill in message length and header length
+            try {
+<span class="nc" id="L518">                TFramedTransport.encodeFrameSize(messageLength, bytes);</span>
+<span class="nc" id="L519">                bos.setWriteIndex(MESSAGE_LENGTH_INDEX);</span>
+<span class="nc" id="L520">                protocol.writeI32(messageLength);</span>
+<span class="nc" id="L521">                bos.setWriteIndex(MESSAGE_HEADER_LENGTH_INDEX);</span>
+<span class="nc" id="L522">                protocol.writeI16((short) (0xffff &amp; headerLength));</span>
+            } finally {
+<span class="nc" id="L524">                bos.setWriteIndex(oldIndex);</span>
+            }
+
+<span class="nc" id="L527">        } catch (TException e) {</span>
+<span class="nc" id="L528">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L529">        }</span>
+
+<span class="nc" id="L531">        buffer.writeBytes(bytes);</span>
+<span class="nc" id="L532">        buffer.writeBytes(bos.toByteArray());</span>
+
+<span class="nc" id="L534">    }</span>
+
+    private void encodeResponse(Channel channel, ChannelBuffer buffer, Response response)
+            throws IOException {
+
+<span class="nc" id="L539">        RpcResult result = (RpcResult) response.getResult();</span>
+
+<span class="nc" id="L541">        RequestData rd = CACHED_REQUEST.get(response.getId());</span>
+
+<span class="nc" id="L543">        String resultClassName = ExtensionLoader.getExtensionLoader(ClassNameGenerator.class).getExtension(</span>
+<span class="nc" id="L544">                channel.getUrl().getParameter(ThriftConstants.CLASS_NAME_GENERATOR_KEY, ThriftClassNameGenerator.NAME))</span>
+<span class="nc" id="L545">                .generateResultClassName(rd.serviceName, rd.methodName);</span>
+
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        if (StringUtils.isEmpty(resultClassName)) {</span>
+<span class="nc" id="L548">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION,</span>
+                    &quot;Could not encode response, the specified interface may be incorrect.&quot;);
+        }
+
+<span class="nc" id="L552">        Class clazz = CACHED_CLASS.get(resultClassName);</span>
+
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (clazz == null) {</span>
+
+            try {
+<span class="nc" id="L557">                clazz = ClassUtils.forNameWithThreadContextClassLoader(resultClassName);</span>
+<span class="nc" id="L558">                CACHED_CLASS.putIfAbsent(resultClassName, clazz);</span>
+<span class="nc" id="L559">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L560">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L561">            }</span>
+
+        }
+
+        TBase resultObj;
+
+        try {
+<span class="nc" id="L568">            resultObj = (TBase) clazz.newInstance();</span>
+<span class="nc" id="L569">        } catch (InstantiationException e) {</span>
+<span class="nc" id="L570">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L571">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L572">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L573">        }</span>
+
+<span class="nc" id="L575">        TApplicationException applicationException = null;</span>
+        TMessage message;
+
+<span class="nc bnc" id="L578" title="All 2 branches missed.">        if (result.hasException()) {</span>
+<span class="nc" id="L579">            Throwable throwable = result.getException();</span>
+<span class="nc" id="L580">            int index = 1;</span>
+<span class="nc" id="L581">            boolean found = false;</span>
+            while (true) {
+<span class="nc" id="L583">                TFieldIdEnum fieldIdEnum = resultObj.fieldForId(index++);</span>
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                if (fieldIdEnum == null) {</span>
+<span class="nc" id="L585">                    break;</span>
+                }
+<span class="nc" id="L587">                String fieldName = fieldIdEnum.getFieldName();</span>
+<span class="nc" id="L588">                String getMethodName = ThriftUtils.generateGetMethodName(fieldName);</span>
+<span class="nc" id="L589">                String setMethodName = ThriftUtils.generateSetMethodName(fieldName);</span>
+                Method getMethod;
+                Method setMethod;
+                try {
+<span class="nc" id="L593">                    getMethod = clazz.getMethod(getMethodName);</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">                    if (getMethod.getReturnType().equals(throwable.getClass())) {</span>
+<span class="nc" id="L595">                        found = true;</span>
+<span class="nc" id="L596">                        setMethod = clazz.getMethod(setMethodName, throwable.getClass());</span>
+<span class="nc" id="L597">                        setMethod.invoke(resultObj, throwable);</span>
+                    }
+<span class="nc" id="L599">                } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L600">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L601">                } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L602">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L603">                } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L604">                    throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L605">                }</span>
+<span class="nc" id="L606">            }</span>
+
+<span class="nc bnc" id="L608" title="All 2 branches missed.">            if (!found) {</span>
+<span class="nc" id="L609">                applicationException = new TApplicationException(throwable.getMessage());</span>
+            }
+
+<span class="nc" id="L612">        } else {</span>
+<span class="nc" id="L613">            Object realResult = result.getResult();</span>
+            // result field id is 0
+<span class="nc" id="L615">            String fieldName = resultObj.fieldForId(0).getFieldName();</span>
+<span class="nc" id="L616">            String setMethodName = ThriftUtils.generateSetMethodName(fieldName);</span>
+<span class="nc" id="L617">            String getMethodName = ThriftUtils.generateGetMethodName(fieldName);</span>
+            Method getMethod;
+            Method setMethod;
+            try {
+<span class="nc" id="L621">                getMethod = clazz.getMethod(getMethodName);</span>
+<span class="nc" id="L622">                setMethod = clazz.getMethod(setMethodName, getMethod.getReturnType());</span>
+<span class="nc" id="L623">                setMethod.invoke(resultObj, realResult);</span>
+<span class="nc" id="L624">            } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L625">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L626">            } catch (InvocationTargetException e) {</span>
+<span class="nc" id="L627">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L628">            } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L629">                throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L630">            }</span>
+
+        }
+
+<span class="nc bnc" id="L634" title="All 2 branches missed.">        if (applicationException != null) {</span>
+<span class="nc" id="L635">            message = new TMessage(rd.methodName, TMessageType.EXCEPTION, rd.id);</span>
+        } else {
+<span class="nc" id="L637">            message = new TMessage(rd.methodName, TMessageType.REPLY, rd.id);</span>
+        }
+
+<span class="nc" id="L640">        RandomAccessByteArrayOutputStream bos = new RandomAccessByteArrayOutputStream(1024);</span>
+
+<span class="nc" id="L642">        TIOStreamTransport transport = new TIOStreamTransport(bos);</span>
+
+<span class="nc" id="L644">        TBinaryProtocol protocol = new TBinaryProtocol(transport);</span>
+
+        int messageLength;
+        int headerLength;
+
+<span class="nc" id="L649">        byte[] bytes = new byte[4];</span>
+        try {
+            // magic
+<span class="nc" id="L652">            protocol.writeI16(MAGIC);</span>
+            // message length
+<span class="nc" id="L654">            protocol.writeI32(Integer.MAX_VALUE);</span>
+            // message header length
+<span class="nc" id="L656">            protocol.writeI16(Short.MAX_VALUE);</span>
+            // version
+<span class="nc" id="L658">            protocol.writeByte(VERSION);</span>
+            // service name
+<span class="nc" id="L660">            protocol.writeString(rd.serviceName);</span>
+            // id
+<span class="nc" id="L662">            protocol.writeI64(response.getId());</span>
+<span class="nc" id="L663">            protocol.getTransport().flush();</span>
+<span class="nc" id="L664">            headerLength = bos.size();</span>
+
+            // message
+<span class="nc" id="L667">            protocol.writeMessageBegin(message);</span>
+<span class="nc bnc" id="L668" title="All 3 branches missed.">            switch (message.type) {</span>
+                case TMessageType.EXCEPTION:
+<span class="nc" id="L670">                    applicationException.write(protocol);</span>
+<span class="nc" id="L671">                    break;</span>
+                case TMessageType.REPLY:
+<span class="nc" id="L673">                    resultObj.write(protocol);</span>
+<span class="nc" id="L674">                    break;</span>
+                default:
+            }
+<span class="nc" id="L677">            protocol.writeMessageEnd();</span>
+<span class="nc" id="L678">            protocol.getTransport().flush();</span>
+<span class="nc" id="L679">            int oldIndex = messageLength = bos.size();</span>
+
+            try {
+<span class="nc" id="L682">                TFramedTransport.encodeFrameSize(messageLength, bytes);</span>
+<span class="nc" id="L683">                bos.setWriteIndex(MESSAGE_LENGTH_INDEX);</span>
+<span class="nc" id="L684">                protocol.writeI32(messageLength);</span>
+<span class="nc" id="L685">                bos.setWriteIndex(MESSAGE_HEADER_LENGTH_INDEX);</span>
+<span class="nc" id="L686">                protocol.writeI16((short) (0xffff &amp; headerLength));</span>
+            } finally {
+<span class="nc" id="L688">                bos.setWriteIndex(oldIndex);</span>
+            }
+
+<span class="nc" id="L691">        } catch (TException e) {</span>
+<span class="nc" id="L692">            throw new RpcException(RpcException.SERIALIZATION_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L693">        }</span>
+
+<span class="nc" id="L695">        buffer.writeBytes(bytes);</span>
+<span class="nc" id="L696">        buffer.writeBytes(bos.toByteArray());</span>
+
+<span class="nc" id="L698">    }</span>
+
+<span class="nc" id="L700">    static class RequestData {</span>
+        int id;
+        String serviceName;
+        String methodName;
+
+        static RequestData create(int id, String sn, String mn) {
+<span class="nc" id="L706">            RequestData result = new RequestData();</span>
+<span class="nc" id="L707">            result.id = id;</span>
+<span class="nc" id="L708">            result.serviceName = sn;</span>
+<span class="nc" id="L709">            result.methodName = mn;</span>
+<span class="nc" id="L710">            return result;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

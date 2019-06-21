@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpClientConnection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-hessian</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.hessian</a> &gt; <span class="el_source">HttpClientConnection.java</span></div><h1>HttpClientConnection.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.hessian;
+
+import com.caucho.hessian.client.HessianConnection;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.message.BasicHeader;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
+
+/**
+ * HttpClientConnection
+ */
+public class HttpClientConnection implements HessianConnection {
+
+    private final HttpClient httpClient;
+
+    private final ByteArrayOutputStream output;
+
+    private final HttpPost request;
+
+    private volatile HttpResponse response;
+
+<span class="nc" id="L45">    public HttpClientConnection(HttpClient httpClient, URL url) {</span>
+<span class="nc" id="L46">        this.httpClient = httpClient;</span>
+<span class="nc" id="L47">        this.output = new ByteArrayOutputStream();</span>
+<span class="nc" id="L48">        this.request = new HttpPost(url.toString());</span>
+<span class="nc" id="L49">    }</span>
+
+    @Override
+    public void addHeader(String key, String value) {
+<span class="nc" id="L53">        request.addHeader(new BasicHeader(key, value));</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public OutputStream getOutputStream() throws IOException {
+<span class="nc" id="L58">        return output;</span>
+    }
+
+    @Override
+    public void sendRequest() throws IOException {
+<span class="nc" id="L63">        request.setEntity(new ByteArrayEntity(output.toByteArray()));</span>
+<span class="nc" id="L64">        this.response = httpClient.execute(request);</span>
+<span class="nc" id="L65">    }</span>
+
+    @Override
+    public int getStatusCode() {
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        return response == null || response.getStatusLine() == null ? 0 : response.getStatusLine().getStatusCode();</span>
+    }
+
+    @Override
+    public String getStatusMessage() {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        return response == null || response.getStatusLine() == null ? null : response.getStatusLine().getReasonPhrase();</span>
+    }
+
+    @Override
+    public String getContentEncoding() {
+<span class="nc bnc" id="L79" title="All 6 branches missed.">        return (response == null || response.getEntity() == null || response.getEntity().getContentEncoding() == null) ? null : response.getEntity().getContentEncoding().getValue();</span>
+    }
+
+    @Override
+    public InputStream getInputStream() throws IOException {
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        return response == null || response.getEntity() == null ? null : response.getEntity().getContent();</span>
+    }
+
+    @Override
+    public void close() throws IOException {
+<span class="nc" id="L89">        HttpPost request = this.request;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (request != null) {</span>
+<span class="nc" id="L91">            request.abort();</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public void destroy() throws IOException {
+<span class="nc" id="L97">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

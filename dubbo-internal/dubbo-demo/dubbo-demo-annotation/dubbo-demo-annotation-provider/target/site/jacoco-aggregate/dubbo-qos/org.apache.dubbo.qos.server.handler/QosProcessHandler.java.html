@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QosProcessHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.server.handler</a> &gt; <span class="el_source">QosProcessHandler.java</span></div><h1>QosProcessHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.server.handler;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.codec.string.StringEncoder;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.CharsetUtil;
+import io.netty.util.concurrent.ScheduledFuture;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+public class QosProcessHandler extends ByteToMessageDecoder {
+
+    private ScheduledFuture&lt;?&gt; welcomeFuture;
+
+    private String welcome;
+    // true means to accept foreign IP
+    private boolean acceptForeignIp;
+
+    public static final String prompt = &quot;dubbo&gt;&quot;;
+
+<span class="nc" id="L48">    public QosProcessHandler(String welcome, boolean acceptForeignIp) {</span>
+<span class="nc" id="L49">        this.welcome = welcome;</span>
+<span class="nc" id="L50">        this.acceptForeignIp = acceptForeignIp;</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+<span class="nc" id="L55">        welcomeFuture = ctx.executor().schedule(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                if (welcome != null) {</span>
+<span class="nc" id="L60">                    ctx.write(Unpooled.wrappedBuffer(welcome.getBytes()));</span>
+<span class="nc" id="L61">                    ctx.writeAndFlush(Unpooled.wrappedBuffer(prompt.getBytes()));</span>
+                }
+<span class="nc" id="L63">            }</span>
+
+        }, 500, TimeUnit.MILLISECONDS);
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List&lt;Object&gt; out) throws Exception {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (in.readableBytes() &lt; 1) {</span>
+<span class="nc" id="L71">            return;</span>
+        }
+
+        // read one byte to guess protocol
+<span class="nc" id="L75">        final int magic = in.getByte(in.readerIndex());</span>
+
+<span class="nc" id="L77">        ChannelPipeline p = ctx.pipeline();</span>
+<span class="nc" id="L78">        p.addLast(new LocalHostPermitHandler(acceptForeignIp));</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (isHttp(magic)) {</span>
+            // no welcome output for http protocol
+<span class="nc bnc" id="L81" title="All 4 branches missed.">            if (welcomeFuture != null &amp;&amp; welcomeFuture.isCancellable()) {</span>
+<span class="nc" id="L82">                welcomeFuture.cancel(false);</span>
+            }
+<span class="nc" id="L84">            p.addLast(new HttpServerCodec());</span>
+<span class="nc" id="L85">            p.addLast(new HttpObjectAggregator(1048576));</span>
+<span class="nc" id="L86">            p.addLast(new HttpProcessHandler());</span>
+<span class="nc" id="L87">            p.remove(this);</span>
+        } else {
+<span class="nc" id="L89">            p.addLast(new LineBasedFrameDecoder(2048));</span>
+<span class="nc" id="L90">            p.addLast(new StringDecoder(CharsetUtil.UTF_8));</span>
+<span class="nc" id="L91">            p.addLast(new StringEncoder(CharsetUtil.UTF_8));</span>
+<span class="nc" id="L92">            p.addLast(new IdleStateHandler(0, 0, 5 * 60));</span>
+<span class="nc" id="L93">            p.addLast(new TelnetProcessHandler());</span>
+<span class="nc" id="L94">            p.remove(this);</span>
+        }
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (evt instanceof IdleStateEvent) {</span>
+<span class="nc" id="L101">            ExecutorUtil.cancelScheduledFuture(welcomeFuture);</span>
+<span class="nc" id="L102">            ctx.close();</span>
+        }
+<span class="nc" id="L104">    }</span>
+
+    // G for GET, and P for POST
+    private static boolean isHttp(int magic) {
+<span class="nc bnc" id="L108" title="All 4 branches missed.">        return magic == 'G' || magic == 'P';</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TagRouter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.router.tag</a> &gt; <span class="el_source">TagRouter.java</span></div><h1>TagRouter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.router.tag;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.configcenter.ConfigChangeEvent;
+import org.apache.dubbo.configcenter.ConfigChangeType;
+import org.apache.dubbo.configcenter.ConfigurationListener;
+import org.apache.dubbo.configcenter.DynamicConfiguration;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.cluster.router.AbstractRouter;
+import org.apache.dubbo.rpc.cluster.router.tag.model.TagRouterRule;
+import org.apache.dubbo.rpc.cluster.router.tag.model.TagRuleParser;
+
+import java.net.UnknownHostException;
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import static org.apache.dubbo.common.Constants.FORCE_USE_TAG;
+import static org.apache.dubbo.common.Constants.TAG_KEY;
+
+/**
+ * TagRouter, &quot;application.tag-router&quot;
+ */
+public class TagRouter extends AbstractRouter implements ConfigurationListener {
+    public static final String NAME = &quot;TAG_ROUTER&quot;;
+    private static final int TAG_ROUTER_DEFAULT_PRIORITY = 100;
+<span class="nc" id="L51">    private static final Logger logger = LoggerFactory.getLogger(TagRouter.class);</span>
+    private static final String RULE_SUFFIX = &quot;.tag-router&quot;;
+
+    private TagRouterRule tagRouterRule;
+    private String application;
+
+    public TagRouter(DynamicConfiguration configuration, URL url) {
+<span class="nc" id="L58">        super(configuration, url);</span>
+<span class="nc" id="L59">        this.priority = TAG_ROUTER_DEFAULT_PRIORITY;</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public synchronized void process(ConfigChangeEvent event) {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L65">            logger.debug(&quot;Notification of tag rule, change type is: &quot; + event.getChangeType() + &quot;, raw rule is:\n &quot; +</span>
+<span class="nc" id="L66">                    event.getValue());</span>
+        }
+
+        try {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (event.getChangeType().equals(ConfigChangeType.DELETED)) {</span>
+<span class="nc" id="L71">                this.tagRouterRule = null;</span>
+            } else {
+<span class="nc" id="L73">                this.tagRouterRule = TagRuleParser.parse(event.getValue());</span>
+            }
+<span class="nc" id="L75">        } catch (Exception e) {</span>
+<span class="nc" id="L76">            logger.error(&quot;Failed to parse the raw tag router rule and it will not take effect, please check if the &quot; +</span>
+                    &quot;rule matches with the template, the raw rule is:\n &quot;, e);
+<span class="nc" id="L78">        }</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L83">        return url;</span>
+    }
+
+    @Override
+    public &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; route(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) throws RpcException {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(invokers)) {</span>
+<span class="nc" id="L89">            return invokers;</span>
+        }
+
+        // since the rule can be changed by config center, we should copy one to use.
+<span class="nc" id="L93">        final TagRouterRule tagRouterRuleCopy = tagRouterRule;</span>
+<span class="nc bnc" id="L94" title="All 6 branches missed.">        if (tagRouterRuleCopy == null || !tagRouterRuleCopy.isValid() || !tagRouterRuleCopy.isEnabled()) {</span>
+<span class="nc" id="L95">            return filterUsingStaticTag(invokers, url, invocation);</span>
+        }
+
+<span class="nc" id="L98">        List&lt;Invoker&lt;T&gt;&gt; result = invokers;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        String tag = StringUtils.isEmpty(invocation.getAttachment(TAG_KEY)) ? url.getParameter(TAG_KEY) :</span>
+<span class="nc" id="L100">                invocation.getAttachment(TAG_KEY);</span>
+
+        // if we are requesting for a Provider with a specific tag
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(tag)) {</span>
+<span class="nc" id="L104">            List&lt;String&gt; addresses = tagRouterRuleCopy.getTagnameToAddresses().get(tag);</span>
+            // filter by dynamic tag group first
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(addresses)) {</span>
+<span class="nc" id="L107">                result = filterInvoker(invokers, invoker -&gt; addressMatches(invoker.getUrl(), addresses));</span>
+                // if result is not null OR it's null but force=true, return result directly
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                if (CollectionUtils.isNotEmpty(result) || tagRouterRuleCopy.isForce()) {</span>
+<span class="nc" id="L110">                    return result;</span>
+                }
+            } else {
+                // dynamic tag group doesn't have any item about the requested app OR it's null after filtered by
+                // dynamic tag group but force=false. check static tag
+<span class="nc" id="L115">                result = filterInvoker(invokers, invoker -&gt; tag.equals(invoker.getUrl().getParameter(TAG_KEY)));</span>
+            }
+            // If there's no tagged providers that can match the current tagged request. force.tag is set by default
+            // to false, which means it will invoke any providers without a tag unless it's explicitly disallowed.
+<span class="nc bnc" id="L119" title="All 4 branches missed.">            if (CollectionUtils.isNotEmpty(result) || isForceUseTag(invocation)) {</span>
+<span class="nc" id="L120">                return result;</span>
+            }
+            // FAILOVER: return all Providers without any tags.
+            else {
+<span class="nc" id="L124">                List&lt;Invoker&lt;T&gt;&gt; tmp = filterInvoker(invokers, invoker -&gt; addressNotMatches(invoker.getUrl(),</span>
+<span class="nc" id="L125">                        tagRouterRuleCopy.getAddresses()));</span>
+<span class="nc" id="L126">                return filterInvoker(tmp, invoker -&gt; StringUtils.isEmpty(invoker.getUrl().getParameter(TAG_KEY)));</span>
+            }
+        } else {
+            // List&lt;String&gt; addresses = tagRouterRule.filter(providerApp);
+            // return all addresses in dynamic tag group.
+<span class="nc" id="L131">            List&lt;String&gt; addresses = tagRouterRuleCopy.getAddresses();</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(addresses)) {</span>
+<span class="nc" id="L133">                result = filterInvoker(invokers, invoker -&gt; addressNotMatches(invoker.getUrl(), addresses));</span>
+                // 1. all addresses are in dynamic tag group, return empty list.
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (CollectionUtils.isEmpty(result)) {</span>
+<span class="nc" id="L136">                    return result;</span>
+                }
+                // 2. if there are some addresses that are not in any dynamic tag group, continue to filter using the
+                // static tag group.
+            }
+<span class="nc" id="L141">            return filterInvoker(result, invoker -&gt; {</span>
+<span class="nc" id="L142">                String localTag = invoker.getUrl().getParameter(TAG_KEY);</span>
+<span class="nc bnc" id="L143" title="All 4 branches missed.">                return StringUtils.isEmpty(localTag) || !tagRouterRuleCopy.getTagNames().contains(localTag);</span>
+            });
+        }
+    }
+
+    /**
+     * If there's no dynamic tag rule being set, use static tag in URL.
+     * &lt;p&gt;
+     * A typical scenario is a Consumer using version 2.7.x calls Providers using version 2.6.x or lower,
+     * the Consumer should always respect the tag in provider URL regardless of whether a dynamic tag rule has been set to it or not.
+     * &lt;p&gt;
+     * TODO, to guarantee consistent behavior of interoperability between 2.6- and 2.7+, this method should has the same logic with the TagRouter in 2.6.x.
+     *
+     * @param invokers
+     * @param url
+     * @param invocation
+     * @param &lt;T&gt;
+     * @return
+     */
+    private &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; filterUsingStaticTag(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) {
+<span class="nc" id="L163">        List&lt;Invoker&lt;T&gt;&gt; result = invokers;</span>
+        // Dynamic param
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        String tag = StringUtils.isEmpty(invocation.getAttachment(TAG_KEY)) ? url.getParameter(TAG_KEY) :</span>
+<span class="nc" id="L166">                invocation.getAttachment(TAG_KEY);</span>
+        // Tag request
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (!StringUtils.isEmpty(tag)) {</span>
+<span class="nc" id="L169">            result = filterInvoker(invokers, invoker -&gt; tag.equals(invoker.getUrl().getParameter(Constants.TAG_KEY)));</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">            if (CollectionUtils.isEmpty(result) &amp;&amp; !isForceUseTag(invocation)) {</span>
+<span class="nc" id="L171">                result = filterInvoker(invokers, invoker -&gt; StringUtils.isEmpty(invoker.getUrl().getParameter(Constants.TAG_KEY)));</span>
+            }
+        } else {
+<span class="nc" id="L174">            result = filterInvoker(invokers, invoker -&gt; StringUtils.isEmpty(invoker.getUrl().getParameter(Constants.TAG_KEY)));</span>
+        }
+<span class="nc" id="L176">        return result;</span>
+    }
+
+    @Override
+    public boolean isRuntime() {
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        return tagRouterRule != null &amp;&amp; tagRouterRule.isRuntime();</span>
+    }
+
+    @Override
+    public boolean isForce() {
+        // FIXME
+<span class="nc bnc" id="L187" title="All 4 branches missed.">        return tagRouterRule != null &amp;&amp; tagRouterRule.isForce();</span>
+    }
+
+    private boolean isForceUseTag(Invocation invocation) {
+<span class="nc" id="L191">        return Boolean.valueOf(invocation.getAttachment(FORCE_USE_TAG, url.getParameter(FORCE_USE_TAG, &quot;false&quot;)));</span>
+    }
+
+    private &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; filterInvoker(List&lt;Invoker&lt;T&gt;&gt; invokers, Predicate&lt;Invoker&lt;T&gt;&gt; predicate) {
+<span class="nc" id="L195">        return invokers.stream()</span>
+<span class="nc" id="L196">                .filter(predicate)</span>
+<span class="nc" id="L197">                .collect(Collectors.toList());</span>
+    }
+
+    private boolean addressMatches(URL url, List&lt;String&gt; addresses) {
+<span class="nc bnc" id="L201" title="All 4 branches missed.">        return addresses != null &amp;&amp; checkAddressMatch(addresses, url.getHost(), url.getPort());</span>
+    }
+
+    private boolean addressNotMatches(URL url, List&lt;String&gt; addresses) {
+<span class="nc bnc" id="L205" title="All 4 branches missed.">        return addresses == null || !checkAddressMatch(addresses, url.getHost(), url.getPort());</span>
+    }
+
+    private boolean checkAddressMatch(List&lt;String&gt; addresses, String host, int port) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        for (String address : addresses) {</span>
+            try {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (NetUtils.matchIpExpression(address, host, port)) {</span>
+<span class="nc" id="L212">                    return true;</span>
+                }
+<span class="nc" id="L214">            } catch (UnknownHostException e) {</span>
+<span class="nc" id="L215">                logger.error(&quot;The format of ip address is invalid in tag route. Address :&quot; + address, e);</span>
+<span class="nc" id="L216">            } catch (Exception e) {</span>
+<span class="nc" id="L217">                logger.error(&quot;The format of ip address is invalid in tag route. Address :&quot; + address, e);</span>
+<span class="nc" id="L218">            }</span>
+<span class="nc" id="L219">        }</span>
+<span class="nc" id="L220">        return false;</span>
+    }
+
+    public void setApplication(String app) {
+<span class="nc" id="L224">        this.application = app;</span>
+<span class="nc" id="L225">    }</span>
+
+    @Override
+    public &lt;T&gt; void notify(List&lt;Invoker&lt;T&gt;&gt; invokers) {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(invokers)) {</span>
+<span class="nc" id="L230">            return;</span>
+        }
+
+<span class="nc" id="L233">        Invoker&lt;T&gt; invoker = invokers.get(0);</span>
+<span class="nc" id="L234">        URL url = invoker.getUrl();</span>
+<span class="nc" id="L235">        String providerApplication = url.getParameter(Constants.REMOTE_APPLICATION_KEY);</span>
+
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (StringUtils.isEmpty(providerApplication)) {</span>
+<span class="nc" id="L238">            logger.error(&quot;TagRouter must getConfig from or subscribe to a specific application, but the application &quot; +</span>
+                    &quot;in this TagRouter is not specified.&quot;);
+<span class="nc" id="L240">            return;</span>
+        }
+
+<span class="nc" id="L243">        synchronized (this) {</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (!providerApplication.equals(application)) {</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                if (!StringUtils.isEmpty(application)) {</span>
+<span class="nc" id="L246">                    configuration.removeListener(application + RULE_SUFFIX, this);</span>
+                }
+<span class="nc" id="L248">                String key = providerApplication + RULE_SUFFIX;</span>
+<span class="nc" id="L249">                configuration.addListener(key, this);</span>
+<span class="nc" id="L250">                application = providerApplication;</span>
+<span class="nc" id="L251">                String rawRule = configuration.getConfig(key);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(rawRule)) {</span>
+<span class="nc" id="L253">                    this.process(new ConfigChangeEvent(key, rawRule));</span>
+                }
+            }
+<span class="nc" id="L256">        }</span>
+<span class="nc" id="L257">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

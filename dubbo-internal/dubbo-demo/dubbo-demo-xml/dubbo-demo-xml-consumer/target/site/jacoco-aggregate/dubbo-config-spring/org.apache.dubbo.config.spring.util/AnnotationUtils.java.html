@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnnotationUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.util</a> &gt; <span class="el_source">AnnotationUtils.java</span></div><h1>AnnotationUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.util;
+
+import org.apache.dubbo.config.annotation.Reference;
+import org.apache.dubbo.config.annotation.Service;
+
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertyResolver;
+import org.springframework.util.StringUtils;
+
+import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static java.lang.String.valueOf;
+import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
+import static org.springframework.core.annotation.AnnotationUtils.getAnnotationAttributes;
+import static org.springframework.core.annotation.AnnotationUtils.getDefaultValue;
+import static org.springframework.util.CollectionUtils.arrayToList;
+import static org.springframework.util.ObjectUtils.nullSafeEquals;
+import static org.springframework.util.StringUtils.trimWhitespace;
+
+/**
+ * Annotation Utilities Class
+ *
+ * @see org.springframework.core.annotation.AnnotationUtils
+ * @since 2.5.11
+ */
+<span class="nc" id="L54">public class AnnotationUtils {</span>
+
+    public static String resolveInterfaceName(Service service, Class&lt;?&gt; defaultInterfaceClass)
+            throws IllegalStateException {
+
+        String interfaceName;
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (StringUtils.hasText(service.interfaceName())) {</span>
+<span class="nc" id="L61">            interfaceName = service.interfaceName();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        } else if (!void.class.equals(service.interfaceClass())) {</span>
+<span class="nc" id="L63">            interfaceName = service.interfaceClass().getName();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        } else if (defaultInterfaceClass.isInterface()) {</span>
+<span class="nc" id="L65">            interfaceName = defaultInterfaceClass.getName();</span>
+        } else {
+<span class="nc" id="L67">            throw new IllegalStateException(</span>
+                    &quot;The @Service undefined interfaceClass or interfaceName, and the type &quot;
+<span class="nc" id="L69">                            + defaultInterfaceClass.getName() + &quot; is not a interface.&quot;);</span>
+        }
+
+<span class="nc" id="L72">        return interfaceName;</span>
+
+    }
+
+    public static String resolveInterfaceName(Reference reference, Class&lt;?&gt; defaultInterfaceClass)
+            throws IllegalStateException {
+
+        String interfaceName;
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (!&quot;&quot;.equals(reference.interfaceName())) {</span>
+<span class="nc" id="L81">            interfaceName = reference.interfaceName();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        } else if (!void.class.equals(reference.interfaceClass())) {</span>
+<span class="nc" id="L83">            interfaceName = reference.interfaceClass().getName();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        } else if (defaultInterfaceClass.isInterface()) {</span>
+<span class="nc" id="L85">            interfaceName = defaultInterfaceClass.getName();</span>
+        } else {
+<span class="nc" id="L87">            throw new IllegalStateException(</span>
+                    &quot;The @Reference undefined interfaceClass or interfaceName, and the type &quot;
+<span class="nc" id="L89">                            + defaultInterfaceClass.getName() + &quot; is not a interface.&quot;);</span>
+        }
+
+<span class="nc" id="L92">        return interfaceName;</span>
+
+    }
+
+
+    // Cloned from https://github.com/alibaba/spring-context-support/blob/1.0.2/src/main/java/com/alibaba/spring/util/AnnotationUtils.java
+
+    /**
+     * Is specified {@link Annotation} present on {@link Method}'s declaring class or parameters or itself.
+     *
+     * @param method          {@link Method}
+     * @param annotationClass {@link Annotation} type
+     * @param &lt;A&gt;             {@link Annotation} type
+     * @return If present , return &lt;code&gt;true&lt;/code&gt; , or &lt;code&gt;false&lt;/code&gt;
+     * @since 2.6.6
+     */
+    public static &lt;A extends Annotation&gt; boolean isPresent(Method method, Class&lt;A&gt; annotationClass) {
+
+<span class="nc" id="L110">        Map&lt;ElementType, List&lt;A&gt;&gt; annotationsMap = findAnnotations(method, annotationClass);</span>
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        return !annotationsMap.isEmpty();</span>
+
+    }
+
+    /**
+     * Find specified {@link Annotation} type maps from {@link Method}
+     *
+     * @param method          {@link Method}
+     * @param annotationClass {@link Annotation} type
+     * @param &lt;A&gt;             {@link Annotation} type
+     * @return {@link Annotation} type maps , the {@link ElementType} as key ,
+     * the list of {@link Annotation} as value.
+     * If {@link Annotation} was annotated on {@link Method}'s parameters{@link ElementType#PARAMETER} ,
+     * the associated {@link Annotation} list may contain multiple elements.
+     * @since 2.6.6
+     */
+    public static &lt;A extends Annotation&gt; Map&lt;ElementType, List&lt;A&gt;&gt; findAnnotations(Method method,
+                                                                                   Class&lt;A&gt; annotationClass) {
+
+<span class="nc" id="L131">        Retention retention = annotationClass.getAnnotation(Retention.class);</span>
+
+<span class="nc" id="L133">        RetentionPolicy retentionPolicy = retention.value();</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (!RetentionPolicy.RUNTIME.equals(retentionPolicy)) {</span>
+<span class="nc" id="L136">            return Collections.emptyMap();</span>
+        }
+
+<span class="nc" id="L139">        Map&lt;ElementType, List&lt;A&gt;&gt; annotationsMap = new LinkedHashMap&lt;ElementType, List&lt;A&gt;&gt;();</span>
+
+<span class="nc" id="L141">        Target target = annotationClass.getAnnotation(Target.class);</span>
+
+<span class="nc" id="L143">        ElementType[] elementTypes = target.value();</span>
+
+
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        for (ElementType elementType : elementTypes) {</span>
+
+<span class="nc" id="L148">            List&lt;A&gt; annotationsList = new LinkedList&lt;A&gt;();</span>
+
+<span class="nc bnc" id="L150" title="All 4 branches missed.">            switch (elementType) {</span>
+
+                case PARAMETER:
+
+<span class="nc" id="L154">                    Annotation[][] parameterAnnotations = method.getParameterAnnotations();</span>
+
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    for (Annotation[] annotations : parameterAnnotations) {</span>
+
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                        for (Annotation annotation : annotations) {</span>
+
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                            if (annotationClass.equals(annotation.annotationType())) {</span>
+
+<span class="nc" id="L162">                                annotationsList.add((A) annotation);</span>
+
+                            }
+
+                        }
+
+                    }
+
+<span class="nc" id="L170">                    break;</span>
+
+                case METHOD:
+
+<span class="nc" id="L174">                    A annotation = findAnnotation(method, annotationClass);</span>
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                    if (annotation != null) {</span>
+
+<span class="nc" id="L178">                        annotationsList.add(annotation);</span>
+
+                    }
+
+                    break;
+
+                case TYPE:
+
+<span class="nc" id="L186">                    Class&lt;?&gt; beanType = method.getDeclaringClass();</span>
+
+<span class="nc" id="L188">                    A annotation2 = findAnnotation(beanType, annotationClass);</span>
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                    if (annotation2 != null) {</span>
+
+<span class="nc" id="L192">                        annotationsList.add(annotation2);</span>
+
+                    }
+
+                    break;
+
+            }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (!annotationsList.isEmpty()) {</span>
+
+<span class="nc" id="L202">                annotationsMap.put(elementType, annotationsList);</span>
+
+            }
+
+
+        }
+
+<span class="nc" id="L209">        return Collections.unmodifiableMap(annotationsMap);</span>
+
+    }
+
+    /**
+     * Get the {@link Annotation} attributes
+     *
+     * @param annotation           specified {@link Annotation}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return non-null
+     * @since 2.6.6
+     */
+    public static Map&lt;String, Object&gt; getAttributes(Annotation annotation, boolean ignoreDefaultValue,
+                                                    String... ignoreAttributeNames) {
+<span class="nc" id="L224">        return getAttributes(annotation, null, ignoreDefaultValue, ignoreAttributeNames);</span>
+    }
+
+    /**
+     * Get the {@link Annotation} attributes
+     *
+     * @param annotation           specified {@link Annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return non-null
+     * @since 2.6.6
+     */
+    public static Map&lt;String, Object&gt; getAttributes(Annotation annotation, PropertyResolver propertyResolver,
+                                                    boolean ignoreDefaultValue, String... ignoreAttributeNames) {
+
+<span class="nc" id="L240">        Set&lt;String&gt; ignoreAttributeNamesSet = new HashSet&lt;String&gt;(arrayToList(ignoreAttributeNames));</span>
+
+<span class="nc" id="L242">        Map&lt;String, Object&gt; attributes = getAnnotationAttributes(annotation);</span>
+
+<span class="nc" id="L244">        Map&lt;String, Object&gt; actualAttributes = new LinkedHashMap&lt;String, Object&gt;();</span>
+
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        for (Map.Entry&lt;String, Object&gt; entry : attributes.entrySet()) {</span>
+
+<span class="nc" id="L248">            String attributeName = entry.getKey();</span>
+<span class="nc" id="L249">            Object attributeValue = entry.getValue();</span>
+
+            // ignore default attribute value
+<span class="nc bnc" id="L252" title="All 4 branches missed.">            if (ignoreDefaultValue &amp;&amp; nullSafeEquals(attributeValue, getDefaultValue(annotation, attributeName))) {</span>
+<span class="nc" id="L253">                continue;</span>
+            }
+
+            // ignore attribute name
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            if (ignoreAttributeNamesSet.contains(attributeName)) {</span>
+<span class="nc" id="L258">                continue;</span>
+            }
+
+            /**
+             * @since 2.7.1
+             * ignore annotation member
+             */
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if (attributeValue.getClass().isAnnotation()){</span>
+<span class="nc" id="L266">                continue;</span>
+            }
+<span class="nc bnc" id="L268" title="All 4 branches missed.">            if (attributeValue.getClass().isArray() &amp;&amp; attributeValue.getClass().getComponentType().isAnnotation()){</span>
+<span class="nc" id="L269">                continue;</span>
+            }
+
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (attributeValue instanceof String) {</span>
+<span class="nc" id="L273">                attributeValue = resolvePlaceholders(valueOf(attributeValue), propertyResolver);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            } else if (attributeValue instanceof String[]) {</span>
+<span class="nc" id="L275">                String[] values = (String[]) attributeValue;</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                for (int i = 0; i &lt; values.length; i++) {</span>
+<span class="nc" id="L277">                    values[i] = resolvePlaceholders(values[i], propertyResolver);</span>
+                }
+<span class="nc" id="L279">                attributeValue = values;</span>
+            }
+<span class="nc" id="L281">            actualAttributes.put(attributeName, attributeValue);</span>
+<span class="nc" id="L282">        }</span>
+<span class="nc" id="L283">        return actualAttributes;</span>
+    }
+
+    private static String resolvePlaceholders(String attributeValue, PropertyResolver propertyResolver) {
+<span class="nc" id="L287">        String resolvedValue = attributeValue;</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (propertyResolver != null) {</span>
+<span class="nc" id="L289">            resolvedValue = propertyResolver.resolvePlaceholders(resolvedValue);</span>
+<span class="nc" id="L290">            resolvedValue = trimWhitespace(resolvedValue);</span>
+        }
+<span class="nc" id="L292">        return resolvedValue;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

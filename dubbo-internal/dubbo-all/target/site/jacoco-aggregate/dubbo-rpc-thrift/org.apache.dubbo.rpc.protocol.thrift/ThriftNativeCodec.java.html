@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ThriftNativeCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift</a> &gt; <span class="el_source">ThriftNativeCodec.java</span></div><h1>ThriftNativeCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBufferOutputStream;
+import org.apache.dubbo.remoting.exchange.Request;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.rpc.Invocation;
+
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TMessage;
+import org.apache.thrift.protocol.TMessageType;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.protocol.TStruct;
+import org.apache.thrift.transport.TIOStreamTransport;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift instead
+ */
+@Deprecated
+<span class="nc" id="L42">public class ThriftNativeCodec implements Codec2 {</span>
+
+<span class="nc" id="L44">    private final AtomicInteger thriftSeq = new AtomicInteger(0);</span>
+
+    protected static TProtocol newProtocol(URL url, ChannelBuffer buffer) throws IOException {
+<span class="nc" id="L47">        String protocol = url.getParameter(ThriftConstants.THRIFT_PROTOCOL_KEY,</span>
+                ThriftConstants.DEFAULT_PROTOCOL);
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (ThriftConstants.BINARY_THRIFT_PROTOCOL.equals(protocol)) {</span>
+<span class="nc" id="L50">            return new TBinaryProtocol(new TIOStreamTransport(new ChannelBufferOutputStream(buffer)));</span>
+        }
+<span class="nc" id="L52">        throw new IOException(&quot;Unsupported protocol type &quot; + protocol);</span>
+    }
+
+    @Override
+    public void encode(Channel channel, ChannelBuffer buffer, Object message)
+            throws IOException {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (message instanceof Request) {</span>
+<span class="nc" id="L59">            encodeRequest(channel, buffer, (Request) message);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        } else if (message instanceof Response) {</span>
+<span class="nc" id="L61">            encodeResponse(channel, buffer, (Response) message);</span>
+        } else {
+<span class="nc" id="L63">            throw new IOException(&quot;Unsupported message type &quot;</span>
+<span class="nc" id="L64">                    + message.getClass().getName());</span>
+        }
+<span class="nc" id="L66">    }</span>
+
+    protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request request)
+            throws IOException {
+<span class="nc" id="L70">        Invocation invocation = (Invocation) request.getData();</span>
+<span class="nc" id="L71">        TProtocol protocol = newProtocol(channel.getUrl(), buffer);</span>
+        try {
+<span class="nc" id="L73">            protocol.writeMessageBegin(new TMessage(</span>
+<span class="nc" id="L74">                    invocation.getMethodName(), TMessageType.CALL,</span>
+<span class="nc" id="L75">                    thriftSeq.getAndIncrement()));</span>
+<span class="nc" id="L76">            protocol.writeStructBegin(new TStruct(invocation.getMethodName() + &quot;_args&quot;));</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            for (int i = 0; i &lt; invocation.getParameterTypes().length; i++) {</span>
+<span class="nc" id="L78">                Class&lt;?&gt; type = invocation.getParameterTypes()[i];</span>
+
+            }
+<span class="nc" id="L81">        } catch (TException e) {</span>
+<span class="nc" id="L82">            throw new IOException(e.getMessage(), e);</span>
+<span class="nc" id="L83">        }</span>
+
+<span class="nc" id="L85">    }</span>
+
+    protected void encodeResponse(Channel channel, ChannelBuffer buffer, Response response)
+            throws IOException {
+
+<span class="nc" id="L90">    }</span>
+
+    @Override
+    public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+<span class="nc" id="L94">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

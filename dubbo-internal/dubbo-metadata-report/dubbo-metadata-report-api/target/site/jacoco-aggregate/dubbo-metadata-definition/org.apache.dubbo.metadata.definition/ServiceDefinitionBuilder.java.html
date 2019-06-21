@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceDefinitionBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-definition</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.definition</a> &gt; <span class="el_source">ServiceDefinitionBuilder.java</span></div><h1>ServiceDefinitionBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.definition;
+
+import org.apache.dubbo.metadata.definition.model.FullServiceDefinition;
+import org.apache.dubbo.metadata.definition.model.MethodDefinition;
+import org.apache.dubbo.metadata.definition.model.ServiceDefinition;
+import org.apache.dubbo.metadata.definition.model.TypeDefinition;
+import org.apache.dubbo.metadata.definition.util.ClassUtils;
+
+import com.google.gson.Gson;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 2015/1/27.
+ */
+public final class ServiceDefinitionBuilder {
+
+    /**
+     * Describe a Java interface in {@link ServiceDefinition}.
+     *
+     * @return Service description
+     */
+    public static ServiceDefinition build(final Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L43">        ServiceDefinition sd = new ServiceDefinition();</span>
+<span class="nc" id="L44">        build(sd, interfaceClass);</span>
+<span class="nc" id="L45">        return sd;</span>
+    }
+
+    public static FullServiceDefinition buildFullDefinition(final Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L49">        FullServiceDefinition sd = new FullServiceDefinition();</span>
+<span class="nc" id="L50">        build(sd, interfaceClass);</span>
+<span class="nc" id="L51">        return sd;</span>
+    }
+
+    public static FullServiceDefinition buildFullDefinition(final Class&lt;?&gt; interfaceClass, Map&lt;String, String&gt; params) {
+<span class="nc" id="L55">        FullServiceDefinition sd = new FullServiceDefinition();</span>
+<span class="nc" id="L56">        build(sd, interfaceClass);</span>
+<span class="nc" id="L57">        sd.setParameters(params);</span>
+<span class="nc" id="L58">        return sd;</span>
+    }
+
+    public static &lt;T extends ServiceDefinition&gt; void build(T sd, final Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L62">        sd.setCanonicalName(interfaceClass.getCanonicalName());</span>
+<span class="nc" id="L63">        sd.setCodeSource(ClassUtils.getCodeSource(interfaceClass));</span>
+
+<span class="nc" id="L65">        TypeDefinitionBuilder builder = new TypeDefinitionBuilder();</span>
+<span class="nc" id="L66">        List&lt;Method&gt; methods = ClassUtils.getPublicNonStaticMethods(interfaceClass);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc" id="L68">            MethodDefinition md = new MethodDefinition();</span>
+<span class="nc" id="L69">            md.setName(method.getName());</span>
+
+            // Process parameter types.
+<span class="nc" id="L72">            Class&lt;?&gt;[] paramTypes = method.getParameterTypes();</span>
+<span class="nc" id="L73">            Type[] genericParamTypes = method.getGenericParameterTypes();</span>
+
+<span class="nc" id="L75">            String[] parameterTypes = new String[paramTypes.length];</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            for (int i = 0; i &lt; paramTypes.length; i++) {</span>
+<span class="nc" id="L77">                TypeDefinition td = builder.build(genericParamTypes[i], paramTypes[i]);</span>
+<span class="nc" id="L78">                parameterTypes[i] = td.getType();</span>
+            }
+<span class="nc" id="L80">            md.setParameterTypes(parameterTypes);</span>
+
+            // Process return type.
+<span class="nc" id="L83">            TypeDefinition td = builder.build(method.getGenericReturnType(), method.getReturnType());</span>
+<span class="nc" id="L84">            md.setReturnType(td.getType());</span>
+
+<span class="nc" id="L86">            sd.getMethods().add(md);</span>
+<span class="nc" id="L87">        }</span>
+
+<span class="nc" id="L89">        sd.setTypes(builder.getTypeDefinitions());</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Describe a Java interface in Json schema.
+     *
+     * @return Service description
+     */
+    public static String schema(final Class&lt;?&gt; clazz) {
+<span class="nc" id="L98">        ServiceDefinition sd = build(clazz);</span>
+<span class="nc" id="L99">        Gson gson = new Gson();</span>
+<span class="nc" id="L100">        return gson.toJson(sd);</span>
+    }
+
+    private ServiceDefinitionBuilder() {
+    }
+}
+
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

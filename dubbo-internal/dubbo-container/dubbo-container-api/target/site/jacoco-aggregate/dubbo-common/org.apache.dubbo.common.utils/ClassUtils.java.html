@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ClassUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-container-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.utils</a> &gt; <span class="el_source">ClassUtils.java</span></div><h1>ClassUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.utils;
+
+
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+<span class="nc" id="L27">public class ClassUtils {</span>
+    /**
+     * Suffix for array class names: &quot;[]&quot;
+     */
+    public static final String ARRAY_SUFFIX = &quot;[]&quot;;
+    /**
+     * Prefix for internal array class names: &quot;[L&quot;
+     */
+    private static final String INTERNAL_ARRAY_PREFIX = &quot;[L&quot;;
+    /**
+     * Map with primitive type name as key and corresponding primitive type as
+     * value, for example: &quot;int&quot; -&gt; &quot;int.class&quot;.
+     */
+<span class="nc" id="L40">    private static final Map&lt;String, Class&lt;?&gt;&gt; primitiveTypeNameMap = new HashMap&lt;String, Class&lt;?&gt;&gt;(16);</span>
+    /**
+     * Map with primitive wrapper type as key and corresponding primitive type
+     * as value, for example: Integer.class -&gt; int.class.
+     */
+<span class="nc" id="L45">    private static final Map&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt; primitiveWrapperTypeMap = new HashMap&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt;(8);</span>
+
+    private static final char PACKAGE_SEPARATOR_CHAR = '.';
+
+    static {
+<span class="nc" id="L50">        primitiveWrapperTypeMap.put(Boolean.class, boolean.class);</span>
+<span class="nc" id="L51">        primitiveWrapperTypeMap.put(Byte.class, byte.class);</span>
+<span class="nc" id="L52">        primitiveWrapperTypeMap.put(Character.class, char.class);</span>
+<span class="nc" id="L53">        primitiveWrapperTypeMap.put(Double.class, double.class);</span>
+<span class="nc" id="L54">        primitiveWrapperTypeMap.put(Float.class, float.class);</span>
+<span class="nc" id="L55">        primitiveWrapperTypeMap.put(Integer.class, int.class);</span>
+<span class="nc" id="L56">        primitiveWrapperTypeMap.put(Long.class, long.class);</span>
+<span class="nc" id="L57">        primitiveWrapperTypeMap.put(Short.class, short.class);</span>
+
+<span class="nc" id="L59">        Set&lt;Class&lt;?&gt;&gt; primitiveTypeNames = new HashSet&lt;&gt;(16);</span>
+<span class="nc" id="L60">        primitiveTypeNames.addAll(primitiveWrapperTypeMap.values());</span>
+<span class="nc" id="L61">        primitiveTypeNames.addAll(Arrays</span>
+<span class="nc" id="L62">                .asList(boolean[].class, byte[].class, char[].class, double[].class,</span>
+                        float[].class, int[].class, long[].class, short[].class));
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        for (Class&lt;?&gt; primitiveTypeName : primitiveTypeNames) {</span>
+<span class="nc" id="L65">            primitiveTypeNameMap.put(primitiveTypeName.getName(), primitiveTypeName);</span>
+<span class="nc" id="L66">        }</span>
+<span class="nc" id="L67">    }</span>
+
+    public static Class&lt;?&gt; forNameWithThreadContextClassLoader(String name)
+            throws ClassNotFoundException {
+<span class="nc" id="L71">        return forName(name, Thread.currentThread().getContextClassLoader());</span>
+    }
+
+    public static Class&lt;?&gt; forNameWithCallerClassLoader(String name, Class&lt;?&gt; caller)
+            throws ClassNotFoundException {
+<span class="nc" id="L76">        return forName(name, caller.getClassLoader());</span>
+    }
+
+    public static ClassLoader getCallerClassLoader(Class&lt;?&gt; caller) {
+<span class="nc" id="L80">        return caller.getClassLoader();</span>
+    }
+
+    /**
+     * get class loader
+     *
+     * @param clazz
+     * @return class loader
+     */
+    public static ClassLoader getClassLoader(Class&lt;?&gt; clazz) {
+<span class="nc" id="L90">        ClassLoader cl = null;</span>
+        try {
+<span class="nc" id="L92">            cl = Thread.currentThread().getContextClassLoader();</span>
+<span class="nc" id="L93">        } catch (Throwable ex) {</span>
+            // Cannot access thread context ClassLoader - falling back to system class loader...
+<span class="nc" id="L95">        }</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (cl == null) {</span>
+            // No thread context class loader -&gt; use class loader of this class.
+<span class="nc" id="L98">            cl = clazz.getClassLoader();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (cl == null) {</span>
+                // getClassLoader() returning null indicates the bootstrap ClassLoader
+                try {
+<span class="nc" id="L102">                    cl = ClassLoader.getSystemClassLoader();</span>
+<span class="nc" id="L103">                } catch (Throwable ex) {</span>
+                    // Cannot access system ClassLoader - oh well, maybe the caller can live with null...
+<span class="nc" id="L105">                }</span>
+            }
+        }
+
+<span class="nc" id="L109">        return cl;</span>
+    }
+
+    /**
+     * Return the default ClassLoader to use: typically the thread context
+     * ClassLoader, if available; the ClassLoader that loaded the ClassUtils
+     * class will be used as fallback.
+     * &lt;p&gt;
+     * Call this method if you intend to use the thread context ClassLoader in a
+     * scenario where you absolutely need a non-null ClassLoader reference: for
+     * example, for class path resource loading (but not necessarily for
+     * &lt;code&gt;Class.forName&lt;/code&gt;, which accepts a &lt;code&gt;null&lt;/code&gt; ClassLoader
+     * reference as well).
+     *
+     * @return the default ClassLoader (never &lt;code&gt;null&lt;/code&gt;)
+     * @see java.lang.Thread#getContextClassLoader()
+     */
+    public static ClassLoader getClassLoader() {
+<span class="nc" id="L127">        return getClassLoader(ClassUtils.class);</span>
+    }
+
+    /**
+     * Same as &lt;code&gt;Class.forName()&lt;/code&gt;, except that it works for primitive
+     * types.
+     */
+    public static Class&lt;?&gt; forName(String name) throws ClassNotFoundException {
+<span class="nc" id="L135">        return forName(name, getClassLoader());</span>
+    }
+
+    /**
+     * Replacement for &lt;code&gt;Class.forName()&lt;/code&gt; that also returns Class
+     * instances for primitives (like &quot;int&quot;) and array class names (like
+     * &quot;String[]&quot;).
+     *
+     * @param name        the name of the Class
+     * @param classLoader the class loader to use (may be &lt;code&gt;null&lt;/code&gt;,
+     *                    which indicates the default class loader)
+     * @return Class instance for the supplied name
+     * @throws ClassNotFoundException if the class was not found
+     * @throws LinkageError           if the class file could not be loaded
+     * @see Class#forName(String, boolean, ClassLoader)
+     */
+    public static Class&lt;?&gt; forName(String name, ClassLoader classLoader)
+            throws ClassNotFoundException, LinkageError {
+
+<span class="nc" id="L154">        Class&lt;?&gt; clazz = resolvePrimitiveClassName(name);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (clazz != null) {</span>
+<span class="nc" id="L156">            return clazz;</span>
+        }
+
+        // &quot;java.lang.String[]&quot; style arrays
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (name.endsWith(ARRAY_SUFFIX)) {</span>
+<span class="nc" id="L161">            String elementClassName = name.substring(0, name.length() - ARRAY_SUFFIX.length());</span>
+<span class="nc" id="L162">            Class&lt;?&gt; elementClass = forName(elementClassName, classLoader);</span>
+<span class="nc" id="L163">            return Array.newInstance(elementClass, 0).getClass();</span>
+        }
+
+        // &quot;[Ljava.lang.String;&quot; style arrays
+<span class="nc" id="L167">        int internalArrayMarker = name.indexOf(INTERNAL_ARRAY_PREFIX);</span>
+<span class="nc bnc" id="L168" title="All 4 branches missed.">        if (internalArrayMarker != -1 &amp;&amp; name.endsWith(&quot;;&quot;)) {</span>
+<span class="nc" id="L169">            String elementClassName = null;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (internalArrayMarker == 0) {</span>
+<span class="nc" id="L171">                elementClassName = name</span>
+<span class="nc" id="L172">                        .substring(INTERNAL_ARRAY_PREFIX.length(), name.length() - 1);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            } else if (name.startsWith(&quot;[&quot;)) {</span>
+<span class="nc" id="L174">                elementClassName = name.substring(1);</span>
+            }
+<span class="nc" id="L176">            Class&lt;?&gt; elementClass = forName(elementClassName, classLoader);</span>
+<span class="nc" id="L177">            return Array.newInstance(elementClass, 0).getClass();</span>
+        }
+
+<span class="nc" id="L180">        ClassLoader classLoaderToUse = classLoader;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (classLoaderToUse == null) {</span>
+<span class="nc" id="L182">            classLoaderToUse = getClassLoader();</span>
+        }
+<span class="nc" id="L184">        return classLoaderToUse.loadClass(name);</span>
+    }
+
+    /**
+     * Resolve the given class name as primitive class, if appropriate,
+     * according to the JVM's naming rules for primitive classes.
+     * &lt;p&gt;
+     * Also supports the JVM's internal class names for primitive arrays. Does
+     * &lt;i&gt;not&lt;/i&gt; support the &quot;[]&quot; suffix notation for primitive arrays; this is
+     * only supported by {@link #forName}.
+     *
+     * @param name the name of the potentially primitive class
+     * @return the primitive class, or &lt;code&gt;null&lt;/code&gt; if the name does not
+     * denote a primitive class or primitive array class
+     */
+    public static Class&lt;?&gt; resolvePrimitiveClassName(String name) {
+<span class="nc" id="L200">        Class&lt;?&gt; result = null;</span>
+        // Most class names will be quite long, considering that they
+        // SHOULD sit in a package, so a length check is worthwhile.
+<span class="nc bnc" id="L203" title="All 4 branches missed.">        if (name != null &amp;&amp; name.length() &lt;= 8) {</span>
+            // Could be a primitive - likely.
+<span class="nc" id="L205">            result = (Class&lt;?&gt;) primitiveTypeNameMap.get(name);</span>
+        }
+<span class="nc" id="L207">        return result;</span>
+    }
+
+    public static String toShortString(Object obj) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L212">            return &quot;null&quot;;</span>
+        }
+<span class="nc" id="L214">        return obj.getClass().getSimpleName() + &quot;@&quot; + System.identityHashCode(obj);</span>
+
+    }
+
+    public static String simpleClassName(Class&lt;?&gt; clazz) {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (clazz == null) {</span>
+<span class="nc" id="L220">            throw new NullPointerException(&quot;clazz&quot;);</span>
+        }
+<span class="nc" id="L222">        String className = clazz.getName();</span>
+<span class="nc" id="L223">        final int lastDotIdx = className.lastIndexOf(PACKAGE_SEPARATOR_CHAR);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (lastDotIdx &gt; -1) {</span>
+<span class="nc" id="L225">            return className.substring(lastDotIdx + 1);</span>
+        }
+<span class="nc" id="L227">        return className;</span>
+    }
+
+
+    public static boolean isPrimitive(Class&lt;?&gt; type) {
+<span class="nc bnc" id="L232" title="All 22 branches missed.">        return type.isPrimitive()</span>
+                || type == String.class
+                || type == Character.class
+                || type == Boolean.class
+                || type == Byte.class
+                || type == Short.class
+                || type == Integer.class
+                || type == Long.class
+                || type == Float.class
+                || type == Double.class
+                || type == Object.class;
+    }
+
+    public static Object convertPrimitive(Class&lt;?&gt; type, String value) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L247">            return null;</span>
+<span class="nc bnc" id="L248" title="All 4 branches missed.">        } else if (type == char.class || type == Character.class) {</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            return value.length() &gt; 0 ? value.charAt(0) : '\0';</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">        } else if (type == boolean.class || type == Boolean.class) {</span>
+<span class="nc" id="L251">            return Boolean.valueOf(value);</span>
+        }
+        try {
+<span class="nc bnc" id="L254" title="All 4 branches missed.">            if (type == byte.class || type == Byte.class) {</span>
+<span class="nc" id="L255">                return Byte.valueOf(value);</span>
+<span class="nc bnc" id="L256" title="All 4 branches missed.">            } else if (type == short.class || type == Short.class) {</span>
+<span class="nc" id="L257">                return Short.valueOf(value);</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">            } else if (type == int.class || type == Integer.class) {</span>
+<span class="nc" id="L259">                return Integer.valueOf(value);</span>
+<span class="nc bnc" id="L260" title="All 4 branches missed.">            } else if (type == long.class || type == Long.class) {</span>
+<span class="nc" id="L261">                return Long.valueOf(value);</span>
+<span class="nc bnc" id="L262" title="All 4 branches missed.">            } else if (type == float.class || type == Float.class) {</span>
+<span class="nc" id="L263">                return Float.valueOf(value);</span>
+<span class="nc bnc" id="L264" title="All 4 branches missed.">            } else if (type == double.class || type == Double.class) {</span>
+<span class="nc" id="L265">                return Double.valueOf(value);</span>
+            }
+<span class="nc" id="L267">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L268">            return null;</span>
+<span class="nc" id="L269">        }</span>
+<span class="nc" id="L270">        return value;</span>
+    }
+
+
+    /**
+     * We only check boolean value at this moment.
+     *
+     * @param type
+     * @param value
+     * @return
+     */
+    public static boolean isTypeMatch(Class&lt;?&gt; type, String value) {
+<span class="nc bnc" id="L282" title="All 4 branches missed.">        if ((type == boolean.class || type == Boolean.class)</span>
+<span class="nc bnc" id="L283" title="All 4 branches missed.">                &amp;&amp; !(&quot;true&quot;.equals(value) || &quot;false&quot;.equals(value))) {</span>
+<span class="nc" id="L284">            return false;</span>
+        }
+<span class="nc" id="L286">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

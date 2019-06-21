@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ClassHelper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-definition</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.utils</a> &gt; <span class="el_source">ClassHelper.java</span></div><h1>ClassHelper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.utils;
+
+
+import java.lang.reflect.Method;
+
+/**
+ * @see org.apache.dubbo.common.utils.ClassUtils
+ * @deprecated Replace to &lt;code&gt;ClassUtils&lt;/code&gt;
+ */
+<span class="nc" id="L26">public class ClassHelper {</span>
+    public static Class&lt;?&gt; forNameWithThreadContextClassLoader(String name) throws ClassNotFoundException {
+<span class="nc" id="L28">        return ClassUtils.forName(name, Thread.currentThread().getContextClassLoader());</span>
+    }
+
+    public static Class&lt;?&gt; forNameWithCallerClassLoader(String name, Class&lt;?&gt; caller) throws ClassNotFoundException {
+<span class="nc" id="L32">        return ClassUtils.forName(name, caller.getClassLoader());</span>
+    }
+
+    public static ClassLoader getCallerClassLoader(Class&lt;?&gt; caller) {
+<span class="nc" id="L36">        return caller.getClassLoader();</span>
+    }
+
+    /**
+     * get class loader
+     *
+     * @param clazz
+     * @return class loader
+     */
+    public static ClassLoader getClassLoader(Class&lt;?&gt; clazz) {
+<span class="nc" id="L46">        return ClassUtils.getClassLoader(clazz);</span>
+    }
+
+    /**
+     * Return the default ClassLoader to use: typically the thread context
+     * ClassLoader, if available; the ClassLoader that loaded the ClassUtils
+     * class will be used as fallback.
+     * &lt;p&gt;
+     * Call this method if you intend to use the thread context ClassLoader in a
+     * scenario where you absolutely need a non-null ClassLoader reference: for
+     * example, for class path resource loading (but not necessarily for
+     * &lt;code&gt;Class.forName&lt;/code&gt;, which accepts a &lt;code&gt;null&lt;/code&gt; ClassLoader
+     * reference as well).
+     *
+     * @return the default ClassLoader (never &lt;code&gt;null&lt;/code&gt;)
+     * @see java.lang.Thread#getContextClassLoader()
+     */
+    public static ClassLoader getClassLoader() {
+<span class="nc" id="L64">        return getClassLoader(ClassHelper.class);</span>
+    }
+
+    /**
+     * Same as &lt;code&gt;Class.forName()&lt;/code&gt;, except that it works for primitive
+     * types.
+     */
+    public static Class&lt;?&gt; forName(String name) throws ClassNotFoundException {
+<span class="nc" id="L72">        return forName(name, getClassLoader());</span>
+    }
+
+    /**
+     * Replacement for &lt;code&gt;Class.forName()&lt;/code&gt; that also returns Class
+     * instances for primitives (like &quot;int&quot;) and array class names (like
+     * &quot;String[]&quot;).
+     *
+     * @param name        the name of the Class
+     * @param classLoader the class loader to use (may be &lt;code&gt;null&lt;/code&gt;,
+     *                    which indicates the default class loader)
+     * @return Class instance for the supplied name
+     * @throws ClassNotFoundException if the class was not found
+     * @throws LinkageError           if the class file could not be loaded
+     * @see Class#forName(String, boolean, ClassLoader)
+     */
+    public static Class&lt;?&gt; forName(String name, ClassLoader classLoader)
+            throws ClassNotFoundException, LinkageError {
+<span class="nc" id="L90">        return ClassUtils.forName(name, classLoader);</span>
+    }
+
+    /**
+     * Resolve the given class name as primitive class, if appropriate,
+     * according to the JVM's naming rules for primitive classes.
+     * &lt;p&gt;
+     * Also supports the JVM's internal class names for primitive arrays. Does
+     * &lt;i&gt;not&lt;/i&gt; support the &quot;[]&quot; suffix notation for primitive arrays; this is
+     * only supported by {@link #forName}.
+     *
+     * @param name the name of the potentially primitive class
+     * @return the primitive class, or &lt;code&gt;null&lt;/code&gt; if the name does not
+     * denote a primitive class or primitive array class
+     */
+    public static Class&lt;?&gt; resolvePrimitiveClassName(String name) {
+<span class="nc" id="L106">        return ClassUtils.resolvePrimitiveClassName(name);</span>
+    }
+
+    public static String toShortString(Object obj) {
+<span class="nc" id="L110">        return ClassUtils.toShortString(obj);</span>
+
+    }
+
+    public static String simpleClassName(Class&lt;?&gt; clazz) {
+<span class="nc" id="L115">        return ClassUtils.simpleClassName(clazz);</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.common.utils.MethodUtils#isSetter(Method)
+     * @deprecated Replace to &lt;code&gt;MethodUtils#isSetter(Method)&lt;/code&gt;
+     */
+    public static boolean isSetter(Method method) {
+<span class="nc" id="L123">        return MethodUtils.isSetter(method);</span>
+    }
+
+    /**
+     * @see org.apache.dubbo.common.utils.MethodUtils#isGetter(Method) (Method)
+     * @deprecated Replace to &lt;code&gt;MethodUtils#isGetter(Method)&lt;/code&gt;
+     */
+    public static boolean isGetter(Method method) {
+<span class="nc" id="L131">        return MethodUtils.isGetter(method);</span>
+    }
+
+    public static boolean isPrimitive(Class&lt;?&gt; type) {
+<span class="nc" id="L135">        return ClassUtils.isPrimitive(type);</span>
+    }
+
+    public static Object convertPrimitive(Class&lt;?&gt; type, String value) {
+<span class="nc" id="L139">        return ClassUtils.convertPrimitive(type,value);</span>
+    }
+
+
+    /**
+     * We only check boolean value at this moment.
+     *
+     * @param type
+     * @param value
+     * @return
+     */
+    public static boolean isTypeMatch(Class&lt;?&gt; type, String value) {
+<span class="nc" id="L151">    return ClassUtils.isTypeMatch(type,value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

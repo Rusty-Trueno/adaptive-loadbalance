@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConfigParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.configurator.parser</a> &gt; <span class="el_source">ConfigParser.java</span></div><h1>ConfigParser.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.configurator.parser;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.cluster.configurator.parser.model.ConfigItem;
+import org.apache.dubbo.rpc.cluster.configurator.parser.model.ConfiguratorConfig;
+
+import org.yaml.snakeyaml.TypeDescription;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Config parser
+ */
+<span class="nc" id="L37">public class ConfigParser {</span>
+
+    public static List&lt;URL&gt; parseConfigurators(String rawConfig) {
+<span class="nc" id="L40">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L41">        ConfiguratorConfig configuratorConfig = parseObject(rawConfig);</span>
+
+<span class="nc" id="L43">        String scope = configuratorConfig.getScope();</span>
+<span class="nc" id="L44">        List&lt;ConfigItem&gt; items = configuratorConfig.getConfigs();</span>
+
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (ConfiguratorConfig.SCOPE_APPLICATION.equals(scope)) {</span>
+<span class="nc" id="L47">            items.forEach(item -&gt; urls.addAll(appItemToUrls(item, configuratorConfig)));</span>
+        } else {
+            // service scope by default.
+<span class="nc" id="L50">            items.forEach(item -&gt; urls.addAll(serviceItemToUrls(item, configuratorConfig)));</span>
+        }
+<span class="nc" id="L52">        return urls;</span>
+    }
+
+    private static &lt;T&gt; T parseObject(String rawConfig) {
+<span class="nc" id="L56">        Constructor constructor = new Constructor(ConfiguratorConfig.class);</span>
+<span class="nc" id="L57">        TypeDescription itemDescription = new TypeDescription(ConfiguratorConfig.class);</span>
+<span class="nc" id="L58">        itemDescription.addPropertyParameters(&quot;items&quot;, ConfigItem.class);</span>
+<span class="nc" id="L59">        constructor.addTypeDescription(itemDescription);</span>
+
+<span class="nc" id="L61">        Yaml yaml = new Yaml(constructor);</span>
+<span class="nc" id="L62">        return yaml.load(rawConfig);</span>
+    }
+
+    private static List&lt;URL&gt; serviceItemToUrls(ConfigItem item, ConfiguratorConfig config) {
+<span class="nc" id="L66">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L67">        List&lt;String&gt; addresses = parseAddresses(item);</span>
+
+<span class="nc" id="L69">        addresses.forEach(addr -&gt; {</span>
+<span class="nc" id="L70">            StringBuilder urlBuilder = new StringBuilder();</span>
+<span class="nc" id="L71">            urlBuilder.append(&quot;override://&quot;).append(addr).append(&quot;/&quot;);</span>
+
+<span class="nc" id="L73">            urlBuilder.append(appendService(config.getKey()));</span>
+<span class="nc" id="L74">            urlBuilder.append(toParameterString(item));</span>
+
+<span class="nc" id="L76">            parseEnabled(item, config, urlBuilder);</span>
+
+<span class="nc" id="L78">            urlBuilder.append(&quot;&amp;category=&quot;).append(Constants.DYNAMIC_CONFIGURATORS_CATEGORY);</span>
+<span class="nc" id="L79">            urlBuilder.append(&quot;&amp;configVersion=&quot;).append(config.getConfigVersion());</span>
+
+<span class="nc" id="L81">            List&lt;String&gt; apps = item.getApplications();</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">            if (apps != null &amp;&amp; apps.size() &gt; 0) {</span>
+<span class="nc" id="L83">                apps.forEach(app -&gt; {</span>
+<span class="nc" id="L84">                    urls.add(URL.valueOf(urlBuilder.append(&quot;&amp;application=&quot;).append(app).toString()));</span>
+<span class="nc" id="L85">                });</span>
+            } else {
+<span class="nc" id="L87">                urls.add(URL.valueOf(urlBuilder.toString()));</span>
+            }
+<span class="nc" id="L89">        });</span>
+
+<span class="nc" id="L91">        return urls;</span>
+    }
+
+    private static List&lt;URL&gt; appItemToUrls(ConfigItem item, ConfiguratorConfig config) {
+<span class="nc" id="L95">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L96">        List&lt;String&gt; addresses = parseAddresses(item);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (String addr : addresses) {</span>
+<span class="nc" id="L98">            StringBuilder urlBuilder = new StringBuilder();</span>
+<span class="nc" id="L99">            urlBuilder.append(&quot;override://&quot;).append(addr).append(&quot;/&quot;);</span>
+<span class="nc" id="L100">            List&lt;String&gt; services = item.getServices();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (services == null) {</span>
+<span class="nc" id="L102">                services = new ArrayList&lt;&gt;();</span>
+            }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (services.size() == 0) {</span>
+<span class="nc" id="L105">                services.add(&quot;*&quot;);</span>
+            }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            for (String s : services) {</span>
+<span class="nc" id="L108">                urlBuilder.append(appendService(s));</span>
+<span class="nc" id="L109">                urlBuilder.append(toParameterString(item));</span>
+
+<span class="nc" id="L111">                urlBuilder.append(&quot;&amp;application=&quot;).append(config.getKey());</span>
+
+<span class="nc" id="L113">                parseEnabled(item, config, urlBuilder);</span>
+
+<span class="nc" id="L115">                urlBuilder.append(&quot;&amp;category=&quot;).append(Constants.APP_DYNAMIC_CONFIGURATORS_CATEGORY);</span>
+<span class="nc" id="L116">                urlBuilder.append(&quot;&amp;configVersion=&quot;).append(config.getConfigVersion());</span>
+
+<span class="nc" id="L118">                urls.add(URL.valueOf(urlBuilder.toString()));</span>
+<span class="nc" id="L119">            }</span>
+<span class="nc" id="L120">        }</span>
+<span class="nc" id="L121">        return urls;</span>
+    }
+
+    private static String toParameterString(ConfigItem item) {
+<span class="nc" id="L125">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L126">        sb.append(&quot;category=&quot;);</span>
+<span class="nc" id="L127">        sb.append(Constants.DYNAMIC_CONFIGURATORS_CATEGORY);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (item.getSide() != null) {</span>
+<span class="nc" id="L129">            sb.append(&quot;&amp;side=&quot;);</span>
+<span class="nc" id="L130">            sb.append(item.getSide());</span>
+        }
+<span class="nc" id="L132">        Map&lt;String, String&gt; parameters = item.getParameters();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L134">            throw new IllegalStateException(&quot;Invalid configurator rule, please specify at least one parameter &quot; +</span>
+                    &quot;you want to change in the rule.&quot;);
+        }
+
+<span class="nc" id="L138">        parameters.forEach((k, v) -&gt; {</span>
+<span class="nc" id="L139">            sb.append(&quot;&amp;&quot;);</span>
+<span class="nc" id="L140">            sb.append(k);</span>
+<span class="nc" id="L141">            sb.append(&quot;=&quot;);</span>
+<span class="nc" id="L142">            sb.append(v);</span>
+<span class="nc" id="L143">        });</span>
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(item.getProviderAddresses())) {</span>
+<span class="nc" id="L146">            sb.append(&quot;&amp;&quot;);</span>
+<span class="nc" id="L147">            sb.append(Constants.OVERRIDE_PROVIDERS_KEY);</span>
+<span class="nc" id="L148">            sb.append(&quot;=&quot;);</span>
+<span class="nc" id="L149">            sb.append(CollectionUtils.join(item.getProviderAddresses(), &quot;,&quot;));</span>
+        }
+
+<span class="nc" id="L152">        return sb.toString();</span>
+    }
+
+    private static String appendService(String serviceKey) {
+<span class="nc" id="L156">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (StringUtils.isEmpty(serviceKey)) {</span>
+<span class="nc" id="L158">            throw new IllegalStateException(&quot;service field in configuration is null.&quot;);</span>
+        }
+
+<span class="nc" id="L161">        String interfaceName = serviceKey;</span>
+<span class="nc" id="L162">        int i = interfaceName.indexOf(&quot;/&quot;);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (i &gt; 0) {</span>
+<span class="nc" id="L164">            sb.append(&quot;group=&quot;);</span>
+<span class="nc" id="L165">            sb.append(interfaceName, 0, i);</span>
+<span class="nc" id="L166">            sb.append(&quot;&amp;&quot;);</span>
+
+<span class="nc" id="L168">            interfaceName = interfaceName.substring(i + 1);</span>
+        }
+<span class="nc" id="L170">        int j = interfaceName.indexOf(&quot;:&quot;);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (j &gt; 0) {</span>
+<span class="nc" id="L172">            sb.append(&quot;version=&quot;);</span>
+<span class="nc" id="L173">            sb.append(interfaceName.substring(j + 1));</span>
+<span class="nc" id="L174">            sb.append(&quot;&amp;&quot;);</span>
+<span class="nc" id="L175">            interfaceName = interfaceName.substring(0, j);</span>
+        }
+<span class="nc" id="L177">        sb.insert(0, interfaceName + &quot;?&quot;);</span>
+
+<span class="nc" id="L179">        return sb.toString();</span>
+    }
+
+    private static void parseEnabled(ConfigItem item, ConfiguratorConfig config, StringBuilder urlBuilder) {
+<span class="nc" id="L183">        urlBuilder.append(&quot;&amp;enabled=&quot;);</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (item.getType() == null || ConfigItem.GENERAL_TYPE.equals(item.getType())) {</span>
+<span class="nc" id="L185">            urlBuilder.append(config.getEnabled());</span>
+        } else {
+<span class="nc" id="L187">            urlBuilder.append(item.getEnabled());</span>
+        }
+<span class="nc" id="L189">    }</span>
+
+    private static List&lt;String&gt; parseAddresses(ConfigItem item) {
+<span class="nc" id="L192">        List&lt;String&gt; addresses = item.getAddresses();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (addresses == null) {</span>
+<span class="nc" id="L194">            addresses = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (addresses.size() == 0) {</span>
+<span class="nc" id="L197">            addresses.add(Constants.ANYHOST_VALUE);</span>
+        }
+<span class="nc" id="L199">        return addresses;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

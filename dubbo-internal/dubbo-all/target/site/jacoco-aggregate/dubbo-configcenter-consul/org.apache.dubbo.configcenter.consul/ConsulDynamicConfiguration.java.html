@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConsulDynamicConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-configcenter-consul</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.configcenter.consul</a> &gt; <span class="el_source">ConsulDynamicConfiguration.java</span></div><h1>ConsulDynamicConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.configcenter.consul;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.configcenter.ConfigChangeEvent;
+import org.apache.dubbo.configcenter.ConfigChangeType;
+import org.apache.dubbo.configcenter.ConfigurationListener;
+import org.apache.dubbo.configcenter.DynamicConfiguration;
+
+import com.ecwid.consul.v1.ConsulClient;
+import com.ecwid.consul.v1.QueryParams;
+import com.ecwid.consul.v1.Response;
+import com.ecwid.consul.v1.kv.model.GetValue;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static org.apache.dubbo.common.Constants.CONFIG_NAMESPACE_KEY;
+import static org.apache.dubbo.common.Constants.PATH_SEPARATOR;
+import static org.apache.dubbo.configcenter.ConfigChangeType.ADDED;
+
+/**
+ * config center implementation for consul
+ */
+public class ConsulDynamicConfiguration implements DynamicConfiguration {
+<span class="nc" id="L50">    private static final Logger logger = LoggerFactory.getLogger(ConsulDynamicConfiguration.class);</span>
+
+    private static final int DEFAULT_PORT = 8500;
+    private static final int DEFAULT_WATCH_TIMEOUT = 60 * 1000;
+    private static final String WATCH_TIMEOUT = &quot;consul-watch-timeout&quot;;
+
+    private URL url;
+    private String rootPath;
+    private ConsulClient client;
+<span class="nc" id="L59">    private int watchTimeout = -1;</span>
+<span class="nc" id="L60">    private ConcurrentMap&lt;String, ConsulKVWatcher&gt; watchers = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L61">    private ConcurrentMap&lt;String, Long&gt; consulIndexes = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L62">    private ExecutorService watcherService = newCachedThreadPool(</span>
+            new NamedThreadFactory(&quot;dubbo-consul-configuration-watcher&quot;, true));
+
+<span class="nc" id="L65">    public ConsulDynamicConfiguration(URL url) {</span>
+<span class="nc" id="L66">        this.url = url;</span>
+<span class="nc" id="L67">        this.rootPath = PATH_SEPARATOR + url.getParameter(CONFIG_NAMESPACE_KEY, DEFAULT_GROUP) + PATH_SEPARATOR + &quot;config&quot;;</span>
+<span class="nc" id="L68">        this.watchTimeout = buildWatchTimeout(url);</span>
+<span class="nc" id="L69">        String host = url.getHost();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        int port = url.getPort() != 0 ? url.getPort() : DEFAULT_PORT;</span>
+<span class="nc" id="L71">        client = new ConsulClient(host, port);</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public void addListener(String key, String group, ConfigurationListener listener) {
+<span class="nc" id="L76">        logger.info(&quot;register listener &quot; + listener.getClass() + &quot; for config with key: &quot; + key + &quot;, group: &quot; + group);</span>
+<span class="nc" id="L77">        ConsulKVWatcher watcher = watchers.putIfAbsent(key, new ConsulKVWatcher(key));</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (watcher == null) {</span>
+<span class="nc" id="L79">            watcher = watchers.get(key);</span>
+<span class="nc" id="L80">            watcherService.submit(watcher);</span>
+        }
+<span class="nc" id="L82">        watcher.addListener(listener);</span>
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void removeListener(String key, String group, ConfigurationListener listener) {
+<span class="nc" id="L87">        logger.info(&quot;unregister listener &quot; + listener.getClass() + &quot; for config with key: &quot; + key + &quot;, group: &quot; + group);</span>
+<span class="nc" id="L88">        ConsulKVWatcher watcher = watchers.get(key);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (watcher != null) {</span>
+<span class="nc" id="L90">            watcher.removeListener(listener);</span>
+        }
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public String getConfig(String key, String group, long timeout) throws IllegalStateException {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(group)) {</span>
+<span class="nc" id="L97">            key = group + PATH_SEPARATOR + key;</span>
+        } else {
+<span class="nc" id="L99">            int i = key.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc" id="L100">            key = key.substring(0, i) + PATH_SEPARATOR + key.substring(i + 1);</span>
+        }
+
+<span class="nc" id="L103">        return (String) getInternalProperty(rootPath + PATH_SEPARATOR + key);</span>
+    }
+
+    @Override
+    public Object getInternalProperty(String key) {
+<span class="nc" id="L108">        logger.info(&quot;get config from: &quot; + key);</span>
+<span class="nc" id="L109">        Response&lt;GetValue&gt; response = getValue(key);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (response != null) {</span>
+<span class="nc" id="L111">            GetValue value = response.getValue();</span>
+<span class="nc" id="L112">            consulIndexes.put(key, response.getConsulIndex());</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            return value != null ? value.getDecodedValue() : null;</span>
+        }
+<span class="nc" id="L115">        return null;</span>
+    }
+
+    private Response&lt;GetValue&gt; getValue(String key) {
+        try {
+<span class="nc" id="L120">            Long currentIndex = consulIndexes.computeIfAbsent(key, k -&gt; -1L);</span>
+<span class="nc" id="L121">            return client.getKVValue(key, new QueryParams(watchTimeout, currentIndex));</span>
+<span class="nc" id="L122">        } catch (Throwable t) {</span>
+<span class="nc" id="L123">            logger.warn(&quot;fail to get value for key: &quot; + key);</span>
+        }
+<span class="nc" id="L125">        return null;</span>
+    }
+
+    private int buildWatchTimeout(URL url) {
+<span class="nc" id="L129">        return url.getParameter(WATCH_TIMEOUT, DEFAULT_WATCH_TIMEOUT) / 1000;</span>
+    }
+
+    private class ConsulKVWatcher implements Runnable {
+        private String key;
+        private Set&lt;ConfigurationListener&gt; listeners;
+<span class="nc" id="L135">        private boolean running = true;</span>
+<span class="nc" id="L136">        private boolean existing = false;</span>
+
+<span class="nc" id="L138">        public ConsulKVWatcher(String key) {</span>
+<span class="nc" id="L139">            this.key = convertKey(key);</span>
+<span class="nc" id="L140">            this.listeners = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L141">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            while (running) {</span>
+<span class="nc" id="L146">                Long lastIndex = consulIndexes.computeIfAbsent(key, k -&gt; -1L);</span>
+<span class="nc" id="L147">                Response&lt;GetValue&gt; response = getValue(key);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (response == null) {</span>
+                    try {
+<span class="nc" id="L150">                        Thread.sleep(watchTimeout);</span>
+<span class="nc" id="L151">                    } catch (InterruptedException e) {</span>
+                        // ignore
+<span class="nc" id="L153">                    }</span>
+<span class="nc" id="L154">                    continue;</span>
+                }
+
+<span class="nc" id="L157">                GetValue getValue = response.getValue();</span>
+<span class="nc" id="L158">                Long currentIndex = response.getConsulIndex();</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">                if (currentIndex == null || currentIndex &lt;= lastIndex) {</span>
+<span class="nc" id="L160">                    continue;</span>
+                }
+
+<span class="nc" id="L163">                consulIndexes.put(key, currentIndex);</span>
+<span class="nc" id="L164">                ConfigChangeEvent event = null;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                if (getValue != null) {</span>
+<span class="nc" id="L166">                    String value = getValue.getDecodedValue();</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    if (existing) {</span>
+<span class="nc" id="L168">                        logger.info(&quot;notify change for key: &quot; + key + &quot;, the changed value is: &quot; + value);</span>
+<span class="nc" id="L169">                        event = new ConfigChangeEvent(key, value);</span>
+                    } else {
+<span class="nc" id="L171">                        logger.info(&quot;notify change for key: &quot; + key + &quot;, the added value is: &quot; + value);</span>
+<span class="nc" id="L172">                        event = new ConfigChangeEvent(key, value, ADDED);</span>
+                    }
+<span class="nc" id="L174">                } else {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                    if (existing) {</span>
+<span class="nc" id="L176">                        logger.info(&quot;notify change for key: &quot; + key + &quot;, the value is deleted&quot;);</span>
+<span class="nc" id="L177">                        event = new ConfigChangeEvent(key, null, ConfigChangeType.DELETED);</span>
+                    }
+                }
+
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                existing = getValue != null;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (event != null) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                    for (ConfigurationListener listener : listeners) {</span>
+<span class="nc" id="L184">                        listener.process(event);</span>
+<span class="nc" id="L185">                    }</span>
+                }
+<span class="nc" id="L187">            }</span>
+<span class="nc" id="L188">        }</span>
+
+        private void addListener(ConfigurationListener listener) {
+<span class="nc" id="L191">            this.listeners.add(listener);</span>
+<span class="nc" id="L192">        }</span>
+
+        private void removeListener(ConfigurationListener listener) {
+<span class="nc" id="L195">            this.listeners.remove(listener);</span>
+<span class="nc" id="L196">        }</span>
+
+        private String convertKey(String key) {
+<span class="nc" id="L199">            int index = key.lastIndexOf('.');</span>
+<span class="nc" id="L200">            return rootPath + PATH_SEPARATOR + key.substring(0, index) + PATH_SEPARATOR + key.substring(index + 1);</span>
+        }
+
+        private void stop() {
+<span class="nc" id="L204">            running = false;</span>
+<span class="nc" id="L205">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HessianProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-hessian</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.hessian</a> &gt; <span class="el_source">HessianProtocol.java</span></div><h1>HessianProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.hessian;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.http.HttpBinder;
+import org.apache.dubbo.remoting.http.HttpHandler;
+import org.apache.dubbo.remoting.http.HttpServer;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.protocol.AbstractProxyProtocol;
+import org.apache.dubbo.rpc.service.GenericService;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import com.caucho.hessian.HessianException;
+import com.caucho.hessian.client.HessianConnectionException;
+import com.caucho.hessian.client.HessianConnectionFactory;
+import com.caucho.hessian.client.HessianProxyFactory;
+import com.caucho.hessian.io.HessianMethodSerializationException;
+import com.caucho.hessian.server.HessianSkeleton;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * http rpc support.
+ */
+public class HessianProtocol extends AbstractProxyProtocol {
+
+<span class="nc" id="L52">    private final Map&lt;String, HttpServer&gt; serverMap = new ConcurrentHashMap&lt;String, HttpServer&gt;();</span>
+
+<span class="nc" id="L54">    private final Map&lt;String, HessianSkeleton&gt; skeletonMap = new ConcurrentHashMap&lt;String, HessianSkeleton&gt;();</span>
+
+    private HttpBinder httpBinder;
+
+    public HessianProtocol() {
+<span class="nc" id="L59">        super(HessianException.class);</span>
+<span class="nc" id="L60">    }</span>
+
+    public void setHttpBinder(HttpBinder httpBinder) {
+<span class="nc" id="L63">        this.httpBinder = httpBinder;</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L68">        return 80;</span>
+    }
+
+    @Override
+    protected &lt;T&gt; Runnable doExport(T impl, Class&lt;T&gt; type, URL url) throws RpcException {
+<span class="nc" id="L73">        String addr = getAddr(url);</span>
+<span class="nc" id="L74">        HttpServer server = serverMap.get(addr);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (server == null) {</span>
+<span class="nc" id="L76">            server = httpBinder.bind(url, new HessianHandler());</span>
+<span class="nc" id="L77">            serverMap.put(addr, server);</span>
+        }
+<span class="nc" id="L79">        final String path = url.getAbsolutePath();</span>
+<span class="nc" id="L80">        final HessianSkeleton skeleton = new HessianSkeleton(impl, type);</span>
+<span class="nc" id="L81">        skeletonMap.put(path, skeleton);</span>
+
+<span class="nc" id="L83">        final String genericPath = path + &quot;/&quot; + Constants.GENERIC_KEY;</span>
+<span class="nc" id="L84">        skeletonMap.put(genericPath, new HessianSkeleton(impl, GenericService.class));</span>
+
+<span class="nc" id="L86">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L89">                skeletonMap.remove(path);</span>
+<span class="nc" id="L90">                skeletonMap.remove(genericPath);</span>
+<span class="nc" id="L91">            }</span>
+        };
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected &lt;T&gt; T doRefer(Class&lt;T&gt; serviceType, URL url) throws RpcException {
+<span class="nc" id="L98">        String generic = url.getParameter(Constants.GENERIC_KEY);</span>
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        boolean isGeneric = ProtocolUtils.isGeneric(generic) || serviceType.equals(GenericService.class);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (isGeneric) {</span>
+<span class="nc" id="L101">            RpcContext.getContext().setAttachment(Constants.GENERIC_KEY, generic);</span>
+<span class="nc" id="L102">            url = url.setPath(url.getPath() + &quot;/&quot; + Constants.GENERIC_KEY);</span>
+        }
+
+<span class="nc" id="L105">        HessianProxyFactory hessianProxyFactory = new HessianProxyFactory();</span>
+<span class="nc" id="L106">        boolean isHessian2Request = url.getParameter(Constants.HESSIAN2_REQUEST_KEY, Constants.DEFAULT_HESSIAN2_REQUEST);</span>
+<span class="nc" id="L107">        hessianProxyFactory.setHessian2Request(isHessian2Request);</span>
+<span class="nc" id="L108">        boolean isOverloadEnabled = url.getParameter(Constants.HESSIAN_OVERLOAD_METHOD_KEY, Constants.DEFAULT_HESSIAN_OVERLOAD_METHOD);</span>
+<span class="nc" id="L109">        hessianProxyFactory.setOverloadEnabled(isOverloadEnabled);</span>
+<span class="nc" id="L110">        String client = url.getParameter(Constants.CLIENT_KEY, Constants.DEFAULT_HTTP_CLIENT);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (&quot;httpclient&quot;.equals(client)) {</span>
+<span class="nc" id="L112">            HessianConnectionFactory factory = new HttpClientConnectionFactory();</span>
+<span class="nc" id="L113">            factory.setHessianProxyFactory(hessianProxyFactory);</span>
+<span class="nc" id="L114">            hessianProxyFactory.setConnectionFactory(factory);</span>
+<span class="nc bnc" id="L115" title="All 6 branches missed.">        } else if (client != null &amp;&amp; client.length() &gt; 0 &amp;&amp; !Constants.DEFAULT_HTTP_CLIENT.equals(client)) {</span>
+<span class="nc" id="L116">            throw new IllegalStateException(&quot;Unsupported http protocol client=\&quot;&quot; + client + &quot;\&quot;!&quot;);</span>
+        } else {
+<span class="nc" id="L118">            HessianConnectionFactory factory = new DubboHessianURLConnectionFactory();</span>
+<span class="nc" id="L119">            factory.setHessianProxyFactory(hessianProxyFactory);</span>
+<span class="nc" id="L120">            hessianProxyFactory.setConnectionFactory(factory);</span>
+        }
+<span class="nc" id="L122">        int timeout = url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc" id="L123">        hessianProxyFactory.setConnectTimeout(timeout);</span>
+<span class="nc" id="L124">        hessianProxyFactory.setReadTimeout(timeout);</span>
+<span class="nc" id="L125">        return (T) hessianProxyFactory.create(serviceType, url.setProtocol(&quot;http&quot;).toJavaURL(), Thread.currentThread().getContextClassLoader());</span>
+    }
+
+    @Override
+    protected int getErrorCode(Throwable e) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (e instanceof HessianConnectionException) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (e.getCause() != null) {</span>
+<span class="nc" id="L132">                Class&lt;?&gt; cls = e.getCause().getClass();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                if (SocketTimeoutException.class.equals(cls)) {</span>
+<span class="nc" id="L134">                    return RpcException.TIMEOUT_EXCEPTION;</span>
+                }
+            }
+<span class="nc" id="L137">            return RpcException.NETWORK_EXCEPTION;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        } else if (e instanceof HessianMethodSerializationException) {</span>
+<span class="nc" id="L139">            return RpcException.SERIALIZATION_EXCEPTION;</span>
+        }
+<span class="nc" id="L141">        return super.getErrorCode(e);</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L146">        super.destroy();</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        for (String key : new ArrayList&lt;String&gt;(serverMap.keySet())) {</span>
+<span class="nc" id="L148">            HttpServer server = serverMap.remove(key);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (server != null) {</span>
+                try {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                    if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L152">                        logger.info(&quot;Close hessian server &quot; + server.getUrl());</span>
+                    }
+<span class="nc" id="L154">                    server.close();</span>
+<span class="nc" id="L155">                } catch (Throwable t) {</span>
+<span class="nc" id="L156">                    logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L157">                }</span>
+            }
+<span class="nc" id="L159">        }</span>
+<span class="nc" id="L160">    }</span>
+
+<span class="nc" id="L162">    private class HessianHandler implements HttpHandler {</span>
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response)
+                throws IOException, ServletException {
+<span class="nc" id="L167">            String uri = request.getRequestURI();</span>
+<span class="nc" id="L168">            HessianSkeleton skeleton = skeletonMap.get(uri);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (!request.getMethod().equalsIgnoreCase(&quot;POST&quot;)) {</span>
+<span class="nc" id="L170">                response.setStatus(500);</span>
+            } else {
+<span class="nc" id="L172">                RpcContext.getContext().setRemoteAddress(request.getRemoteAddr(), request.getRemotePort());</span>
+
+<span class="nc" id="L174">                Enumeration&lt;String&gt; enumeration = request.getHeaderNames();</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                while (enumeration.hasMoreElements()) {</span>
+<span class="nc" id="L176">                    String key = enumeration.nextElement();</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    if (key.startsWith(Constants.DEFAULT_EXCHANGER)) {</span>
+<span class="nc" id="L178">                        RpcContext.getContext().setAttachment(key.substring(Constants.DEFAULT_EXCHANGER.length()),</span>
+<span class="nc" id="L179">                                request.getHeader(key));</span>
+                    }
+<span class="nc" id="L181">                }</span>
+
+                try {
+<span class="nc" id="L184">                    skeleton.invoke(request.getInputStream(), response.getOutputStream());</span>
+<span class="nc" id="L185">                } catch (Throwable e) {</span>
+<span class="nc" id="L186">                    throw new ServletException(e);</span>
+<span class="nc" id="L187">                }</span>
+            }
+<span class="nc" id="L189">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

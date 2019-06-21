@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractServiceBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">AbstractServiceBuilder.java</span></div><h1>AbstractServiceBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.AbstractServiceConfig;
+import org.apache.dubbo.config.ProtocolConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * AbstractBuilder
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L31">public abstract class AbstractServiceBuilder&lt;T extends AbstractServiceConfig, B extends AbstractServiceBuilder&lt;T, B&gt;&gt;</span>
+        extends AbstractInterfaceBuilder&lt;T, B&gt; {
+
+    /**
+     * The service version
+     */
+    protected String version;
+
+    /**
+     * The service group
+     */
+    protected String group;
+
+    /**
+     * whether the service is deprecated
+     */
+    protected Boolean deprecated;
+
+    /**
+     * The time delay register service (milliseconds)
+     */
+    protected Integer delay;
+
+    /**
+     * Whether to export the service
+     */
+    protected Boolean export;
+
+    /**
+     * The service weight
+     */
+    protected Integer weight;
+
+    /**
+     * Document center
+     */
+    protected String document;
+
+    /**
+     * Whether to register as a dynamic service or not on register center, it the value is false, the status will be disabled
+     * after the service registered,and it needs to be enabled manually; if you want to disable the service, you also need
+     * manual processing
+     */
+    protected Boolean dynamic;
+
+    /**
+     * Whether to use token
+     */
+    protected String token;
+
+    /**
+     * Whether to export access logs to logs
+     */
+    protected String accesslog;
+
+    /**
+     * The protocol list the service will export with
+     */
+    protected List&lt;ProtocolConfig&gt; protocols;
+    protected String protocolIds;
+
+    // max allowed execute times
+    private Integer executes;
+
+    /**
+     * Whether to register
+     */
+    private Boolean register;
+
+    /**
+     * Warm up period
+     */
+    private Integer warmup;
+
+    /**
+     * The serialization type
+     */
+    private String serialization;
+
+    public B version(String version) {
+<span class="nc" id="L111">        this.version = version;</span>
+<span class="nc" id="L112">        return getThis();</span>
+    }
+
+    public B group(String group) {
+<span class="nc" id="L116">        this.group = group;</span>
+<span class="nc" id="L117">        return getThis();</span>
+    }
+
+    public B deprecated(Boolean deprecated) {
+<span class="nc" id="L121">        this.deprecated = deprecated;</span>
+<span class="nc" id="L122">        return getThis();</span>
+    }
+
+    public B delay(Integer delay) {
+<span class="nc" id="L126">        this.delay = delay;</span>
+<span class="nc" id="L127">        return getThis();</span>
+    }
+
+    public B export(Boolean export) {
+<span class="nc" id="L131">        this.export = export;</span>
+<span class="nc" id="L132">        return getThis();</span>
+    }
+
+    public B weight(Integer weight) {
+<span class="nc" id="L136">        this.weight = weight;</span>
+<span class="nc" id="L137">        return getThis();</span>
+    }
+
+    public B document(String document) {
+<span class="nc" id="L141">        this.document = document;</span>
+<span class="nc" id="L142">        return getThis();</span>
+    }
+
+    public B dynamic(Boolean dynamic) {
+<span class="nc" id="L146">        this.dynamic = dynamic;</span>
+<span class="nc" id="L147">        return getThis();</span>
+    }
+
+    public B token(String token) {
+<span class="nc" id="L151">        this.token = token;</span>
+<span class="nc" id="L152">        return getThis();</span>
+    }
+
+    public B token(Boolean token) {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (token != null) {</span>
+<span class="nc" id="L157">            this.token = token.toString();</span>
+        } else {
+<span class="nc" id="L159">            this.token = null;</span>
+        }
+<span class="nc" id="L161">        return getThis();</span>
+    }
+
+    public B accesslog(String accesslog) {
+<span class="nc" id="L165">        this.accesslog = accesslog;</span>
+<span class="nc" id="L166">        return getThis();</span>
+    }
+
+    public B accesslog(Boolean accesslog) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (accesslog != null) {</span>
+<span class="nc" id="L171">            this.accesslog = accesslog.toString();</span>
+        } else {
+<span class="nc" id="L173">            this.accesslog = null;</span>
+        }
+<span class="nc" id="L175">        return getThis();</span>
+    }
+
+    public B addProtocols(List&lt;ProtocolConfig&gt; protocols) {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (this.protocols == null) {</span>
+<span class="nc" id="L180">            this.protocols = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L182">        this.protocols.addAll(protocols);</span>
+<span class="nc" id="L183">        return getThis();</span>
+    }
+
+    public B addProtocol(ProtocolConfig protocol) {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (this.protocols == null) {</span>
+<span class="nc" id="L188">            this.protocols = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L190">        this.protocols.add(protocol);</span>
+<span class="nc" id="L191">        return getThis();</span>
+    }
+
+    public B protocolIds(String protocolIds) {
+<span class="nc" id="L195">        this.protocolIds = protocolIds;</span>
+<span class="nc" id="L196">        return getThis();</span>
+    }
+
+    public B executes(Integer executes) {
+<span class="nc" id="L200">        this.executes = executes;</span>
+<span class="nc" id="L201">        return getThis();</span>
+    }
+
+    public B register(Boolean register) {
+<span class="nc" id="L205">        this.register = register;</span>
+<span class="nc" id="L206">        return getThis();</span>
+    }
+
+    public B warmup(Integer warmup) {
+<span class="nc" id="L210">        this.warmup = warmup;</span>
+<span class="nc" id="L211">        return getThis();</span>
+    }
+
+    public  B serialization(String serialization) {
+<span class="nc" id="L215">        this.serialization = serialization;</span>
+<span class="nc" id="L216">        return getThis();</span>
+    }
+
+    @Override
+    public void build(T instance) {
+<span class="nc" id="L221">        super.build(instance);</span>
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (!StringUtils.isEmpty(version)) {</span>
+<span class="nc" id="L224">            instance.setVersion(version);</span>
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (!StringUtils.isEmpty(group)) {</span>
+<span class="nc" id="L227">            instance.setGroup(group);</span>
+        }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (deprecated != null) {</span>
+<span class="nc" id="L230">            instance.setDeprecated(deprecated);</span>
+        }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (delay != null) {</span>
+<span class="nc" id="L233">            instance.setDelay(delay);</span>
+        }
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (export != null) {</span>
+<span class="nc" id="L236">            instance.setExport(export);</span>
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (weight != null) {</span>
+<span class="nc" id="L239">            instance.setWeight(weight);</span>
+        }
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (!StringUtils.isEmpty(document)) {</span>
+<span class="nc" id="L242">            instance.setDocument(document);</span>
+        }
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (dynamic != null) {</span>
+<span class="nc" id="L245">            instance.setDynamic(dynamic);</span>
+        }
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (!StringUtils.isEmpty(token)) {</span>
+<span class="nc" id="L248">            instance.setToken(token);</span>
+        }
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (!StringUtils.isEmpty(accesslog)) {</span>
+<span class="nc" id="L251">            instance.setAccesslog(accesslog);</span>
+        }
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (protocols != null) {</span>
+<span class="nc" id="L254">            instance.setProtocols(protocols);</span>
+        }
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (!StringUtils.isEmpty(protocolIds)) {</span>
+<span class="nc" id="L257">            instance.setProtocolIds(protocolIds);</span>
+        }
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (executes != null) {</span>
+<span class="nc" id="L260">            instance.setExecutes(executes);</span>
+        }
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        if (register != null) {</span>
+<span class="nc" id="L263">            instance.setRegister(register);</span>
+        }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (warmup != null) {</span>
+<span class="nc" id="L266">            instance.setWarmup(warmup);</span>
+        }
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (!StringUtils.isEmpty(serialization)) {</span>
+<span class="nc" id="L269">            instance.setSerialization(serialization);</span>
+        }
+<span class="nc" id="L271">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

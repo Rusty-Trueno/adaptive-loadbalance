@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">ApplicationConfig.java</span></div><h1>ApplicationConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.compiler.support.AdaptiveCompiler;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.support.Parameter;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+
+/**
+ * The application info
+ *
+ * @export
+ */
+public class ApplicationConfig extends AbstractConfig {
+
+    private static final long serialVersionUID = 5508512956753757169L;
+
+    /**
+     * Application name
+     */
+    private String name;
+
+    /**
+     * The application version
+     */
+    private String version;
+
+    /**
+     * Application owner
+     */
+    private String owner;
+
+    /**
+     * Application's organization (BU)
+     */
+    private String organization;
+
+    /**
+     * Architecture layer
+     */
+    private String architecture;
+
+    /**
+     * Environment, e.g. dev, test or production
+     */
+    private String environment;
+
+    /**
+     * Java compiler
+     */
+    private String compiler;
+
+    /**
+     * The type of the log access
+     */
+    private String logger;
+
+    /**
+     * Registry centers
+     */
+    private List&lt;RegistryConfig&gt; registries;
+    private String registryIds;
+
+    /**
+     * Monitor center
+     */
+    private MonitorConfig monitor;
+
+    /**
+     * Is default or not
+     */
+    private Boolean isDefault;
+
+    /**
+     * Directory for saving thread dump
+     */
+    private String dumpDirectory;
+
+    /**
+     * Whether to enable qos or not
+     */
+    private Boolean qosEnable;
+
+    /**
+     * The qos port to listen
+     */
+    private Integer qosPort;
+
+    /**
+     * Should we accept foreign ip or not?
+     */
+    private Boolean qosAcceptForeignIp;
+
+    /**
+     * Customized parameters
+     */
+    private Map&lt;String, String&gt; parameters;
+
+    /**
+     * Config the shutdown.wait
+     */
+    private String shutwait;
+
+<span class="nc" id="L126">    public ApplicationConfig() {</span>
+<span class="nc" id="L127">    }</span>
+
+<span class="nc" id="L129">    public ApplicationConfig(String name) {</span>
+<span class="nc" id="L130">        setName(name);</span>
+<span class="nc" id="L131">    }</span>
+
+    @Parameter(key = Constants.APPLICATION_KEY, required = true, useKeyAsProperty = false)
+    public String getName() {
+<span class="nc" id="L135">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L139">        checkName(Constants.NAME, name);</span>
+<span class="nc" id="L140">        this.name = name;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (StringUtils.isEmpty(id)) {</span>
+<span class="nc" id="L142">            id = name;</span>
+        }
+<span class="nc" id="L144">    }</span>
+
+    @Parameter(key = &quot;application.version&quot;)
+    public String getVersion() {
+<span class="nc" id="L148">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L152">        this.version = version;</span>
+<span class="nc" id="L153">    }</span>
+
+    public String getOwner() {
+<span class="nc" id="L156">        return owner;</span>
+    }
+
+    public void setOwner(String owner) {
+<span class="nc" id="L160">        checkMultiName(Constants.OWNER, owner);</span>
+<span class="nc" id="L161">        this.owner = owner;</span>
+<span class="nc" id="L162">    }</span>
+
+    public String getOrganization() {
+<span class="nc" id="L165">        return organization;</span>
+    }
+
+    public void setOrganization(String organization) {
+<span class="nc" id="L169">        checkName(Constants.ORGANIZATION, organization);</span>
+<span class="nc" id="L170">        this.organization = organization;</span>
+<span class="nc" id="L171">    }</span>
+
+    public String getArchitecture() {
+<span class="nc" id="L174">        return architecture;</span>
+    }
+
+    public void setArchitecture(String architecture) {
+<span class="nc" id="L178">        checkName(Constants.ARCHITECTURE, architecture);</span>
+<span class="nc" id="L179">        this.architecture = architecture;</span>
+<span class="nc" id="L180">    }</span>
+
+    public String getEnvironment() {
+<span class="nc" id="L183">        return environment;</span>
+    }
+
+    public void setEnvironment(String environment) {
+<span class="nc" id="L187">        checkName(Constants.ENVIRONMENT, environment);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (environment != null) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (!(Constants.DEVELOPMENT_ENVIRONMENT.equals(environment)</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                    || Constants.TEST_ENVIRONMENT.equals(environment)</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                    || Constants.PRODUCTION_ENVIRONMENT.equals(environment))) {</span>
+
+<span class="nc" id="L193">                throw new IllegalStateException(String.format(&quot;Unsupported environment: %s, only support %s/%s/%s, default is %s.&quot;,</span>
+                        environment,
+                        Constants.DEVELOPMENT_ENVIRONMENT,
+                        Constants.TEST_ENVIRONMENT,
+                        Constants.PRODUCTION_ENVIRONMENT,
+                        Constants.PRODUCTION_ENVIRONMENT));
+            }
+        }
+<span class="nc" id="L201">        this.environment = environment;</span>
+<span class="nc" id="L202">    }</span>
+
+    public RegistryConfig getRegistry() {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        return CollectionUtils.isEmpty(registries) ? null : registries.get(0);</span>
+    }
+
+    public void setRegistry(RegistryConfig registry) {
+<span class="nc" id="L209">        List&lt;RegistryConfig&gt; registries = new ArrayList&lt;RegistryConfig&gt;(1);</span>
+<span class="nc" id="L210">        registries.add(registry);</span>
+<span class="nc" id="L211">        this.registries = registries;</span>
+<span class="nc" id="L212">    }</span>
+
+    public List&lt;RegistryConfig&gt; getRegistries() {
+<span class="nc" id="L215">        return registries;</span>
+    }
+
+    @SuppressWarnings({&quot;unchecked&quot;})
+    public void setRegistries(List&lt;? extends RegistryConfig&gt; registries) {
+<span class="nc" id="L220">        this.registries = (List&lt;RegistryConfig&gt;) registries;</span>
+<span class="nc" id="L221">    }</span>
+
+    @Parameter(excluded = true)
+    public String getRegistryIds() {
+<span class="nc" id="L225">        return registryIds;</span>
+    }
+
+    public void setRegistryIds(String registryIds) {
+<span class="nc" id="L229">        this.registryIds = registryIds;</span>
+<span class="nc" id="L230">    }</span>
+
+    public MonitorConfig getMonitor() {
+<span class="nc" id="L233">        return monitor;</span>
+    }
+
+    public void setMonitor(String monitor) {
+<span class="nc" id="L237">        this.monitor = new MonitorConfig(monitor);</span>
+<span class="nc" id="L238">    }</span>
+
+    public void setMonitor(MonitorConfig monitor) {
+<span class="nc" id="L241">        this.monitor = monitor;</span>
+<span class="nc" id="L242">    }</span>
+
+    public String getCompiler() {
+<span class="nc" id="L245">        return compiler;</span>
+    }
+
+    public void setCompiler(String compiler) {
+<span class="nc" id="L249">        this.compiler = compiler;</span>
+<span class="nc" id="L250">        AdaptiveCompiler.setDefaultCompiler(compiler);</span>
+<span class="nc" id="L251">    }</span>
+
+    public String getLogger() {
+<span class="nc" id="L254">        return logger;</span>
+    }
+
+    public void setLogger(String logger) {
+<span class="nc" id="L258">        this.logger = logger;</span>
+<span class="nc" id="L259">        LoggerFactory.setLoggerAdapter(logger);</span>
+<span class="nc" id="L260">    }</span>
+
+    public Boolean isDefault() {
+<span class="nc" id="L263">        return isDefault;</span>
+    }
+
+    public void setDefault(Boolean isDefault) {
+<span class="nc" id="L267">        this.isDefault = isDefault;</span>
+<span class="nc" id="L268">    }</span>
+
+    @Parameter(key = Constants.DUMP_DIRECTORY)
+    public String getDumpDirectory() {
+<span class="nc" id="L272">        return dumpDirectory;</span>
+    }
+
+    public void setDumpDirectory(String dumpDirectory) {
+<span class="nc" id="L276">        this.dumpDirectory = dumpDirectory;</span>
+<span class="nc" id="L277">    }</span>
+
+    @Parameter(key = Constants.QOS_ENABLE)
+    public Boolean getQosEnable() {
+<span class="nc" id="L281">        return qosEnable;</span>
+    }
+
+    public void setQosEnable(Boolean qosEnable) {
+<span class="nc" id="L285">        this.qosEnable = qosEnable;</span>
+<span class="nc" id="L286">    }</span>
+
+    @Parameter(key = Constants.QOS_PORT)
+    public Integer getQosPort() {
+<span class="nc" id="L290">        return qosPort;</span>
+    }
+
+    public void setQosPort(Integer qosPort) {
+<span class="nc" id="L294">        this.qosPort = qosPort;</span>
+<span class="nc" id="L295">    }</span>
+
+    @Parameter(key = Constants.ACCEPT_FOREIGN_IP)
+    public Boolean getQosAcceptForeignIp() {
+<span class="nc" id="L299">        return qosAcceptForeignIp;</span>
+    }
+
+    public void setQosAcceptForeignIp(Boolean qosAcceptForeignIp) {
+<span class="nc" id="L303">        this.qosAcceptForeignIp = qosAcceptForeignIp;</span>
+<span class="nc" id="L304">    }</span>
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L307">        return parameters;</span>
+    }
+
+    public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L311">        checkParameterName(parameters);</span>
+<span class="nc" id="L312">        this.parameters = parameters;</span>
+<span class="nc" id="L313">    }</span>
+
+    public String getShutwait() {
+<span class="nc" id="L316">        return shutwait;</span>
+    }
+
+    public void setShutwait(String shutwait) {
+<span class="nc" id="L320">        System.setProperty(Constants.SHUTDOWN_WAIT_KEY, shutwait);</span>
+<span class="nc" id="L321">        this.shutwait = shutwait;</span>
+<span class="nc" id="L322">    }</span>
+
+    @Override
+    @Parameter(excluded = true)
+    public boolean isValid() {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        return !StringUtils.isEmpty(name);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

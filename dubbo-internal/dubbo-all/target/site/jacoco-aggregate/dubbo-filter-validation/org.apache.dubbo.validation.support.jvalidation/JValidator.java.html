@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JValidator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-filter-validation</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.validation.support.jvalidation</a> &gt; <span class="el_source">JValidator.java</span></div><h1>JValidator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.validation.support.jvalidation;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.bytecode.ClassGenerator;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.validation.MethodValidated;
+import org.apache.dubbo.validation.Validator;
+
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtField;
+import javassist.CtNewConstructor;
+import javassist.Modifier;
+import javassist.NotFoundException;
+import javassist.bytecode.AnnotationsAttribute;
+import javassist.bytecode.ClassFile;
+import javassist.bytecode.ConstPool;
+import javassist.bytecode.annotation.ArrayMemberValue;
+import javassist.bytecode.annotation.BooleanMemberValue;
+import javassist.bytecode.annotation.ByteMemberValue;
+import javassist.bytecode.annotation.CharMemberValue;
+import javassist.bytecode.annotation.ClassMemberValue;
+import javassist.bytecode.annotation.DoubleMemberValue;
+import javassist.bytecode.annotation.EnumMemberValue;
+import javassist.bytecode.annotation.FloatMemberValue;
+import javassist.bytecode.annotation.IntegerMemberValue;
+import javassist.bytecode.annotation.LongMemberValue;
+import javassist.bytecode.annotation.MemberValue;
+import javassist.bytecode.annotation.ShortMemberValue;
+import javassist.bytecode.annotation.StringMemberValue;
+
+import javax.validation.Constraint;
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
+import javax.validation.Validation;
+import javax.validation.ValidatorFactory;
+import javax.validation.groups.Default;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Implementation of JValidation. JValidation is invoked if configuration validation attribute value is 'jvalidation'.
+ * &lt;pre&gt;
+ *     e.g. &amp;lt;dubbo:method name=&quot;save&quot; validation=&quot;jvalidation&quot; /&amp;gt;
+ * &lt;/pre&gt;
+ */
+public class JValidator implements Validator {
+
+<span class="nc" id="L78">    private static final Logger logger = LoggerFactory.getLogger(JValidator.class);</span>
+
+    private final Class&lt;?&gt; clazz;
+
+    private final Map&lt;String, Class&gt; methodClassMap;
+
+    private final javax.validation.Validator validator;
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+<span class="nc" id="L87">    public JValidator(URL url) {</span>
+<span class="nc" id="L88">        this.clazz = ReflectUtils.forName(url.getServiceInterface());</span>
+<span class="nc" id="L89">        String jvalidation = url.getParameter(&quot;jvalidation&quot;);</span>
+        ValidatorFactory factory;
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (jvalidation != null &amp;&amp; jvalidation.length() &gt; 0) {</span>
+<span class="nc" id="L92">            factory = Validation.byProvider((Class) ReflectUtils.forName(jvalidation)).configure().buildValidatorFactory();</span>
+        } else {
+<span class="nc" id="L94">            factory = Validation.buildDefaultValidatorFactory();</span>
+        }
+<span class="nc" id="L96">        this.validator = factory.getValidator();</span>
+<span class="nc" id="L97">        this.methodClassMap = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L98">    }</span>
+
+    private static boolean isPrimitives(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (cls.isArray()) {</span>
+<span class="nc" id="L102">            return isPrimitive(cls.getComponentType());</span>
+        }
+<span class="nc" id="L104">        return isPrimitive(cls);</span>
+    }
+
+    private static boolean isPrimitive(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L108" title="All 8 branches missed.">        return cls.isPrimitive() || cls == String.class || cls == Boolean.class || cls == Character.class</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                || Number.class.isAssignableFrom(cls) || Date.class.isAssignableFrom(cls);</span>
+    }
+
+    private static Object getMethodParameterBean(Class&lt;?&gt; clazz, Method method, Object[] args) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (!hasConstraintParameter(method)) {</span>
+<span class="nc" id="L114">            return null;</span>
+        }
+        try {
+<span class="nc" id="L117">            String parameterClassName = generateMethodParameterClassName(clazz, method);</span>
+            Class&lt;?&gt; parameterClass;
+            try {
+<span class="nc" id="L120">                parameterClass = Class.forName(parameterClassName, true, clazz.getClassLoader());</span>
+<span class="nc" id="L121">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L122">                ClassPool pool = ClassGenerator.getClassPool(clazz.getClassLoader());</span>
+<span class="nc" id="L123">                CtClass ctClass = pool.makeClass(parameterClassName);</span>
+<span class="nc" id="L124">                ClassFile classFile = ctClass.getClassFile();</span>
+<span class="nc" id="L125">                classFile.setVersionToJava5();</span>
+<span class="nc" id="L126">                ctClass.addConstructor(CtNewConstructor.defaultConstructor(pool.getCtClass(parameterClassName)));</span>
+                // parameter fields
+<span class="nc" id="L128">                Class&lt;?&gt;[] parameterTypes = method.getParameterTypes();</span>
+<span class="nc" id="L129">                Annotation[][] parameterAnnotations = method.getParameterAnnotations();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                for (int i = 0; i &lt; parameterTypes.length; i++) {</span>
+<span class="nc" id="L131">                    Class&lt;?&gt; type = parameterTypes[i];</span>
+<span class="nc" id="L132">                    Annotation[] annotations = parameterAnnotations[i];</span>
+<span class="nc" id="L133">                    AnnotationsAttribute attribute = new AnnotationsAttribute(classFile.getConstPool(), AnnotationsAttribute.visibleTag);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                    for (Annotation annotation : annotations) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                        if (annotation.annotationType().isAnnotationPresent(Constraint.class)) {</span>
+<span class="nc" id="L136">                            javassist.bytecode.annotation.Annotation ja = new javassist.bytecode.annotation.Annotation(</span>
+<span class="nc" id="L137">                                    classFile.getConstPool(), pool.getCtClass(annotation.annotationType().getName()));</span>
+<span class="nc" id="L138">                            Method[] members = annotation.annotationType().getMethods();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                            for (Method member : members) {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                                if (Modifier.isPublic(member.getModifiers())</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                                        &amp;&amp; member.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                                        &amp;&amp; member.getDeclaringClass() == annotation.annotationType()) {</span>
+<span class="nc" id="L143">                                    Object value = member.invoke(annotation);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                                    if (null != value) {</span>
+<span class="nc" id="L145">                                        MemberValue memberValue = createMemberValue(</span>
+<span class="nc" id="L146">                                                classFile.getConstPool(), pool.get(member.getReturnType().getName()), value);</span>
+<span class="nc" id="L147">                                        ja.addMemberValue(member.getName(), memberValue);</span>
+                                    }
+                                }
+                            }
+<span class="nc" id="L151">                            attribute.addAnnotation(ja);</span>
+                        }
+                    }
+<span class="nc" id="L154">                    String fieldName = method.getName() + &quot;Argument&quot; + i;</span>
+<span class="nc" id="L155">                    CtField ctField = CtField.make(&quot;public &quot; + type.getCanonicalName() + &quot; &quot; + fieldName + &quot;;&quot;, pool.getCtClass(parameterClassName));</span>
+<span class="nc" id="L156">                    ctField.getFieldInfo().addAttribute(attribute);</span>
+<span class="nc" id="L157">                    ctClass.addField(ctField);</span>
+                }
+<span class="nc" id="L159">                parameterClass = ctClass.toClass(clazz.getClassLoader(), null);</span>
+<span class="nc" id="L160">            }</span>
+<span class="nc" id="L161">            Object parameterBean = parameterClass.newInstance();</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc" id="L163">                Field field = parameterClass.getField(method.getName() + &quot;Argument&quot; + i);</span>
+<span class="nc" id="L164">                field.set(parameterBean, args[i]);</span>
+            }
+<span class="nc" id="L166">            return parameterBean;</span>
+<span class="nc" id="L167">        } catch (Throwable e) {</span>
+<span class="nc" id="L168">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L169">            return null;</span>
+        }
+    }
+
+    private static String generateMethodParameterClassName(Class&lt;?&gt; clazz, Method method) {
+<span class="nc" id="L174">        StringBuilder builder = new StringBuilder().append(clazz.getName())</span>
+<span class="nc" id="L175">                .append(&quot;_&quot;)</span>
+<span class="nc" id="L176">                .append(toUpperMethoName(method.getName()))</span>
+<span class="nc" id="L177">                .append(&quot;Parameter&quot;);</span>
+
+<span class="nc" id="L179">        Class&lt;?&gt;[] parameterTypes = method.getParameterTypes();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        for (Class&lt;?&gt; parameterType : parameterTypes) {</span>
+<span class="nc" id="L181">            builder.append(&quot;_&quot;).append(parameterType.getName());</span>
+        }
+
+<span class="nc" id="L184">        return builder.toString();</span>
+    }
+
+    private static boolean hasConstraintParameter(Method method) {
+<span class="nc" id="L188">        Annotation[][] parameterAnnotations = method.getParameterAnnotations();</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">        if (parameterAnnotations != null &amp;&amp; parameterAnnotations.length &gt; 0) {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            for (Annotation[] annotations : parameterAnnotations) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                for (Annotation annotation : annotations) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    if (annotation.annotationType().isAnnotationPresent(Constraint.class)) {</span>
+<span class="nc" id="L193">                        return true;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L198">        return false;</span>
+    }
+
+    private static String toUpperMethoName(String methodName) {
+<span class="nc" id="L202">        return methodName.substring(0, 1).toUpperCase() + methodName.substring(1);</span>
+    }
+
+    // Copy from javassist.bytecode.annotation.Annotation.createMemberValue(ConstPool, CtClass);
+    private static MemberValue createMemberValue(ConstPool cp, CtClass type, Object value) throws NotFoundException {
+<span class="nc" id="L207">        MemberValue memberValue = javassist.bytecode.annotation.Annotation.createMemberValue(cp, type);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (memberValue instanceof BooleanMemberValue) {</span>
+<span class="nc" id="L209">            ((BooleanMemberValue) memberValue).setValue((Boolean) value);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        } else if (memberValue instanceof ByteMemberValue) {</span>
+<span class="nc" id="L211">            ((ByteMemberValue) memberValue).setValue((Byte) value);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        } else if (memberValue instanceof CharMemberValue) {</span>
+<span class="nc" id="L213">            ((CharMemberValue) memberValue).setValue((Character) value);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        } else if (memberValue instanceof ShortMemberValue) {</span>
+<span class="nc" id="L215">            ((ShortMemberValue) memberValue).setValue((Short) value);</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        } else if (memberValue instanceof IntegerMemberValue) {</span>
+<span class="nc" id="L217">            ((IntegerMemberValue) memberValue).setValue((Integer) value);</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        } else if (memberValue instanceof LongMemberValue) {</span>
+<span class="nc" id="L219">            ((LongMemberValue) memberValue).setValue((Long) value);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        } else if (memberValue instanceof FloatMemberValue) {</span>
+<span class="nc" id="L221">            ((FloatMemberValue) memberValue).setValue((Float) value);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        } else if (memberValue instanceof DoubleMemberValue) {</span>
+<span class="nc" id="L223">            ((DoubleMemberValue) memberValue).setValue((Double) value);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        } else if (memberValue instanceof ClassMemberValue) {</span>
+<span class="nc" id="L225">            ((ClassMemberValue) memberValue).setValue(((Class&lt;?&gt;) value).getName());</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        } else if (memberValue instanceof StringMemberValue) {</span>
+<span class="nc" id="L227">            ((StringMemberValue) memberValue).setValue((String) value);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        } else if (memberValue instanceof EnumMemberValue) {</span>
+<span class="nc" id="L229">            ((EnumMemberValue) memberValue).setValue(((Enum&lt;?&gt;) value).name());</span>
+        }
+        /* else if (memberValue instanceof AnnotationMemberValue) */
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        else if (memberValue instanceof ArrayMemberValue) {</span>
+<span class="nc" id="L233">            CtClass arrayType = type.getComponentType();</span>
+<span class="nc" id="L234">            int len = Array.getLength(value);</span>
+<span class="nc" id="L235">            MemberValue[] members = new MemberValue[len];</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L237">                members[i] = createMemberValue(cp, arrayType, Array.get(value, i));</span>
+            }
+<span class="nc" id="L239">            ((ArrayMemberValue) memberValue).setValue(members);</span>
+        }
+<span class="nc" id="L241">        return memberValue;</span>
+    }
+
+    @Override
+    public void validate(String methodName, Class&lt;?&gt;[] parameterTypes, Object[] arguments) throws Exception {
+<span class="nc" id="L246">        List&lt;Class&lt;?&gt;&gt; groups = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L247">        Class&lt;?&gt; methodClass = methodClass(methodName);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (methodClass != null) {</span>
+<span class="nc" id="L249">            groups.add(methodClass);</span>
+        }
+<span class="nc" id="L251">        Set&lt;ConstraintViolation&lt;?&gt;&gt; violations = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L252">        Method method = clazz.getMethod(methodName, parameterTypes);</span>
+        Class&lt;?&gt;[] methodClasses;
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (method.isAnnotationPresent(MethodValidated.class)){</span>
+<span class="nc" id="L255">            methodClasses = method.getAnnotation(MethodValidated.class).value();</span>
+<span class="nc" id="L256">            groups.addAll(Arrays.asList(methodClasses));</span>
+        }
+        // add into default group
+<span class="nc" id="L259">        groups.add(0, Default.class);</span>
+<span class="nc" id="L260">        groups.add(1, clazz);</span>
+
+        // convert list to array
+<span class="nc" id="L263">        Class&lt;?&gt;[] classgroups = groups.toArray(new Class[groups.size()]);</span>
+
+<span class="nc" id="L265">        Object parameterBean = getMethodParameterBean(clazz, method, arguments);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (parameterBean != null) {</span>
+<span class="nc" id="L267">            violations.addAll(validator.validate(parameterBean, classgroups ));</span>
+        }
+
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        for (Object arg : arguments) {</span>
+<span class="nc" id="L271">            validate(violations, arg, classgroups);</span>
+        }
+
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (!violations.isEmpty()) {</span>
+<span class="nc" id="L275">            logger.error(&quot;Failed to validate service: &quot; + clazz.getName() + &quot;, method: &quot; + methodName + &quot;, cause: &quot; + violations);</span>
+<span class="nc" id="L276">            throw new ConstraintViolationException(&quot;Failed to validate service: &quot; + clazz.getName() + &quot;, method: &quot; + methodName + &quot;, cause: &quot; + violations, violations);</span>
+        }
+<span class="nc" id="L278">    }</span>
+
+    private Class methodClass(String methodName) {
+<span class="nc" id="L281">        Class&lt;?&gt; methodClass = null;</span>
+<span class="nc" id="L282">        String methodClassName = clazz.getName() + &quot;$&quot; + toUpperMethoName(methodName);</span>
+<span class="nc" id="L283">        Class cached = methodClassMap.get(methodClassName);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        if (cached != null) {</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            return cached == clazz ? null : cached;</span>
+        }
+        try {
+<span class="nc" id="L288">            methodClass = Class.forName(methodClassName, false, Thread.currentThread().getContextClassLoader());</span>
+<span class="nc" id="L289">            methodClassMap.put(methodClassName, methodClass);</span>
+<span class="nc" id="L290">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L291">            methodClassMap.put(methodClassName, clazz);</span>
+<span class="nc" id="L292">        }</span>
+<span class="nc" id="L293">        return methodClass;</span>
+    }
+
+    private void validate(Set&lt;ConstraintViolation&lt;?&gt;&gt; violations, Object arg, Class&lt;?&gt;... groups) {
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        if (arg != null &amp;&amp; !isPrimitives(arg.getClass())) {</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if (arg instanceof Object[]) {</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                for (Object item : (Object[]) arg) {</span>
+<span class="nc" id="L300">                    validate(violations, item, groups);</span>
+                }
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            } else if (arg instanceof Collection) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                for (Object item : (Collection&lt;?&gt;) arg) {</span>
+<span class="nc" id="L304">                    validate(violations, item, groups);</span>
+<span class="nc" id="L305">                }</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            } else if (arg instanceof Map) {</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                for (Map.Entry&lt;?, ?&gt; entry : ((Map&lt;?, ?&gt;) arg).entrySet()) {</span>
+<span class="nc" id="L308">                    validate(violations, entry.getKey(), groups);</span>
+<span class="nc" id="L309">                    validate(violations, entry.getValue(), groups);</span>
+<span class="nc" id="L310">                }</span>
+            } else {
+<span class="nc" id="L312">                violations.addAll(validator.validate(arg, groups));</span>
+            }
+        }
+<span class="nc" id="L315">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

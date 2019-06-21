@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ChannelWrappedInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">ChannelWrappedInvoker.java</span></div><h1>ChannelWrappedInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.TimeoutException;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.remoting.exchange.support.header.HeaderExchangeClient;
+import org.apache.dubbo.remoting.transport.ClientDelegate;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.protocol.AbstractInvoker;
+
+import java.net.InetSocketAddress;
+
+/**
+ * Wrap the existing invoker on the channel.
+ */
+class ChannelWrappedInvoker&lt;T&gt; extends AbstractInvoker&lt;T&gt; {
+
+    private final Channel channel;
+    private final String serviceKey;
+    private final ExchangeClient currentClient;
+
+    ChannelWrappedInvoker(Class&lt;T&gt; serviceType, Channel channel, URL url, String serviceKey) {
+<span class="nc" id="L47">        super(serviceType, url, new String[]{Constants.GROUP_KEY, Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});</span>
+<span class="nc" id="L48">        this.channel = channel;</span>
+<span class="nc" id="L49">        this.serviceKey = serviceKey;</span>
+<span class="nc" id="L50">        this.currentClient = new HeaderExchangeClient(new ChannelWrapper(this.channel), false);</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    protected Result doInvoke(Invocation invocation) throws Throwable {
+<span class="nc" id="L55">        RpcInvocation inv = (RpcInvocation) invocation;</span>
+        // use interface's name as service path to export if it's not found on client side
+<span class="nc" id="L57">        inv.setAttachment(Constants.PATH_KEY, getInterface().getName());</span>
+<span class="nc" id="L58">        inv.setAttachment(Constants.CALLBACK_SERVICE_KEY, serviceKey);</span>
+
+        try {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if (getUrl().getMethodParameter(invocation.getMethodName(), Constants.ASYNC_KEY, false)) { // may have concurrency issue</span>
+<span class="nc" id="L62">                currentClient.send(inv, getUrl().getMethodParameter(invocation.getMethodName(), Constants.SENT_KEY, false));</span>
+<span class="nc" id="L63">                return new RpcResult();</span>
+            }
+<span class="nc" id="L65">            int timeout = getUrl().getMethodParameter(invocation.getMethodName(), Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (timeout &gt; 0) {</span>
+<span class="nc" id="L67">                return (Result) currentClient.request(inv, timeout).get();</span>
+            } else {
+<span class="nc" id="L69">                return (Result) currentClient.request(inv).get();</span>
+            }
+<span class="nc" id="L71">        } catch (RpcException e) {</span>
+<span class="nc" id="L72">            throw e;</span>
+<span class="nc" id="L73">        } catch (TimeoutException e) {</span>
+<span class="nc" id="L74">            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L75">        } catch (RemotingException e) {</span>
+<span class="nc" id="L76">            throw new RpcException(RpcException.NETWORK_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L77">        } catch (Throwable e) { // here is non-biz exception, wrap it.</span>
+<span class="nc" id="L78">            throw new RpcException(e.getMessage(), e);</span>
+        }
+    }
+
+    @Override
+    public void destroy() {
+//        super.destroy();
+//        try {
+//            channel.close();
+//        } catch (Throwable t) {
+//            logger.warn(t.getMessage(), t);
+//        }
+<span class="nc" id="L90">    }</span>
+
+    public static class ChannelWrapper extends ClientDelegate {
+
+        private final Channel channel;
+        private final URL url;
+
+<span class="nc" id="L97">        ChannelWrapper(Channel channel) {</span>
+<span class="nc" id="L98">            this.channel = channel;</span>
+<span class="nc" id="L99">            this.url = channel.getUrl().addParameter(&quot;codec&quot;, DubboCodec.NAME);</span>
+<span class="nc" id="L100">        }</span>
+
+        @Override
+        public URL getUrl() {
+<span class="nc" id="L104">            return url;</span>
+        }
+
+        @Override
+        public ChannelHandler getChannelHandler() {
+<span class="nc" id="L109">            return channel.getChannelHandler();</span>
+        }
+
+        @Override
+        public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L114">            return channel.getLocalAddress();</span>
+        }
+
+        @Override
+        public void close() {
+<span class="nc" id="L119">            channel.close();</span>
+<span class="nc" id="L120">        }</span>
+
+        @Override
+        public boolean isClosed() {
+<span class="nc bnc" id="L124" title="All 4 branches missed.">            return channel == null || channel.isClosed();</span>
+        }
+
+        @Override
+        public void reset(URL url) {
+<span class="nc" id="L129">            throw new RpcException(&quot;ChannelInvoker can not reset.&quot;);</span>
+        }
+
+        @Override
+        public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L134">            return channel.getLocalAddress();</span>
+        }
+
+        @Override
+        public boolean isConnected() {
+<span class="nc bnc" id="L139" title="All 4 branches missed.">            return channel != null &amp;&amp; channel.isConnected();</span>
+        }
+
+        @Override
+        public boolean hasAttribute(String key) {
+<span class="nc" id="L144">            return channel.hasAttribute(key);</span>
+        }
+
+        @Override
+        public Object getAttribute(String key) {
+<span class="nc" id="L149">            return channel.getAttribute(key);</span>
+        }
+
+        @Override
+        public void setAttribute(String key, Object value) {
+<span class="nc" id="L154">            channel.setAttribute(key, value);</span>
+<span class="nc" id="L155">        }</span>
+
+        @Override
+        public void removeAttribute(String key) {
+<span class="nc" id="L159">            channel.removeAttribute(key);</span>
+<span class="nc" id="L160">        }</span>
+
+        @Override
+        public void reconnect() throws RemotingException {
+
+<span class="nc" id="L165">        }</span>
+
+        @Override
+        public void send(Object message) throws RemotingException {
+<span class="nc" id="L169">            channel.send(message);</span>
+<span class="nc" id="L170">        }</span>
+
+        @Override
+        public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L174">            channel.send(message, sent);</span>
+<span class="nc" id="L175">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

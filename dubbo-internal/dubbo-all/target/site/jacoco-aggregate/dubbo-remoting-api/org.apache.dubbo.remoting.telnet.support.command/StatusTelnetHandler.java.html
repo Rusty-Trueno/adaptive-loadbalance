@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StatusTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.telnet.support.command</a> &gt; <span class="el_source">StatusTelnetHandler.java</span></div><h1>StatusTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.telnet.support.command;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.status.Status;
+import org.apache.dubbo.common.status.StatusChecker;
+import org.apache.dubbo.common.status.support.StatusUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+import org.apache.dubbo.remoting.telnet.support.TelnetUtils;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * StatusTelnetHandler
+ */
+@Activate
+@Help(parameter = &quot;[-l]&quot;, summary = &quot;Show status.&quot;, detail = &quot;Show status.&quot;)
+<span class="nc" id="L41">public class StatusTelnetHandler implements TelnetHandler {</span>
+
+<span class="nc" id="L43">    private final ExtensionLoader&lt;StatusChecker&gt; extensionLoader = ExtensionLoader.getExtensionLoader(StatusChecker.class);</span>
+
+    @Override
+    public String telnet(Channel channel, String message) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (message.equals(&quot;-l&quot;)) {</span>
+<span class="nc" id="L48">            List&lt;StatusChecker&gt; checkers = extensionLoader.getActivateExtension(channel.getUrl(), &quot;status&quot;);</span>
+<span class="nc" id="L49">            String[] header = new String[]{&quot;resource&quot;, &quot;status&quot;, &quot;message&quot;};</span>
+<span class="nc" id="L50">            List&lt;List&lt;String&gt;&gt; table = new ArrayList&lt;List&lt;String&gt;&gt;();</span>
+<span class="nc" id="L51">            Map&lt;String, Status&gt; statuses = new HashMap&lt;String, Status&gt;();</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(checkers)) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">                for (StatusChecker checker : checkers) {</span>
+<span class="nc" id="L54">                    String name = extensionLoader.getExtensionName(checker);</span>
+                    Status stat;
+                    try {
+<span class="nc" id="L57">                        stat = checker.check();</span>
+<span class="nc" id="L58">                    } catch (Throwable t) {</span>
+<span class="nc" id="L59">                        stat = new Status(Status.Level.ERROR, t.getMessage());</span>
+<span class="nc" id="L60">                    }</span>
+<span class="nc" id="L61">                    statuses.put(name, stat);</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">                    if (stat.getLevel() != null &amp;&amp; stat.getLevel() != Status.Level.UNKNOWN) {</span>
+<span class="nc" id="L63">                        List&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L64">                        row.add(name);</span>
+<span class="nc" id="L65">                        row.add(String.valueOf(stat.getLevel()));</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                        row.add(stat.getMessage() == null ? &quot;&quot; : stat.getMessage());</span>
+<span class="nc" id="L67">                        table.add(row);</span>
+                    }
+<span class="nc" id="L69">                }</span>
+            }
+<span class="nc" id="L71">            Status stat = StatusUtils.getSummaryStatus(statuses);</span>
+<span class="nc" id="L72">            List&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L73">            row.add(&quot;summary&quot;);</span>
+<span class="nc" id="L74">            row.add(String.valueOf(stat.getLevel()));</span>
+<span class="nc" id="L75">            row.add(stat.getMessage());</span>
+<span class="nc" id="L76">            table.add(row);</span>
+<span class="nc" id="L77">            return TelnetUtils.toTable(header, table);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        } else if (message.length() &gt; 0) {</span>
+<span class="nc" id="L79">            return &quot;Unsupported parameter &quot; + message + &quot; for status.&quot;;</span>
+        }
+<span class="nc" id="L81">        String status = channel.getUrl().getParameter(&quot;status&quot;);</span>
+<span class="nc" id="L82">        Map&lt;String, Status&gt; statuses = new HashMap&lt;String, Status&gt;();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (CollectionUtils.isNotEmptyMap(statuses)) {</span>
+<span class="nc" id="L84">            String[] ss = Constants.COMMA_SPLIT_PATTERN.split(status);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            for (String s : ss) {</span>
+<span class="nc" id="L86">                StatusChecker handler = extensionLoader.getExtension(s);</span>
+                Status stat;
+                try {
+<span class="nc" id="L89">                    stat = handler.check();</span>
+<span class="nc" id="L90">                } catch (Throwable t) {</span>
+<span class="nc" id="L91">                    stat = new Status(Status.Level.ERROR, t.getMessage());</span>
+<span class="nc" id="L92">                }</span>
+<span class="nc" id="L93">                statuses.put(s, stat);</span>
+            }
+        }
+<span class="nc" id="L96">        Status stat = StatusUtils.getSummaryStatus(statuses);</span>
+<span class="nc" id="L97">        return String.valueOf(stat.getLevel());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

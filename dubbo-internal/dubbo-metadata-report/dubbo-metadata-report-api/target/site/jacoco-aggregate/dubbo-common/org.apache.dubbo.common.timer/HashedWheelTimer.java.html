@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HashedWheelTimer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.timer</a> &gt; <span class="el_source">HashedWheelTimer.java</span></div><h1>HashedWheelTimer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2012 The Netty Project
+ *
+ * The Netty Project licenses this file to you under the Apache License,
+ * version 2.0 (the &quot;License&quot;); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.dubbo.common.timer;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ClassUtils;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * A {@link Timer} optimized for approximated I/O timeout scheduling.
+ *
+ * &lt;h3&gt;Tick Duration&lt;/h3&gt;
+ * &lt;p&gt;
+ * As described with 'approximated', this timer does not execute the scheduled
+ * {@link TimerTask} on time.  {@link HashedWheelTimer}, on every tick, will
+ * check if there are any {@link TimerTask}s behind the schedule and execute
+ * them.
+ * &lt;p&gt;
+ * You can increase or decrease the accuracy of the execution timing by
+ * specifying smaller or larger tick duration in the constructor.  In most
+ * network applications, I/O timeout does not need to be accurate.  Therefore,
+ * the default tick duration is 100 milliseconds and you will not need to try
+ * different configurations in most cases.
+ *
+ * &lt;h3&gt;Ticks per Wheel (Wheel Size)&lt;/h3&gt;
+ * &lt;p&gt;
+ * {@link HashedWheelTimer} maintains a data structure called 'wheel'.
+ * To put simply, a wheel is a hash table of {@link TimerTask}s whose hash
+ * function is 'dead line of the task'.  The default number of ticks per wheel
+ * (i.e. the size of the wheel) is 512.  You could specify a larger value
+ * if you are going to schedule a lot of timeouts.
+ *
+ * &lt;h3&gt;Do not create many instances.&lt;/h3&gt;
+ * &lt;p&gt;
+ * {@link HashedWheelTimer} creates a new thread whenever it is instantiated and
+ * started.  Therefore, you should make sure to create only one instance and
+ * share it across your application.  One of the common mistakes, that makes
+ * your application unresponsive, is to create a new instance for every connection.
+ *
+ * &lt;h3&gt;Implementation Details&lt;/h3&gt;
+ * &lt;p&gt;
+ * {@link HashedWheelTimer} is based on
+ * &lt;a href=&quot;http://cseweb.ucsd.edu/users/varghese/&quot;&gt;George Varghese&lt;/a&gt; and
+ * Tony Lauck's paper,
+ * &lt;a href=&quot;http://cseweb.ucsd.edu/users/varghese/PAPERS/twheel.ps.Z&quot;&gt;'Hashed
+ * and Hierarchical Timing Wheels: data structures to efficiently implement a
+ * timer facility'&lt;/a&gt;.  More comprehensive slides are located
+ * &lt;a href=&quot;http://www.cse.wustl.edu/~cdgill/courses/cs6874/TimingWheels.ppt&quot;&gt;here&lt;/a&gt;.
+ */
+public class HashedWheelTimer implements Timer {
+
+    /**
+     * may be in spi?
+     */
+    public static final String NAME = &quot;hased&quot;;
+
+<span class="nc" id="L87">    private static final Logger logger = LoggerFactory.getLogger(HashedWheelTimer.class);</span>
+
+<span class="nc" id="L89">    private static final AtomicInteger INSTANCE_COUNTER = new AtomicInteger();</span>
+<span class="nc" id="L90">    private static final AtomicBoolean WARNED_TOO_MANY_INSTANCES = new AtomicBoolean();</span>
+    private static final int INSTANCE_COUNT_LIMIT = 64;
+<span class="nc" id="L92">    private static final AtomicIntegerFieldUpdater&lt;HashedWheelTimer&gt; WORKER_STATE_UPDATER =</span>
+<span class="nc" id="L93">            AtomicIntegerFieldUpdater.newUpdater(HashedWheelTimer.class, &quot;workerState&quot;);</span>
+
+<span class="nc" id="L95">    private final Worker worker = new Worker();</span>
+    private final Thread workerThread;
+
+    private static final int WORKER_STATE_INIT = 0;
+    private static final int WORKER_STATE_STARTED = 1;
+    private static final int WORKER_STATE_SHUTDOWN = 2;
+
+    /**
+     * 0 - init, 1 - started, 2 - shut down
+     */
+    @SuppressWarnings({&quot;unused&quot;, &quot;FieldMayBeFinal&quot;})
+    private volatile int workerState;
+
+    private final long tickDuration;
+    private final HashedWheelBucket[] wheel;
+    private final int mask;
+<span class="nc" id="L111">    private final CountDownLatch startTimeInitialized = new CountDownLatch(1);</span>
+<span class="nc" id="L112">    private final Queue&lt;HashedWheelTimeout&gt; timeouts = new LinkedBlockingQueue&lt;&gt;();</span>
+<span class="nc" id="L113">    private final Queue&lt;HashedWheelTimeout&gt; cancelledTimeouts = new LinkedBlockingQueue&lt;&gt;();</span>
+<span class="nc" id="L114">    private final AtomicLong pendingTimeouts = new AtomicLong(0);</span>
+    private final long maxPendingTimeouts;
+
+    private volatile long startTime;
+
+    /**
+     * Creates a new timer with the default thread factory
+     * ({@link Executors#defaultThreadFactory()}), default tick duration, and
+     * default number of ticks per wheel.
+     */
+    public HashedWheelTimer() {
+<span class="nc" id="L125">        this(Executors.defaultThreadFactory());</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * Creates a new timer with the default thread factory
+     * ({@link Executors#defaultThreadFactory()}) and default number of ticks
+     * per wheel.
+     *
+     * @param tickDuration the duration between tick
+     * @param unit         the time unit of the {@code tickDuration}
+     * @throws NullPointerException     if {@code unit} is {@code null}
+     * @throws IllegalArgumentException if {@code tickDuration} is &amp;lt;= 0
+     */
+    public HashedWheelTimer(long tickDuration, TimeUnit unit) {
+<span class="nc" id="L139">        this(Executors.defaultThreadFactory(), tickDuration, unit);</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Creates a new timer with the default thread factory
+     * ({@link Executors#defaultThreadFactory()}).
+     *
+     * @param tickDuration  the duration between tick
+     * @param unit          the time unit of the {@code tickDuration}
+     * @param ticksPerWheel the size of the wheel
+     * @throws NullPointerException     if {@code unit} is {@code null}
+     * @throws IllegalArgumentException if either of {@code tickDuration} and {@code ticksPerWheel} is &amp;lt;= 0
+     */
+    public HashedWheelTimer(long tickDuration, TimeUnit unit, int ticksPerWheel) {
+<span class="nc" id="L153">        this(Executors.defaultThreadFactory(), tickDuration, unit, ticksPerWheel);</span>
+<span class="nc" id="L154">    }</span>
+
+    /**
+     * Creates a new timer with the default tick duration and default number of
+     * ticks per wheel.
+     *
+     * @param threadFactory a {@link ThreadFactory} that creates a
+     *                      background {@link Thread} which is dedicated to
+     *                      {@link TimerTask} execution.
+     * @throws NullPointerException if {@code threadFactory} is {@code null}
+     */
+    public HashedWheelTimer(ThreadFactory threadFactory) {
+<span class="nc" id="L166">        this(threadFactory, 100, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * Creates a new timer with the default number of ticks per wheel.
+     *
+     * @param threadFactory a {@link ThreadFactory} that creates a
+     *                      background {@link Thread} which is dedicated to
+     *                      {@link TimerTask} execution.
+     * @param tickDuration  the duration between tick
+     * @param unit          the time unit of the {@code tickDuration}
+     * @throws NullPointerException     if either of {@code threadFactory} and {@code unit} is {@code null}
+     * @throws IllegalArgumentException if {@code tickDuration} is &amp;lt;= 0
+     */
+    public HashedWheelTimer(
+            ThreadFactory threadFactory, long tickDuration, TimeUnit unit) {
+<span class="nc" id="L182">        this(threadFactory, tickDuration, unit, 512);</span>
+<span class="nc" id="L183">    }</span>
+
+    /**
+     * Creates a new timer.
+     *
+     * @param threadFactory a {@link ThreadFactory} that creates a
+     *                      background {@link Thread} which is dedicated to
+     *                      {@link TimerTask} execution.
+     * @param tickDuration  the duration between tick
+     * @param unit          the time unit of the {@code tickDuration}
+     * @param ticksPerWheel the size of the wheel
+     * @throws NullPointerException     if either of {@code threadFactory} and {@code unit} is {@code null}
+     * @throws IllegalArgumentException if either of {@code tickDuration} and {@code ticksPerWheel} is &amp;lt;= 0
+     */
+    public HashedWheelTimer(
+            ThreadFactory threadFactory,
+            long tickDuration, TimeUnit unit, int ticksPerWheel) {
+<span class="nc" id="L200">        this(threadFactory, tickDuration, unit, ticksPerWheel, -1);</span>
+<span class="nc" id="L201">    }</span>
+
+    /**
+     * Creates a new timer.
+     *
+     * @param threadFactory      a {@link ThreadFactory} that creates a
+     *                           background {@link Thread} which is dedicated to
+     *                           {@link TimerTask} execution.
+     * @param tickDuration       the duration between tick
+     * @param unit               the time unit of the {@code tickDuration}
+     * @param ticksPerWheel      the size of the wheel
+     * @param maxPendingTimeouts The maximum number of pending timeouts after which call to
+     *                           {@code newTimeout} will result in
+     *                           {@link java.util.concurrent.RejectedExecutionException}
+     *                           being thrown. No maximum pending timeouts limit is assumed if
+     *                           this value is 0 or negative.
+     * @throws NullPointerException     if either of {@code threadFactory} and {@code unit} is {@code null}
+     * @throws IllegalArgumentException if either of {@code tickDuration} and {@code ticksPerWheel} is &amp;lt;= 0
+     */
+    public HashedWheelTimer(
+            ThreadFactory threadFactory,
+            long tickDuration, TimeUnit unit, int ticksPerWheel,
+<span class="nc" id="L223">            long maxPendingTimeouts) {</span>
+
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (threadFactory == null) {</span>
+<span class="nc" id="L226">            throw new NullPointerException(&quot;threadFactory&quot;);</span>
+        }
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (unit == null) {</span>
+<span class="nc" id="L229">            throw new NullPointerException(&quot;unit&quot;);</span>
+        }
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (tickDuration &lt;= 0) {</span>
+<span class="nc" id="L232">            throw new IllegalArgumentException(&quot;tickDuration must be greater than 0: &quot; + tickDuration);</span>
+        }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (ticksPerWheel &lt;= 0) {</span>
+<span class="nc" id="L235">            throw new IllegalArgumentException(&quot;ticksPerWheel must be greater than 0: &quot; + ticksPerWheel);</span>
+        }
+
+        // Normalize ticksPerWheel to power of two and initialize the wheel.
+<span class="nc" id="L239">        wheel = createWheel(ticksPerWheel);</span>
+<span class="nc" id="L240">        mask = wheel.length - 1;</span>
+
+        // Convert tickDuration to nanos.
+<span class="nc" id="L243">        this.tickDuration = unit.toNanos(tickDuration);</span>
+
+        // Prevent overflow.
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (this.tickDuration &gt;= Long.MAX_VALUE / wheel.length) {</span>
+<span class="nc" id="L247">            throw new IllegalArgumentException(String.format(</span>
+                    &quot;tickDuration: %d (expected: 0 &lt; tickDuration in nanos &lt; %d&quot;,
+<span class="nc" id="L249">                    tickDuration, Long.MAX_VALUE / wheel.length));</span>
+        }
+<span class="nc" id="L251">        workerThread = threadFactory.newThread(worker);</span>
+
+<span class="nc" id="L253">        this.maxPendingTimeouts = maxPendingTimeouts;</span>
+
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (INSTANCE_COUNTER.incrementAndGet() &gt; INSTANCE_COUNT_LIMIT &amp;&amp;</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                WARNED_TOO_MANY_INSTANCES.compareAndSet(false, true)) {</span>
+<span class="nc" id="L257">            reportTooManyInstances();</span>
+        }
+<span class="nc" id="L259">    }</span>
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+<span class="nc" id="L264">            super.finalize();</span>
+        } finally {
+            // This object is going to be GCed and it is assumed the ship has sailed to do a proper shutdown. If
+            // we have not yet shutdown then we want to make sure we decrement the active instance count.
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (WORKER_STATE_UPDATER.getAndSet(this, WORKER_STATE_SHUTDOWN) != WORKER_STATE_SHUTDOWN) {</span>
+<span class="nc" id="L269">                INSTANCE_COUNTER.decrementAndGet();</span>
+            }
+        }
+<span class="nc" id="L272">    }</span>
+
+    private static HashedWheelBucket[] createWheel(int ticksPerWheel) {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (ticksPerWheel &lt;= 0) {</span>
+<span class="nc" id="L276">            throw new IllegalArgumentException(</span>
+                    &quot;ticksPerWheel must be greater than 0: &quot; + ticksPerWheel);
+        }
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (ticksPerWheel &gt; 1073741824) {</span>
+<span class="nc" id="L280">            throw new IllegalArgumentException(</span>
+                    &quot;ticksPerWheel may not be greater than 2^30: &quot; + ticksPerWheel);
+        }
+
+<span class="nc" id="L284">        ticksPerWheel = normalizeTicksPerWheel(ticksPerWheel);</span>
+<span class="nc" id="L285">        HashedWheelBucket[] wheel = new HashedWheelBucket[ticksPerWheel];</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        for (int i = 0; i &lt; wheel.length; i++) {</span>
+<span class="nc" id="L287">            wheel[i] = new HashedWheelBucket();</span>
+        }
+<span class="nc" id="L289">        return wheel;</span>
+    }
+
+    private static int normalizeTicksPerWheel(int ticksPerWheel) {
+<span class="nc" id="L293">        int normalizedTicksPerWheel = ticksPerWheel - 1;</span>
+<span class="nc" id="L294">        normalizedTicksPerWheel |= normalizedTicksPerWheel &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L295">        normalizedTicksPerWheel |= normalizedTicksPerWheel &gt;&gt;&gt; 2;</span>
+<span class="nc" id="L296">        normalizedTicksPerWheel |= normalizedTicksPerWheel &gt;&gt;&gt; 4;</span>
+<span class="nc" id="L297">        normalizedTicksPerWheel |= normalizedTicksPerWheel &gt;&gt;&gt; 8;</span>
+<span class="nc" id="L298">        normalizedTicksPerWheel |= normalizedTicksPerWheel &gt;&gt;&gt; 16;</span>
+<span class="nc" id="L299">        return normalizedTicksPerWheel + 1;</span>
+    }
+
+    /**
+     * Starts the background thread explicitly.  The background thread will
+     * start automatically on demand even if you did not call this method.
+     *
+     * @throws IllegalStateException if this timer has been
+     *                               {@linkplain #stop() stopped} already
+     */
+    public void start() {
+<span class="nc bnc" id="L310" title="All 4 branches missed.">        switch (WORKER_STATE_UPDATER.get(this)) {</span>
+            case WORKER_STATE_INIT:
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_INIT, WORKER_STATE_STARTED)) {</span>
+<span class="nc" id="L313">                    workerThread.start();</span>
+                }
+                break;
+            case WORKER_STATE_STARTED:
+<span class="nc" id="L317">                break;</span>
+            case WORKER_STATE_SHUTDOWN:
+<span class="nc" id="L319">                throw new IllegalStateException(&quot;cannot be started once stopped&quot;);</span>
+            default:
+<span class="nc" id="L321">                throw new Error(&quot;Invalid WorkerState&quot;);</span>
+        }
+
+        // Wait until the startTime is initialized by the worker.
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        while (startTime == 0) {</span>
+            try {
+<span class="nc" id="L327">                startTimeInitialized.await();</span>
+<span class="nc" id="L328">            } catch (InterruptedException ignore) {</span>
+                // Ignore - it will be ready very soon.
+<span class="nc" id="L330">            }</span>
+        }
+<span class="nc" id="L332">    }</span>
+
+    @Override
+    public Set&lt;Timeout&gt; stop() {
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (Thread.currentThread() == workerThread) {</span>
+<span class="nc" id="L337">            throw new IllegalStateException(</span>
+<span class="nc" id="L338">                    HashedWheelTimer.class.getSimpleName() +</span>
+                            &quot;.stop() cannot be called from &quot; +
+<span class="nc" id="L340">                            TimerTask.class.getSimpleName());</span>
+        }
+
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (!WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {</span>
+            // workerState can be 0 or 2 at this moment - let it always be 2.
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            if (WORKER_STATE_UPDATER.getAndSet(this, WORKER_STATE_SHUTDOWN) != WORKER_STATE_SHUTDOWN) {</span>
+<span class="nc" id="L346">                INSTANCE_COUNTER.decrementAndGet();</span>
+            }
+
+<span class="nc" id="L349">            return Collections.emptySet();</span>
+        }
+
+        try {
+<span class="nc" id="L353">            boolean interrupted = false;</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            while (workerThread.isAlive()) {</span>
+<span class="nc" id="L355">                workerThread.interrupt();</span>
+                try {
+<span class="nc" id="L357">                    workerThread.join(100);</span>
+<span class="nc" id="L358">                } catch (InterruptedException ignored) {</span>
+<span class="nc" id="L359">                    interrupted = true;</span>
+<span class="nc" id="L360">                }</span>
+            }
+
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (interrupted) {</span>
+<span class="nc" id="L364">                Thread.currentThread().interrupt();</span>
+            }
+        } finally {
+<span class="nc" id="L367">            INSTANCE_COUNTER.decrementAndGet();</span>
+        }
+<span class="nc" id="L369">        return worker.unprocessedTimeouts();</span>
+    }
+
+    @Override
+    public boolean isStop() {
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        return WORKER_STATE_SHUTDOWN == WORKER_STATE_UPDATER.get(this);</span>
+    }
+
+    @Override
+    public Timeout newTimeout(TimerTask task, long delay, TimeUnit unit) {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        if (task == null) {</span>
+<span class="nc" id="L380">            throw new NullPointerException(&quot;task&quot;);</span>
+        }
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if (unit == null) {</span>
+<span class="nc" id="L383">            throw new NullPointerException(&quot;unit&quot;);</span>
+        }
+
+<span class="nc" id="L386">        long pendingTimeoutsCount = pendingTimeouts.incrementAndGet();</span>
+
+<span class="nc bnc" id="L388" title="All 4 branches missed.">        if (maxPendingTimeouts &gt; 0 &amp;&amp; pendingTimeoutsCount &gt; maxPendingTimeouts) {</span>
+<span class="nc" id="L389">            pendingTimeouts.decrementAndGet();</span>
+<span class="nc" id="L390">            throw new RejectedExecutionException(&quot;Number of pending timeouts (&quot;</span>
+                    + pendingTimeoutsCount + &quot;) is greater than or equal to maximum allowed pending &quot;
+                    + &quot;timeouts (&quot; + maxPendingTimeouts + &quot;)&quot;);
+        }
+
+<span class="nc" id="L395">        start();</span>
+
+        // Add the timeout to the timeout queue which will be processed on the next tick.
+        // During processing all the queued HashedWheelTimeouts will be added to the correct HashedWheelBucket.
+<span class="nc" id="L399">        long deadline = System.nanoTime() + unit.toNanos(delay) - startTime;</span>
+
+        // Guard against overflow.
+<span class="nc bnc" id="L402" title="All 4 branches missed.">        if (delay &gt; 0 &amp;&amp; deadline &lt; 0) {</span>
+<span class="nc" id="L403">            deadline = Long.MAX_VALUE;</span>
+        }
+<span class="nc" id="L405">        HashedWheelTimeout timeout = new HashedWheelTimeout(this, task, deadline);</span>
+<span class="nc" id="L406">        timeouts.add(timeout);</span>
+<span class="nc" id="L407">        return timeout;</span>
+    }
+
+    /**
+     * Returns the number of pending timeouts of this {@link Timer}.
+     */
+    public long pendingTimeouts() {
+<span class="nc" id="L414">        return pendingTimeouts.get();</span>
+    }
+
+    private static void reportTooManyInstances() {
+<span class="nc" id="L418">        String resourceType = ClassUtils.simpleClassName(HashedWheelTimer.class);</span>
+<span class="nc" id="L419">        logger.error(&quot;You are creating too many &quot; + resourceType + &quot; instances. &quot; +</span>
+                resourceType + &quot; is a shared resource that must be reused across the JVM,&quot; +
+                &quot;so that only a few instances are created.&quot;);
+<span class="nc" id="L422">    }</span>
+
+<span class="nc" id="L424">    private final class Worker implements Runnable {</span>
+<span class="nc" id="L425">        private final Set&lt;Timeout&gt; unprocessedTimeouts = new HashSet&lt;Timeout&gt;();</span>
+
+        private long tick;
+
+        @Override
+        public void run() {
+            // Initialize the startTime.
+<span class="nc" id="L432">            startTime = System.nanoTime();</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            if (startTime == 0) {</span>
+                // We use 0 as an indicator for the uninitialized value here, so make sure it's not 0 when initialized.
+<span class="nc" id="L435">                startTime = 1;</span>
+            }
+
+            // Notify the other threads waiting for the initialization at start().
+<span class="nc" id="L439">            startTimeInitialized.countDown();</span>
+
+            do {
+<span class="nc" id="L442">                final long deadline = waitForNextTick();</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                if (deadline &gt; 0) {</span>
+<span class="nc" id="L444">                    int idx = (int) (tick &amp; mask);</span>
+<span class="nc" id="L445">                    processCancelledTasks();</span>
+<span class="nc" id="L446">                    HashedWheelBucket bucket =</span>
+<span class="nc" id="L447">                            wheel[idx];</span>
+<span class="nc" id="L448">                    transferTimeoutsToBuckets();</span>
+<span class="nc" id="L449">                    bucket.expireTimeouts(deadline);</span>
+<span class="nc" id="L450">                    tick++;</span>
+                }
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            } while (WORKER_STATE_UPDATER.get(HashedWheelTimer.this) == WORKER_STATE_STARTED);</span>
+
+            // Fill the unprocessedTimeouts so we can return them from stop() method.
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            for (HashedWheelBucket bucket : wheel) {</span>
+<span class="nc" id="L456">                bucket.clearTimeouts(unprocessedTimeouts);</span>
+            }
+            for (; ; ) {
+<span class="nc" id="L459">                HashedWheelTimeout timeout = timeouts.poll();</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                if (timeout == null) {</span>
+<span class="nc" id="L461">                    break;</span>
+                }
+<span class="nc bnc" id="L463" title="All 2 branches missed.">                if (!timeout.isCancelled()) {</span>
+<span class="nc" id="L464">                    unprocessedTimeouts.add(timeout);</span>
+                }
+<span class="nc" id="L466">            }</span>
+<span class="nc" id="L467">            processCancelledTasks();</span>
+<span class="nc" id="L468">        }</span>
+
+        private void transferTimeoutsToBuckets() {
+            // transfer only max. 100000 timeouts per tick to prevent a thread to stale the workerThread when it just
+            // adds new timeouts in a loop.
+<span class="nc bnc" id="L473" title="All 2 branches missed.">            for (int i = 0; i &lt; 100000; i++) {</span>
+<span class="nc" id="L474">                HashedWheelTimeout timeout = timeouts.poll();</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                if (timeout == null) {</span>
+                    // all processed
+<span class="nc" id="L477">                    break;</span>
+                }
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                if (timeout.state() == HashedWheelTimeout.ST_CANCELLED) {</span>
+                    // Was cancelled in the meantime.
+<span class="nc" id="L481">                    continue;</span>
+                }
+
+<span class="nc" id="L484">                long calculated = timeout.deadline / tickDuration;</span>
+<span class="nc" id="L485">                timeout.remainingRounds = (calculated - tick) / wheel.length;</span>
+
+                // Ensure we don't schedule for past.
+<span class="nc" id="L488">                final long ticks = Math.max(calculated, tick);</span>
+<span class="nc" id="L489">                int stopIndex = (int) (ticks &amp; mask);</span>
+
+<span class="nc" id="L491">                HashedWheelBucket bucket = wheel[stopIndex];</span>
+<span class="nc" id="L492">                bucket.addTimeout(timeout);</span>
+            }
+<span class="nc" id="L494">        }</span>
+
+        private void processCancelledTasks() {
+            for (; ; ) {
+<span class="nc" id="L498">                HashedWheelTimeout timeout = cancelledTimeouts.poll();</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                if (timeout == null) {</span>
+                    // all processed
+<span class="nc" id="L501">                    break;</span>
+                }
+                try {
+<span class="nc" id="L504">                    timeout.remove();</span>
+<span class="nc" id="L505">                } catch (Throwable t) {</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                    if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L507">                        logger.warn(&quot;An exception was thrown while process a cancellation task&quot;, t);</span>
+                    }
+<span class="nc" id="L509">                }</span>
+<span class="nc" id="L510">            }</span>
+<span class="nc" id="L511">        }</span>
+
+        /**
+         * calculate goal nanoTime from startTime and current tick number,
+         * then wait until that goal has been reached.
+         *
+         * @return Long.MIN_VALUE if received a shutdown request,
+         * current time otherwise (with Long.MIN_VALUE changed by +1)
+         */
+        private long waitForNextTick() {
+<span class="nc" id="L521">            long deadline = tickDuration * (tick + 1);</span>
+
+            for (; ; ) {
+<span class="nc" id="L524">                final long currentTime = System.nanoTime() - startTime;</span>
+<span class="nc" id="L525">                long sleepTimeMs = (deadline - currentTime + 999999) / 1000000;</span>
+
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                if (sleepTimeMs &lt;= 0) {</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                    if (currentTime == Long.MIN_VALUE) {</span>
+<span class="nc" id="L529">                        return -Long.MAX_VALUE;</span>
+                    } else {
+<span class="nc" id="L531">                        return currentTime;</span>
+                    }
+                }
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                if (isWindows()) {</span>
+<span class="nc" id="L535">                    sleepTimeMs = sleepTimeMs / 10 * 10;</span>
+                }
+
+                try {
+<span class="nc" id="L539">                    Thread.sleep(sleepTimeMs);</span>
+<span class="nc" id="L540">                } catch (InterruptedException ignored) {</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                    if (WORKER_STATE_UPDATER.get(HashedWheelTimer.this) == WORKER_STATE_SHUTDOWN) {</span>
+<span class="nc" id="L542">                        return Long.MIN_VALUE;</span>
+                    }
+<span class="nc" id="L544">                }</span>
+<span class="nc" id="L545">            }</span>
+        }
+
+        Set&lt;Timeout&gt; unprocessedTimeouts() {
+<span class="nc" id="L549">            return Collections.unmodifiableSet(unprocessedTimeouts);</span>
+        }
+    }
+
+    private static final class HashedWheelTimeout implements Timeout {
+
+        private static final int ST_INIT = 0;
+        private static final int ST_CANCELLED = 1;
+        private static final int ST_EXPIRED = 2;
+<span class="nc" id="L558">        private static final AtomicIntegerFieldUpdater&lt;HashedWheelTimeout&gt; STATE_UPDATER =</span>
+<span class="nc" id="L559">                AtomicIntegerFieldUpdater.newUpdater(HashedWheelTimeout.class, &quot;state&quot;);</span>
+
+        private final HashedWheelTimer timer;
+        private final TimerTask task;
+        private final long deadline;
+
+<span class="nc" id="L565">        @SuppressWarnings({&quot;unused&quot;, &quot;FieldMayBeFinal&quot;, &quot;RedundantFieldInitialization&quot;})</span>
+        private volatile int state = ST_INIT;
+
+        /**
+         * RemainingRounds will be calculated and set by Worker.transferTimeoutsToBuckets() before the
+         * HashedWheelTimeout will be added to the correct HashedWheelBucket.
+         */
+        long remainingRounds;
+
+        /**
+         * This will be used to chain timeouts in HashedWheelTimerBucket via a double-linked-list.
+         * As only the workerThread will act on it there is no need for synchronization / volatile.
+         */
+        HashedWheelTimeout next;
+        HashedWheelTimeout prev;
+
+        /**
+         * The bucket to which the timeout was added
+         */
+        HashedWheelBucket bucket;
+
+<span class="nc" id="L586">        HashedWheelTimeout(HashedWheelTimer timer, TimerTask task, long deadline) {</span>
+<span class="nc" id="L587">            this.timer = timer;</span>
+<span class="nc" id="L588">            this.task = task;</span>
+<span class="nc" id="L589">            this.deadline = deadline;</span>
+<span class="nc" id="L590">        }</span>
+
+        @Override
+        public Timer timer() {
+<span class="nc" id="L594">            return timer;</span>
+        }
+
+        @Override
+        public TimerTask task() {
+<span class="nc" id="L599">            return task;</span>
+        }
+
+        @Override
+        public boolean cancel() {
+            // only update the state it will be removed from HashedWheelBucket on next tick.
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            if (!compareAndSetState(ST_INIT, ST_CANCELLED)) {</span>
+<span class="nc" id="L606">                return false;</span>
+            }
+            // If a task should be canceled we put this to another queue which will be processed on each tick.
+            // So this means that we will have a GC latency of max. 1 tick duration which is good enough. This way
+            // we can make again use of our MpscLinkedQueue and so minimize the locking / overhead as much as possible.
+<span class="nc" id="L611">            timer.cancelledTimeouts.add(this);</span>
+<span class="nc" id="L612">            return true;</span>
+        }
+
+        void remove() {
+<span class="nc" id="L616">            HashedWheelBucket bucket = this.bucket;</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">            if (bucket != null) {</span>
+<span class="nc" id="L618">                bucket.remove(this);</span>
+            } else {
+<span class="nc" id="L620">                timer.pendingTimeouts.decrementAndGet();</span>
+            }
+<span class="nc" id="L622">        }</span>
+
+        public boolean compareAndSetState(int expected, int state) {
+<span class="nc" id="L625">            return STATE_UPDATER.compareAndSet(this, expected, state);</span>
+        }
+
+        public int state() {
+<span class="nc" id="L629">            return state;</span>
+        }
+
+        @Override
+        public boolean isCancelled() {
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            return state() == ST_CANCELLED;</span>
+        }
+
+        @Override
+        public boolean isExpired() {
+<span class="nc bnc" id="L639" title="All 2 branches missed.">            return state() == ST_EXPIRED;</span>
+        }
+
+        public void expire() {
+<span class="nc bnc" id="L643" title="All 2 branches missed.">            if (!compareAndSetState(ST_INIT, ST_EXPIRED)) {</span>
+<span class="nc" id="L644">                return;</span>
+            }
+
+            try {
+<span class="nc" id="L648">                task.run(this);</span>
+<span class="nc" id="L649">            } catch (Throwable t) {</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">                if (logger.isWarnEnabled()) {</span>
+<span class="nc" id="L651">                    logger.warn(&quot;An exception was thrown by &quot; + TimerTask.class.getSimpleName() + '.', t);</span>
+                }
+<span class="nc" id="L653">            }</span>
+<span class="nc" id="L654">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L658">            final long currentTime = System.nanoTime();</span>
+<span class="nc" id="L659">            long remaining = deadline - currentTime + timer.startTime;</span>
+<span class="nc" id="L660">            String simpleClassName = ClassUtils.simpleClassName(this.getClass());</span>
+
+<span class="nc" id="L662">            StringBuilder buf = new StringBuilder(192)</span>
+<span class="nc" id="L663">                    .append(simpleClassName)</span>
+<span class="nc" id="L664">                    .append('(')</span>
+<span class="nc" id="L665">                    .append(&quot;deadline: &quot;);</span>
+<span class="nc bnc" id="L666" title="All 2 branches missed.">            if (remaining &gt; 0) {</span>
+<span class="nc" id="L667">                buf.append(remaining)</span>
+<span class="nc" id="L668">                        .append(&quot; ns later&quot;);</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            } else if (remaining &lt; 0) {</span>
+<span class="nc" id="L670">                buf.append(-remaining)</span>
+<span class="nc" id="L671">                        .append(&quot; ns ago&quot;);</span>
+            } else {
+<span class="nc" id="L673">                buf.append(&quot;now&quot;);</span>
+            }
+
+<span class="nc bnc" id="L676" title="All 2 branches missed.">            if (isCancelled()) {</span>
+<span class="nc" id="L677">                buf.append(&quot;, cancelled&quot;);</span>
+            }
+
+<span class="nc" id="L680">            return buf.append(&quot;, task: &quot;)</span>
+<span class="nc" id="L681">                    .append(task())</span>
+<span class="nc" id="L682">                    .append(')')</span>
+<span class="nc" id="L683">                    .toString();</span>
+        }
+    }
+
+    /**
+     * Bucket that stores HashedWheelTimeouts. These are stored in a linked-list like datastructure to allow easy
+     * removal of HashedWheelTimeouts in the middle. Also the HashedWheelTimeout act as nodes themself and so no
+     * extra object creation is needed.
+     */
+<span class="nc bnc" id="L692" title="All 2 branches missed.">    private static final class HashedWheelBucket {</span>
+
+        /**
+         * Used for the linked-list datastructure
+         */
+        private HashedWheelTimeout head;
+        private HashedWheelTimeout tail;
+
+        /**
+         * Add {@link HashedWheelTimeout} to this bucket.
+         */
+        void addTimeout(HashedWheelTimeout timeout) {
+<span class="nc bnc" id="L704" title="All 4 branches missed.">            assert timeout.bucket == null;</span>
+<span class="nc" id="L705">            timeout.bucket = this;</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">            if (head == null) {</span>
+<span class="nc" id="L707">                head = tail = timeout;</span>
+            } else {
+<span class="nc" id="L709">                tail.next = timeout;</span>
+<span class="nc" id="L710">                timeout.prev = tail;</span>
+<span class="nc" id="L711">                tail = timeout;</span>
+            }
+<span class="nc" id="L713">        }</span>
+
+        /**
+         * Expire all {@link HashedWheelTimeout}s for the given {@code deadline}.
+         */
+        void expireTimeouts(long deadline) {
+<span class="nc" id="L719">            HashedWheelTimeout timeout = head;</span>
+
+            // process all timeouts
+<span class="nc bnc" id="L722" title="All 2 branches missed.">            while (timeout != null) {</span>
+<span class="nc" id="L723">                HashedWheelTimeout next = timeout.next;</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                if (timeout.remainingRounds &lt;= 0) {</span>
+<span class="nc" id="L725">                    next = remove(timeout);</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">                    if (timeout.deadline &lt;= deadline) {</span>
+<span class="nc" id="L727">                        timeout.expire();</span>
+                    } else {
+                        // The timeout was placed into a wrong slot. This should never happen.
+<span class="nc" id="L730">                        throw new IllegalStateException(String.format(</span>
+<span class="nc" id="L731">                                &quot;timeout.deadline (%d) &gt; deadline (%d)&quot;, timeout.deadline, deadline));</span>
+                    }
+<span class="nc bnc" id="L733" title="All 2 branches missed.">                } else if (timeout.isCancelled()) {</span>
+<span class="nc" id="L734">                    next = remove(timeout);</span>
+                } else {
+<span class="nc" id="L736">                    timeout.remainingRounds--;</span>
+                }
+<span class="nc" id="L738">                timeout = next;</span>
+<span class="nc" id="L739">            }</span>
+<span class="nc" id="L740">        }</span>
+
+        public HashedWheelTimeout remove(HashedWheelTimeout timeout) {
+<span class="nc" id="L743">            HashedWheelTimeout next = timeout.next;</span>
+            // remove timeout that was either processed or cancelled by updating the linked-list
+<span class="nc bnc" id="L745" title="All 2 branches missed.">            if (timeout.prev != null) {</span>
+<span class="nc" id="L746">                timeout.prev.next = next;</span>
+            }
+<span class="nc bnc" id="L748" title="All 2 branches missed.">            if (timeout.next != null) {</span>
+<span class="nc" id="L749">                timeout.next.prev = timeout.prev;</span>
+            }
+
+<span class="nc bnc" id="L752" title="All 2 branches missed.">            if (timeout == head) {</span>
+                // if timeout is also the tail we need to adjust the entry too
+<span class="nc bnc" id="L754" title="All 2 branches missed.">                if (timeout == tail) {</span>
+<span class="nc" id="L755">                    tail = null;</span>
+<span class="nc" id="L756">                    head = null;</span>
+                } else {
+<span class="nc" id="L758">                    head = next;</span>
+                }
+<span class="nc bnc" id="L760" title="All 2 branches missed.">            } else if (timeout == tail) {</span>
+                // if the timeout is the tail modify the tail to be the prev node.
+<span class="nc" id="L762">                tail = timeout.prev;</span>
+            }
+            // null out prev, next and bucket to allow for GC.
+<span class="nc" id="L765">            timeout.prev = null;</span>
+<span class="nc" id="L766">            timeout.next = null;</span>
+<span class="nc" id="L767">            timeout.bucket = null;</span>
+<span class="nc" id="L768">            timeout.timer.pendingTimeouts.decrementAndGet();</span>
+<span class="nc" id="L769">            return next;</span>
+        }
+
+        /**
+         * Clear this bucket and return all not expired / cancelled {@link Timeout}s.
+         */
+        void clearTimeouts(Set&lt;Timeout&gt; set) {
+            for (; ; ) {
+<span class="nc" id="L777">                HashedWheelTimeout timeout = pollTimeout();</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">                if (timeout == null) {</span>
+<span class="nc" id="L779">                    return;</span>
+                }
+<span class="nc bnc" id="L781" title="All 4 branches missed.">                if (timeout.isExpired() || timeout.isCancelled()) {</span>
+<span class="nc" id="L782">                    continue;</span>
+                }
+<span class="nc" id="L784">                set.add(timeout);</span>
+<span class="nc" id="L785">            }</span>
+        }
+
+        private HashedWheelTimeout pollTimeout() {
+<span class="nc" id="L789">            HashedWheelTimeout head = this.head;</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">            if (head == null) {</span>
+<span class="nc" id="L791">                return null;</span>
+            }
+<span class="nc" id="L793">            HashedWheelTimeout next = head.next;</span>
+<span class="nc bnc" id="L794" title="All 2 branches missed.">            if (next == null) {</span>
+<span class="nc" id="L795">                tail = this.head = null;</span>
+            } else {
+<span class="nc" id="L797">                this.head = next;</span>
+<span class="nc" id="L798">                next.prev = null;</span>
+            }
+
+            // null out prev and next to allow for GC.
+<span class="nc" id="L802">            head.next = null;</span>
+<span class="nc" id="L803">            head.prev = null;</span>
+<span class="nc" id="L804">            head.bucket = null;</span>
+<span class="nc" id="L805">            return head;</span>
+        }
+    }
+
+    private boolean isWindows() {
+<span class="nc" id="L810">        return System.getProperty(&quot;os.name&quot;, &quot;&quot;).toLowerCase(Locale.US).contains(&quot;win&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InvokeTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo.telnet</a> &gt; <span class="el_source">InvokeTelnetHandler.java</span></div><h1>InvokeTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo.telnet;
+
+import com.alibaba.fastjson.JSON;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ProviderMethodModel;
+import org.apache.dubbo.rpc.model.ProviderModel;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.dubbo.common.utils.PojoUtils.realize;
+
+/**
+ * InvokeTelnetHandler
+ */
+@Activate
+@Help(parameter = &quot;[service.]method(args) &quot;, summary = &quot;Invoke the service method.&quot;,
+        detail = &quot;Invoke the service method.&quot;)
+<span class="nc" id="L46">public class InvokeTelnetHandler implements TelnetHandler {</span>
+
+    public static final String INVOKE_MESSAGE_KEY = &quot;telnet.invoke.method.message&quot;;
+    public static final String INVOKE_METHOD_LIST_KEY = &quot;telnet.invoke.method.list&quot;;
+    public static final String INVOKE_METHOD_PROVIDER_KEY = &quot;telnet.invoke.method.provider&quot;;
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public String telnet(Channel channel, String message) {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (StringUtils.isEmpty(message)) {</span>
+<span class="nc" id="L56">            return &quot;Please input method name, eg: \r\ninvoke xxxMethod(1234, \&quot;abcd\&quot;, {\&quot;prop\&quot; : \&quot;value\&quot;})\r\n&quot; +</span>
+                    &quot;invoke XxxService.xxxMethod(1234, \&quot;abcd\&quot;, {\&quot;prop\&quot; : \&quot;value\&quot;})\r\n&quot; +
+                    &quot;invoke com.xxx.XxxService.xxxMethod(1234, \&quot;abcd\&quot;, {\&quot;prop\&quot; : \&quot;value\&quot;})&quot;;
+        }
+
+<span class="nc" id="L61">        String service = (String) channel.getAttribute(ChangeTelnetHandler.SERVICE_KEY);</span>
+
+<span class="nc" id="L63">        int i = message.indexOf(&quot;(&quot;);</span>
+
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        if (i &lt; 0 || !message.endsWith(&quot;)&quot;)) {</span>
+<span class="nc" id="L66">            return &quot;Invalid parameters, format: service.method(args)&quot;;</span>
+        }
+
+<span class="nc" id="L69">        String method = message.substring(0, i).trim();</span>
+<span class="nc" id="L70">        String args = message.substring(i + 1, message.length() - 1).trim();</span>
+<span class="nc" id="L71">        i = method.lastIndexOf(&quot;.&quot;);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L73">            service = method.substring(0, i).trim();</span>
+<span class="nc" id="L74">            method = method.substring(i + 1).trim();</span>
+        }
+
+        List&lt;Object&gt; list;
+        try {
+<span class="nc" id="L79">            list = JSON.parseArray(&quot;[&quot; + args + &quot;]&quot;, Object.class);</span>
+<span class="nc" id="L80">        } catch (Throwable t) {</span>
+<span class="nc" id="L81">            return &quot;Invalid json argument, cause: &quot; + t.getMessage();</span>
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L84">        Method invokeMethod = null;</span>
+<span class="nc" id="L85">        ProviderModel selectedProvider = null;</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (isInvokedSelectCommand(channel)) {</span>
+<span class="nc" id="L87">            selectedProvider = (ProviderModel) channel.getAttribute(INVOKE_METHOD_PROVIDER_KEY);</span>
+<span class="nc" id="L88">            invokeMethod = (Method) channel.getAttribute(SelectTelnetHandler.SELECT_METHOD_KEY);</span>
+        } else {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            for (ProviderModel provider : ApplicationModel.allProviderModels()) {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                if (isServiceMatch(service, provider)) {</span>
+<span class="nc" id="L92">                    selectedProvider = provider;</span>
+<span class="nc" id="L93">                    List&lt;Method&gt; methodList = findSameSignatureMethod(provider.getAllMethods(), method, list);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                    if (CollectionUtils.isNotEmpty(methodList)) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                        if (methodList.size() == 1) {</span>
+<span class="nc" id="L96">                            invokeMethod = methodList.get(0);</span>
+                        } else {
+<span class="nc" id="L98">                            List&lt;Method&gt; matchMethods = findMatchMethods(methodList, list);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                            if (CollectionUtils.isNotEmpty(matchMethods)) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                                if (matchMethods.size() == 1) {</span>
+<span class="nc" id="L101">                                    invokeMethod = matchMethods.get(0);</span>
+                                } else { //exist overridden method
+<span class="nc" id="L103">                                    channel.setAttribute(INVOKE_METHOD_PROVIDER_KEY, provider);</span>
+<span class="nc" id="L104">                                    channel.setAttribute(INVOKE_METHOD_LIST_KEY, matchMethods);</span>
+<span class="nc" id="L105">                                    channel.setAttribute(INVOKE_MESSAGE_KEY, message);</span>
+<span class="nc" id="L106">                                    printSelectMessage(buf, matchMethods);</span>
+<span class="nc" id="L107">                                    return buf.toString();</span>
+                                }
+                            }
+<span class="nc" id="L110">                        }</span>
+                    }
+                    break;
+                }
+<span class="nc" id="L114">            }</span>
+        }
+
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (!StringUtils.isEmpty(service)) {</span>
+<span class="nc" id="L119">            buf.append(&quot;Use default service &quot;).append(service).append(&quot;.&quot;);</span>
+        }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (selectedProvider != null) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (invokeMethod != null) {</span>
+                try {
+<span class="nc" id="L124">                    Object[] array = realize(list.toArray(), invokeMethod.getParameterTypes(),</span>
+<span class="nc" id="L125">                            invokeMethod.getGenericParameterTypes());</span>
+<span class="nc" id="L126">                    long start = System.currentTimeMillis();</span>
+<span class="nc" id="L127">                    RpcResult result = new RpcResult();</span>
+                    try {
+<span class="nc" id="L129">                        Object o = invokeMethod.invoke(selectedProvider.getServiceInstance(), array);</span>
+<span class="nc" id="L130">                        result.setValue(o);</span>
+<span class="nc" id="L131">                    } catch (Throwable t) {</span>
+<span class="nc" id="L132">                        result.setException(t);</span>
+<span class="nc" id="L133">                    }</span>
+<span class="nc" id="L134">                    long end = System.currentTimeMillis();</span>
+<span class="nc" id="L135">                    buf.append(&quot;\r\nresult: &quot;);</span>
+<span class="nc" id="L136">                    buf.append(JSON.toJSONString(result.recreate()));</span>
+<span class="nc" id="L137">                    buf.append(&quot;\r\nelapsed: &quot;);</span>
+<span class="nc" id="L138">                    buf.append(end - start);</span>
+<span class="nc" id="L139">                    buf.append(&quot; ms.&quot;);</span>
+<span class="nc" id="L140">                } catch (Throwable t) {</span>
+<span class="nc" id="L141">                    return &quot;Failed to invoke method &quot; + invokeMethod.getName() + &quot;, cause: &quot; + StringUtils.toString(t);</span>
+<span class="nc" id="L142">                }</span>
+            } else {
+<span class="nc" id="L144">                buf.append(&quot;\r\nNo such method &quot;).append(method).append(&quot; in service &quot;).append(service);</span>
+            }
+        } else {
+<span class="nc" id="L147">            buf.append(&quot;\r\nNo such service &quot;).append(service);</span>
+        }
+<span class="nc" id="L149">        return buf.toString();</span>
+    }
+
+
+    private boolean isServiceMatch(String service, ProviderModel provider) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        return provider.getServiceName().equalsIgnoreCase(service)</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                || provider.getServiceInterfaceClass().getSimpleName().equalsIgnoreCase(service)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                || provider.getServiceInterfaceClass().getName().equalsIgnoreCase(service)</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                || StringUtils.isEmpty(service);</span>
+    }
+
+    private List&lt;Method&gt; findSameSignatureMethod(List&lt;ProviderMethodModel&gt; methods, String lookupMethodName, List&lt;Object&gt; args) {
+<span class="nc" id="L161">        List&lt;Method&gt; sameSignatureMethods = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (ProviderMethodModel model : methods) {</span>
+<span class="nc" id="L163">            Method method = model.getMethod();</span>
+<span class="nc bnc" id="L164" title="All 4 branches missed.">            if (method.getName().equals(lookupMethodName) &amp;&amp; method.getParameterTypes().length == args.size()) {</span>
+<span class="nc" id="L165">                sameSignatureMethods.add(method);</span>
+            }
+<span class="nc" id="L167">        }</span>
+<span class="nc" id="L168">        return sameSignatureMethods;</span>
+    }
+
+    private List&lt;Method&gt; findMatchMethods(List&lt;Method&gt; methods, List&lt;Object&gt; args) {
+<span class="nc" id="L172">        List&lt;Method&gt; matchMethod = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (isMatch(method, args)) {</span>
+<span class="nc" id="L175">                matchMethod.add(method);</span>
+            }
+<span class="nc" id="L177">        }</span>
+<span class="nc" id="L178">        return matchMethod;</span>
+    }
+
+    private static boolean isMatch(Method method, List&lt;Object&gt; args) {
+<span class="nc" id="L182">        Class&lt;?&gt;[] types = method.getParameterTypes();</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (types.length != args.size()) {</span>
+<span class="nc" id="L184">            return false;</span>
+        }
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        for (int i = 0; i &lt; types.length; i++) {</span>
+<span class="nc" id="L187">            Class&lt;?&gt; type = types[i];</span>
+<span class="nc" id="L188">            Object arg = args.get(i);</span>
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (arg == null) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (type.isPrimitive()) {</span>
+<span class="nc" id="L192">                    return false;</span>
+                }
+
+                // if the type is not primitive, we choose to believe what the invoker want is a null value
+                continue;
+            }
+
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (ReflectUtils.isPrimitive(arg.getClass())) {</span>
+                // allow string arg to enum type, @see PojoUtils.realize0()
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                if (arg instanceof String &amp;&amp; type.isEnum()) {</span>
+<span class="nc" id="L202">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                if (!ReflectUtils.isPrimitive(type)) {</span>
+<span class="nc" id="L206">                    return false;</span>
+                }
+
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                if (!ReflectUtils.isCompatible(type, arg)) {</span>
+<span class="nc" id="L210">                    return false;</span>
+                }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            } else if (arg instanceof Map) {</span>
+<span class="nc" id="L213">                String name = (String) ((Map&lt;?, ?&gt;) arg).get(&quot;class&quot;);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                if (StringUtils.isNotEmpty(name)) {</span>
+<span class="nc" id="L215">                    Class&lt;?&gt; cls = ReflectUtils.forName(name);</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                    if (!type.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L217">                        return false;</span>
+                    }
+<span class="nc" id="L219">                } else {</span>
+<span class="nc" id="L220">                    return true;</span>
+                }
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            } else if (arg instanceof Collection) {</span>
+<span class="nc bnc" id="L223" title="All 4 branches missed.">                if (!type.isArray() &amp;&amp; !type.isAssignableFrom(arg.getClass())) {</span>
+<span class="nc" id="L224">                    return false;</span>
+                }
+            } else {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                if (!type.isAssignableFrom(arg.getClass())) {</span>
+<span class="nc" id="L228">                    return false;</span>
+                }
+            }
+        }
+<span class="nc" id="L232">        return true;</span>
+    }
+
+    private void printSelectMessage(StringBuilder buf, List&lt;Method&gt; methods) {
+<span class="nc" id="L236">        buf.append(&quot;Methods:\r\n&quot;);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        for (int i = 0; i &lt; methods.size(); i++) {</span>
+<span class="nc" id="L238">            Method method = methods.get(i);</span>
+<span class="nc" id="L239">            buf.append((i + 1) + &quot;. &quot; + method.getName() + &quot;(&quot;);</span>
+<span class="nc" id="L240">            Class&lt;?&gt;[] parameterTypes = method.getParameterTypes();</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            for (int n = 0; n &lt; parameterTypes.length; n++) {</span>
+<span class="nc" id="L242">                buf.append(parameterTypes[n].getSimpleName());</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                if (n != parameterTypes.length - 1) {</span>
+<span class="nc" id="L244">                    buf.append(&quot;,&quot;);</span>
+                }
+            }
+<span class="nc" id="L247">            buf.append(&quot;)\r\n&quot;);</span>
+        }
+<span class="nc" id="L249">        buf.append(&quot;Please use the select command to select the method you want to invoke. eg: select 1&quot;);</span>
+<span class="nc" id="L250">    }</span>
+
+    private boolean isInvokedSelectCommand(Channel channel) {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (channel.hasAttribute(SelectTelnetHandler.SELECT_KEY)) {</span>
+<span class="nc" id="L254">            channel.removeAttribute(SelectTelnetHandler.SELECT_KEY);</span>
+<span class="nc" id="L255">            return true;</span>
+        }
+<span class="nc" id="L257">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

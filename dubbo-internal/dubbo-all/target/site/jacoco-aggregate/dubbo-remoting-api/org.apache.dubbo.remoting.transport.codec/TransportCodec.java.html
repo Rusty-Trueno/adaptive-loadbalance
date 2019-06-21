@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TransportCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.codec</a> &gt; <span class="el_source">TransportCodec.java</span></div><h1>TransportCodec.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.codec;
+
+import org.apache.dubbo.common.serialize.Cleanable;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.serialize.ObjectOutput;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBufferInputStream;
+import org.apache.dubbo.remoting.buffer.ChannelBufferOutputStream;
+import org.apache.dubbo.remoting.transport.AbstractCodec;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * TransportCodec
+ */
+<span class="nc" id="L36">public class TransportCodec extends AbstractCodec {</span>
+
+    @Override
+    public void encode(Channel channel, ChannelBuffer buffer, Object message) throws IOException {
+<span class="nc" id="L40">        OutputStream output = new ChannelBufferOutputStream(buffer);</span>
+<span class="nc" id="L41">        ObjectOutput objectOutput = getSerialization(channel).serialize(channel.getUrl(), output);</span>
+<span class="nc" id="L42">        encodeData(channel, objectOutput, message);</span>
+<span class="nc" id="L43">        objectOutput.flushBuffer();</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (objectOutput instanceof Cleanable) {</span>
+<span class="nc" id="L45">            ((Cleanable) objectOutput).cleanup();</span>
+        }
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+<span class="nc" id="L51">        InputStream input = new ChannelBufferInputStream(buffer);</span>
+<span class="nc" id="L52">        ObjectInput objectInput = getSerialization(channel).deserialize(channel.getUrl(), input);</span>
+<span class="nc" id="L53">        Object object = decodeData(channel, objectInput);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (objectInput instanceof Cleanable) {</span>
+<span class="nc" id="L55">            ((Cleanable) objectInput).cleanup();</span>
+        }
+<span class="nc" id="L57">        return object;</span>
+    }
+
+    protected void encodeData(Channel channel, ObjectOutput output, Object message) throws IOException {
+<span class="nc" id="L61">        encodeData(output, message);</span>
+<span class="nc" id="L62">    }</span>
+
+    protected Object decodeData(Channel channel, ObjectInput input) throws IOException {
+<span class="nc" id="L65">        return decodeData(input);</span>
+    }
+
+    protected void encodeData(ObjectOutput output, Object message) throws IOException {
+<span class="nc" id="L69">        output.writeObject(message);</span>
+<span class="nc" id="L70">    }</span>
+
+    protected Object decodeData(ObjectInput input) throws IOException {
+        try {
+<span class="nc" id="L74">            return input.readObject();</span>
+<span class="nc" id="L75">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L76">            throw new IOException(&quot;ClassNotFoundException: &quot; + StringUtils.toString(e));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

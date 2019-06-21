@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FailoverClusterInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.support</a> &gt; <span class="el_source">FailoverClusterInvoker.java</span></div><h1>FailoverClusterInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.cluster.Directory;
+import org.apache.dubbo.rpc.cluster.LoadBalance;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * When invoke fails, log the initial error and retry other invokers (retry n times, which means at most n different invokers will be invoked)
+ * Note that retry causes latency.
+ * &lt;p&gt;
+ * &lt;a href=&quot;http://en.wikipedia.org/wiki/Failover&quot;&gt;Failover&lt;/a&gt;
+ *
+ */
+public class FailoverClusterInvoker&lt;T&gt; extends AbstractClusterInvoker&lt;T&gt; {
+
+<span class="nc" id="L47">    private static final Logger logger = LoggerFactory.getLogger(FailoverClusterInvoker.class);</span>
+
+    public FailoverClusterInvoker(Directory&lt;T&gt; directory) {
+<span class="nc" id="L50">        super(directory);</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    public Result doInvoke(Invocation invocation, final List&lt;Invoker&lt;T&gt;&gt; invokers, LoadBalance loadbalance) throws RpcException {
+<span class="nc" id="L56">        List&lt;Invoker&lt;T&gt;&gt; copyInvokers = invokers;</span>
+<span class="nc" id="L57">        checkInvokers(copyInvokers, invocation);</span>
+<span class="nc" id="L58">        String methodName = RpcUtils.getMethodName(invocation);</span>
+<span class="nc" id="L59">        int len = getUrl().getMethodParameter(methodName, Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (len &lt;= 0) {</span>
+<span class="nc" id="L61">            len = 1;</span>
+        }
+        // retry loop.
+<span class="nc" id="L64">        RpcException le = null; // last exception.</span>
+<span class="nc" id="L65">        List&lt;Invoker&lt;T&gt;&gt; invoked = new ArrayList&lt;Invoker&lt;T&gt;&gt;(copyInvokers.size()); // invoked invokers.</span>
+<span class="nc" id="L66">        Set&lt;String&gt; providers = new HashSet&lt;String&gt;(len);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+            //Reselect before retry to avoid a change of candidate `invokers`.
+            //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L71">                checkWhetherDestroyed();</span>
+<span class="nc" id="L72">                copyInvokers = list(invocation);</span>
+                // check again
+<span class="nc" id="L74">                checkInvokers(copyInvokers, invocation);</span>
+            }
+<span class="nc" id="L76">            Invoker&lt;T&gt; invoker = select(loadbalance, invocation, copyInvokers, invoked);</span>
+<span class="nc" id="L77">            invoked.add(invoker);</span>
+<span class="nc" id="L78">            RpcContext.getContext().setInvokers((List) invoked);</span>
+            try {
+<span class="nc" id="L80">                Result result = invoker.invoke(invocation);</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">                if (le != null &amp;&amp; logger.isWarnEnabled()) {</span>
+<span class="nc" id="L82">                    logger.warn(&quot;Although retry the method &quot; + methodName</span>
+<span class="nc" id="L83">                            + &quot; in the service &quot; + getInterface().getName()</span>
+<span class="nc" id="L84">                            + &quot; was successful by the provider &quot; + invoker.getUrl().getAddress()</span>
+                            + &quot;, but there have been failed providers &quot; + providers
+<span class="nc" id="L86">                            + &quot; (&quot; + providers.size() + &quot;/&quot; + copyInvokers.size()</span>
+<span class="nc" id="L87">                            + &quot;) from the registry &quot; + directory.getUrl().getAddress()</span>
+<span class="nc" id="L88">                            + &quot; on the consumer &quot; + NetUtils.getLocalHost()</span>
+<span class="nc" id="L89">                            + &quot; using the dubbo version &quot; + Version.getVersion() + &quot;. Last error is: &quot;</span>
+<span class="nc" id="L90">                            + le.getMessage(), le);</span>
+                }
+<span class="nc" id="L92">                return result;</span>
+<span class="nc" id="L93">            } catch (RpcException e) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                if (e.isBiz()) { // biz exception.</span>
+<span class="nc" id="L95">                    throw e;</span>
+                }
+<span class="nc" id="L97">                le = e;</span>
+<span class="nc" id="L98">            } catch (Throwable e) {</span>
+<span class="nc" id="L99">                le = new RpcException(e.getMessage(), e);</span>
+            } finally {
+<span class="nc" id="L101">                providers.add(invoker.getUrl().getAddress());</span>
+            }
+        }
+<span class="nc" id="L104">        throw new RpcException(le.getCode(), &quot;Failed to invoke the method &quot;</span>
+<span class="nc" id="L105">                + methodName + &quot; in the service &quot; + getInterface().getName()</span>
+                + &quot;. Tried &quot; + len + &quot; times of the providers &quot; + providers
+<span class="nc" id="L107">                + &quot; (&quot; + providers.size() + &quot;/&quot; + copyInvokers.size()</span>
+<span class="nc" id="L108">                + &quot;) from the registry &quot; + directory.getUrl().getAddress()</span>
+<span class="nc" id="L109">                + &quot; on the consumer &quot; + NetUtils.getLocalHost() + &quot; using the dubbo version &quot;</span>
+<span class="nc" id="L110">                + Version.getVersion() + &quot;. Last error is: &quot;</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                + le.getMessage(), le.getCause() != null ? le.getCause() : le);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

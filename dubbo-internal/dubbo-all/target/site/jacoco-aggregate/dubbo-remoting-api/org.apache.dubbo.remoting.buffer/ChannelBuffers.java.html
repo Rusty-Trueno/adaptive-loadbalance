@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ChannelBuffers.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.buffer</a> &gt; <span class="el_source">ChannelBuffers.java</span></div><h1>ChannelBuffers.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.buffer;
+
+import java.nio.ByteBuffer;
+
+public final class ChannelBuffers {
+
+<span class="nc" id="L24">    public static final ChannelBuffer EMPTY_BUFFER = new HeapChannelBuffer(0);</span>
+
+    private ChannelBuffers() {
+    }
+
+    public static ChannelBuffer dynamicBuffer() {
+<span class="nc" id="L30">        return dynamicBuffer(256);</span>
+    }
+
+    public static ChannelBuffer dynamicBuffer(int capacity) {
+<span class="nc" id="L34">        return new DynamicChannelBuffer(capacity);</span>
+    }
+
+    public static ChannelBuffer dynamicBuffer(int capacity,
+                                              ChannelBufferFactory factory) {
+<span class="nc" id="L39">        return new DynamicChannelBuffer(capacity, factory);</span>
+    }
+
+    public static ChannelBuffer buffer(int capacity) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (capacity &lt; 0) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;capacity can not be negative&quot;);</span>
+        }
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (capacity == 0) {</span>
+<span class="nc" id="L47">            return EMPTY_BUFFER;</span>
+        }
+<span class="nc" id="L49">        return new HeapChannelBuffer(capacity);</span>
+    }
+
+    public static ChannelBuffer wrappedBuffer(byte[] array, int offset, int length) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (array == null) {</span>
+<span class="nc" id="L54">            throw new NullPointerException(&quot;array == null&quot;);</span>
+        }
+<span class="nc" id="L56">        byte[] dest = new byte[length];</span>
+<span class="nc" id="L57">        System.arraycopy(array, offset, dest, 0, length);</span>
+<span class="nc" id="L58">        return wrappedBuffer(dest);</span>
+    }
+
+    public static ChannelBuffer wrappedBuffer(byte[] array) {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (array == null) {</span>
+<span class="nc" id="L63">            throw new NullPointerException(&quot;array == null&quot;);</span>
+        }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (array.length == 0) {</span>
+<span class="nc" id="L66">            return EMPTY_BUFFER;</span>
+        }
+<span class="nc" id="L68">        return new HeapChannelBuffer(array);</span>
+    }
+
+    public static ChannelBuffer wrappedBuffer(ByteBuffer buffer) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (!buffer.hasRemaining()) {</span>
+<span class="nc" id="L73">            return EMPTY_BUFFER;</span>
+        }
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (buffer.hasArray()) {</span>
+<span class="nc" id="L76">            return wrappedBuffer(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());</span>
+        } else {
+<span class="nc" id="L78">            return new ByteBufferBackedChannelBuffer(buffer);</span>
+        }
+    }
+
+    public static ChannelBuffer directBuffer(int capacity) {
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (capacity == 0) {</span>
+<span class="nc" id="L84">            return EMPTY_BUFFER;</span>
+        }
+
+<span class="nc" id="L87">        ChannelBuffer buffer = new ByteBufferBackedChannelBuffer(</span>
+<span class="nc" id="L88">                ByteBuffer.allocateDirect(capacity));</span>
+<span class="nc" id="L89">        buffer.clear();</span>
+<span class="nc" id="L90">        return buffer;</span>
+    }
+
+    public static boolean equals(ChannelBuffer bufferA, ChannelBuffer bufferB) {
+<span class="nc" id="L94">        final int aLen = bufferA.readableBytes();</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (aLen != bufferB.readableBytes()) {</span>
+<span class="nc" id="L96">            return false;</span>
+        }
+
+<span class="nc" id="L99">        final int byteCount = aLen &amp; 7;</span>
+
+<span class="nc" id="L101">        int aIndex = bufferA.readerIndex();</span>
+<span class="nc" id="L102">        int bIndex = bufferB.readerIndex();</span>
+
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (int i = byteCount; i &gt; 0; i--) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (bufferA.getByte(aIndex) != bufferB.getByte(bIndex)) {</span>
+<span class="nc" id="L106">                return false;</span>
+            }
+<span class="nc" id="L108">            aIndex++;</span>
+<span class="nc" id="L109">            bIndex++;</span>
+        }
+
+<span class="nc" id="L112">        return true;</span>
+    }
+
+    public static int compare(ChannelBuffer bufferA, ChannelBuffer bufferB) {
+<span class="nc" id="L116">        final int aLen = bufferA.readableBytes();</span>
+<span class="nc" id="L117">        final int bLen = bufferB.readableBytes();</span>
+<span class="nc" id="L118">        final int minLength = Math.min(aLen, bLen);</span>
+
+<span class="nc" id="L120">        int aIndex = bufferA.readerIndex();</span>
+<span class="nc" id="L121">        int bIndex = bufferB.readerIndex();</span>
+
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        for (int i = minLength; i &gt; 0; i--) {</span>
+<span class="nc" id="L124">            byte va = bufferA.getByte(aIndex);</span>
+<span class="nc" id="L125">            byte vb = bufferB.getByte(bIndex);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (va &gt; vb) {</span>
+<span class="nc" id="L127">                return 1;</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            } else if (va &lt; vb) {</span>
+<span class="nc" id="L129">                return -1;</span>
+            }
+<span class="nc" id="L131">            aIndex++;</span>
+<span class="nc" id="L132">            bIndex++;</span>
+        }
+
+<span class="nc" id="L135">        return aLen - bLen;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

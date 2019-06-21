@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RegistryBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">RegistryBuilder.java</span></div><h1>RegistryBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import java.util.Map;
+
+import org.apache.dubbo.config.RegistryConfig;
+
+/**
+ * This is a builder for build {@link RegistryConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L28">public class RegistryBuilder extends AbstractBuilder&lt;RegistryConfig, RegistryBuilder&gt; {</span>
+    /**
+     * Register center address
+     */
+    private String address;
+
+    /**
+     * Username to login register center
+     */
+    private String username;
+
+    /**
+     * Password to login register center
+     */
+    private String password;
+
+    /**
+     * Default port for register center
+     */
+    private Integer port;
+
+    /**
+     * Protocol for register center
+     */
+    private String protocol;
+
+    /**
+     * Network transmission type
+     */
+    private String transporter;
+
+    private String server;
+
+    private String client;
+
+    private String cluster;
+
+    /**
+     * The group the services registry in
+     */
+    private String group;
+
+    private String version;
+
+    /**
+     * Request timeout in milliseconds for register center
+     */
+    private Integer timeout;
+
+    /**
+     * Session timeout in milliseconds for register center
+     */
+    private Integer session;
+
+    /**
+     * File for saving register center dynamic list
+     */
+    private String file;
+
+    /**
+     * Wait time before stop
+     */
+    private Integer wait;
+
+    /**
+     * Whether to check if register center is available when boot up
+     */
+    private Boolean check;
+
+    /**
+     * Whether to allow dynamic service to register on the register center
+     */
+    private Boolean dynamic;
+
+    /**
+     * Whether to export service on the register center
+     */
+    private Boolean register;
+
+    /**
+     * Whether allow to subscribe service on the register center
+     */
+    private Boolean subscribe;
+
+    /**
+     * The customized parameters
+     */
+    private Map&lt;String, String&gt; parameters;
+
+    /**
+     * Whether it's default
+     */
+    private Boolean isDefault;
+
+    /**
+     * Simple the registry. both useful for provider and consumer
+     *
+     * @since 2.7.0
+     */
+    private Boolean simplified;
+    /**
+     * After simplify the registry, should add some paramter individually. just for provider.
+     * &lt;p&gt;
+     * such as: extra-keys = A,b,c,d
+     *
+     * @since 2.7.0
+     */
+    private String extraKeys;
+
+    public RegistryBuilder address(String address) {
+<span class="nc" id="L138">        this.address = address;</span>
+<span class="nc" id="L139">        return getThis();</span>
+    }
+
+    public RegistryBuilder username(String username) {
+<span class="nc" id="L143">        this.username = username;</span>
+<span class="nc" id="L144">        return getThis();</span>
+    }
+
+    public RegistryBuilder password(String password) {
+<span class="nc" id="L148">        this.password = password;</span>
+<span class="nc" id="L149">        return getThis();</span>
+    }
+
+    public RegistryBuilder port(Integer port) {
+<span class="nc" id="L153">        this.port = port;</span>
+<span class="nc" id="L154">        return getThis();</span>
+    }
+
+    public RegistryBuilder protocol(String protocol) {
+<span class="nc" id="L158">        this.protocol = protocol;</span>
+<span class="nc" id="L159">        return getThis();</span>
+    }
+
+    public RegistryBuilder transporter(String transporter) {
+<span class="nc" id="L163">        this.transporter = transporter;</span>
+<span class="nc" id="L164">        return getThis();</span>
+    }
+
+    /**
+     * @param transport
+     * @see #transporter(String)
+     * @deprecated
+     */
+    @Deprecated
+    public RegistryBuilder transport(String transport) {
+<span class="nc" id="L174">        this.transporter = transport;</span>
+<span class="nc" id="L175">        return getThis();</span>
+    }
+
+    public RegistryBuilder server(String server) {
+<span class="nc" id="L179">        this.server = server;</span>
+<span class="nc" id="L180">        return getThis();</span>
+    }
+
+    public RegistryBuilder client(String client) {
+<span class="nc" id="L184">        this.client = client;</span>
+<span class="nc" id="L185">        return getThis();</span>
+    }
+
+    public RegistryBuilder cluster(String cluster) {
+<span class="nc" id="L189">        this.cluster = cluster;</span>
+<span class="nc" id="L190">        return getThis();</span>
+    }
+
+    public RegistryBuilder group(String group) {
+<span class="nc" id="L194">        this.group = group;</span>
+<span class="nc" id="L195">        return getThis();</span>
+    }
+
+    public RegistryBuilder version(String version) {
+<span class="nc" id="L199">        this.version = version;</span>
+<span class="nc" id="L200">        return getThis();</span>
+    }
+
+    public RegistryBuilder timeout(Integer timeout) {
+<span class="nc" id="L204">        this.timeout = timeout;</span>
+<span class="nc" id="L205">        return getThis();</span>
+    }
+
+    public RegistryBuilder session(Integer session) {
+<span class="nc" id="L209">        this.session = session;</span>
+<span class="nc" id="L210">        return getThis();</span>
+    }
+
+    public RegistryBuilder file(String file) {
+<span class="nc" id="L214">        this.file = file;</span>
+<span class="nc" id="L215">        return getThis();</span>
+    }
+
+    /**
+     * @param wait
+     * @see org.apache.dubbo.config.builders.ProviderBuilder#wait(Integer)
+     * @deprecated
+     */
+    @Deprecated
+    public RegistryBuilder wait(Integer wait) {
+<span class="nc" id="L225">        this.wait = wait;</span>
+<span class="nc" id="L226">        return getThis();</span>
+    }
+
+    public RegistryBuilder isCheck(Boolean check) {
+<span class="nc" id="L230">        this.check = check;</span>
+<span class="nc" id="L231">        return getThis();</span>
+    }
+
+    public RegistryBuilder isDynamic(Boolean dynamic) {
+<span class="nc" id="L235">        this.dynamic = dynamic;</span>
+<span class="nc" id="L236">        return getThis();</span>
+    }
+
+    public RegistryBuilder register(Boolean register) {
+<span class="nc" id="L240">        this.register = register;</span>
+<span class="nc" id="L241">        return getThis();</span>
+    }
+
+    public RegistryBuilder subscribe(Boolean subscribe) {
+<span class="nc" id="L245">        this.subscribe = subscribe;</span>
+<span class="nc" id="L246">        return getThis();</span>
+    }
+
+    public RegistryBuilder appendParameter(String key, String value) {
+<span class="nc" id="L250">        this.parameters = appendParameter(parameters, key, value);</span>
+<span class="nc" id="L251">        return getThis();</span>
+    }
+
+    public RegistryBuilder appendParameters(Map&lt;String, String&gt; appendParameters) {
+<span class="nc" id="L255">        this.parameters = appendParameters(parameters, appendParameters);</span>
+<span class="nc" id="L256">        return getThis();</span>
+    }
+
+    public RegistryBuilder isDefault(Boolean isDefault) {
+<span class="nc" id="L260">        this.isDefault = isDefault;</span>
+<span class="nc" id="L261">        return getThis();</span>
+    }
+
+    public RegistryBuilder simplified(Boolean simplified) {
+<span class="nc" id="L265">        this.simplified = simplified;</span>
+<span class="nc" id="L266">        return getThis();</span>
+    }
+
+    public RegistryBuilder extraKeys(String extraKeys) {
+<span class="nc" id="L270">        this.extraKeys = extraKeys;</span>
+<span class="nc" id="L271">        return getThis();</span>
+    }
+
+    public RegistryConfig build() {
+<span class="nc" id="L275">        RegistryConfig registry = new RegistryConfig();</span>
+<span class="nc" id="L276">        super.build(registry);</span>
+
+<span class="nc" id="L278">        registry.setAddress(address);</span>
+<span class="nc" id="L279">        registry.setCheck(check);</span>
+<span class="nc" id="L280">        registry.setClient(client);</span>
+<span class="nc" id="L281">        registry.setCluster(cluster);</span>
+<span class="nc" id="L282">        registry.setDefault(isDefault);</span>
+<span class="nc" id="L283">        registry.setDynamic(dynamic);</span>
+<span class="nc" id="L284">        registry.setExtraKeys(extraKeys);</span>
+<span class="nc" id="L285">        registry.setFile(file);</span>
+<span class="nc" id="L286">        registry.setGroup(group);</span>
+<span class="nc" id="L287">        registry.setParameters(parameters);</span>
+<span class="nc" id="L288">        registry.setPassword(password);</span>
+<span class="nc" id="L289">        registry.setPort(port);</span>
+<span class="nc" id="L290">        registry.setProtocol(protocol);</span>
+<span class="nc" id="L291">        registry.setRegister(register);</span>
+<span class="nc" id="L292">        registry.setServer(server);</span>
+<span class="nc" id="L293">        registry.setSession(session);</span>
+<span class="nc" id="L294">        registry.setSimplified(simplified);</span>
+<span class="nc" id="L295">        registry.setSubscribe(subscribe);</span>
+<span class="nc" id="L296">        registry.setTimeout(timeout);</span>
+<span class="nc" id="L297">        registry.setTransporter(transporter);</span>
+<span class="nc" id="L298">        registry.setUsername(username);</span>
+<span class="nc" id="L299">        registry.setVersion(version);</span>
+<span class="nc" id="L300">        registry.setWait(wait);</span>
+
+<span class="nc" id="L302">        return registry;</span>
+    }
+
+    @Override
+    protected RegistryBuilder getThis() {
+<span class="nc" id="L307">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

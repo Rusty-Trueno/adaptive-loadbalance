@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HeaderExchangeServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support.header</a> &gt; <span class="el_source">HeaderExchangeServer.java</span></div><h1>HeaderExchangeServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.support.header;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.timer.HashedWheelTimer;
+import org.apache.dubbo.common.utils.Assert;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Server;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeServer;
+import org.apache.dubbo.remoting.exchange.Request;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.unmodifiableCollection;
+
+/**
+ * ExchangeServerImpl
+ */
+public class HeaderExchangeServer implements ExchangeServer {
+
+<span class="nc" id="L50">    protected final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+    private final Server server;
+<span class="nc" id="L53">    private AtomicBoolean closed = new AtomicBoolean(false);</span>
+
+<span class="nc" id="L55">    private static final HashedWheelTimer IDLE_CHECK_TIMER = new HashedWheelTimer(new NamedThreadFactory(&quot;dubbo-server-idleCheck&quot;, true), 1,</span>
+            TimeUnit.SECONDS, Constants.TICKS_PER_WHEEL);
+
+    private CloseTimerTask closeTimerTask;
+
+<span class="nc" id="L60">    public HeaderExchangeServer(Server server) {</span>
+<span class="nc" id="L61">        Assert.notNull(server, &quot;server == null&quot;);</span>
+<span class="nc" id="L62">        this.server = server;</span>
+<span class="nc" id="L63">        startIdleCheckTask(getUrl());</span>
+<span class="nc" id="L64">    }</span>
+
+    public Server getServer() {
+<span class="nc" id="L67">        return server;</span>
+    }
+
+    @Override
+    public boolean isClosed() {
+<span class="nc" id="L72">        return server.isClosed();</span>
+    }
+
+    private boolean isRunning() {
+<span class="nc" id="L76">        Collection&lt;Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (Channel channel : channels) {</span>
+
+            /**
+             *  If there are any client connections,
+             *  our server should be running.
+             */
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (channel.isConnected()) {</span>
+<span class="nc" id="L85">                return true;</span>
+            }
+<span class="nc" id="L87">        }</span>
+<span class="nc" id="L88">        return false;</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L93">        doClose();</span>
+<span class="nc" id="L94">        server.close();</span>
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public void close(final int timeout) {
+<span class="nc" id="L99">        startClose();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (timeout &gt; 0) {</span>
+<span class="nc" id="L101">            final long max = (long) timeout;</span>
+<span class="nc" id="L102">            final long start = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (getUrl().getParameter(Constants.CHANNEL_SEND_READONLYEVENT_KEY, true)) {</span>
+<span class="nc" id="L104">                sendChannelReadOnlyEvent();</span>
+            }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            while (HeaderExchangeServer.this.isRunning()</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    &amp;&amp; System.currentTimeMillis() - start &lt; max) {</span>
+                try {
+<span class="nc" id="L109">                    Thread.sleep(10);</span>
+<span class="nc" id="L110">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L111">                    logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L112">                }</span>
+            }
+        }
+<span class="nc" id="L115">        doClose();</span>
+<span class="nc" id="L116">        server.close(timeout);</span>
+<span class="nc" id="L117">    }</span>
+
+    @Override
+    public void startClose() {
+<span class="nc" id="L121">        server.startClose();</span>
+<span class="nc" id="L122">    }</span>
+
+    private void sendChannelReadOnlyEvent() {
+<span class="nc" id="L125">        Request request = new Request();</span>
+<span class="nc" id="L126">        request.setEvent(Request.READONLY_EVENT);</span>
+<span class="nc" id="L127">        request.setTwoWay(false);</span>
+<span class="nc" id="L128">        request.setVersion(Version.getProtocolVersion());</span>
+
+<span class="nc" id="L130">        Collection&lt;Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        for (Channel channel : channels) {</span>
+            try {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                if (channel.isConnected()) {</span>
+<span class="nc" id="L134">                    channel.send(request, getUrl().getParameter(Constants.CHANNEL_READONLYEVENT_SENT_KEY, true));</span>
+                }
+<span class="nc" id="L136">            } catch (RemotingException e) {</span>
+<span class="nc" id="L137">                logger.warn(&quot;send cannot write message error.&quot;, e);</span>
+<span class="nc" id="L138">            }</span>
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">    }</span>
+
+    private void doClose() {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!closed.compareAndSet(false, true)) {</span>
+<span class="nc" id="L144">            return;</span>
+        }
+<span class="nc" id="L146">        cancelCloseTask();</span>
+<span class="nc" id="L147">    }</span>
+
+    private void cancelCloseTask() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (closeTimerTask != null) {</span>
+<span class="nc" id="L151">            closeTimerTask.cancel();</span>
+        }
+<span class="nc" id="L153">    }</span>
+
+    @Override
+    public Collection&lt;ExchangeChannel&gt; getExchangeChannels() {
+<span class="nc" id="L157">        Collection&lt;ExchangeChannel&gt; exchangeChannels = new ArrayList&lt;ExchangeChannel&gt;();</span>
+<span class="nc" id="L158">        Collection&lt;Channel&gt; channels = server.getChannels();</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(channels)) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            for (Channel channel : channels) {</span>
+<span class="nc" id="L161">                exchangeChannels.add(HeaderExchangeChannel.getOrAddChannel(channel));</span>
+<span class="nc" id="L162">            }</span>
+        }
+<span class="nc" id="L164">        return exchangeChannels;</span>
+    }
+
+    @Override
+    public ExchangeChannel getExchangeChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L169">        Channel channel = server.getChannel(remoteAddress);</span>
+<span class="nc" id="L170">        return HeaderExchangeChannel.getOrAddChannel(channel);</span>
+    }
+
+    @Override
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    public Collection&lt;Channel&gt; getChannels() {
+<span class="nc" id="L176">        return (Collection) getExchangeChannels();</span>
+    }
+
+    @Override
+    public Channel getChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L181">        return getExchangeChannel(remoteAddress);</span>
+    }
+
+    @Override
+    public boolean isBound() {
+<span class="nc" id="L186">        return server.isBound();</span>
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L191">        return server.getLocalAddress();</span>
+    }
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L196">        return server.getUrl();</span>
+    }
+
+    @Override
+    public ChannelHandler getChannelHandler() {
+<span class="nc" id="L201">        return server.getChannelHandler();</span>
+    }
+
+    @Override
+    public void reset(URL url) {
+<span class="nc" id="L206">        server.reset(url);</span>
+        try {
+<span class="nc" id="L208">            int currHeartbeat = UrlUtils.getHeartbeat(getUrl());</span>
+<span class="nc" id="L209">            int currIdleTimeout = UrlUtils.getIdleTimeout(getUrl());</span>
+<span class="nc" id="L210">            int heartbeat = UrlUtils.getHeartbeat(url);</span>
+<span class="nc" id="L211">            int idleTimeout = UrlUtils.getIdleTimeout(url);</span>
+<span class="nc bnc" id="L212" title="All 4 branches missed.">            if (currHeartbeat != heartbeat || currIdleTimeout != idleTimeout) {</span>
+<span class="nc" id="L213">                cancelCloseTask();</span>
+<span class="nc" id="L214">                startIdleCheckTask(url);</span>
+            }
+<span class="nc" id="L216">        } catch (Throwable t) {</span>
+<span class="nc" id="L217">            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L218">        }</span>
+<span class="nc" id="L219">    }</span>
+
+    @Override
+    @Deprecated
+    public void reset(org.apache.dubbo.common.Parameters parameters) {
+<span class="nc" id="L224">        reset(getUrl().addParameters(parameters.getParameters()));</span>
+<span class="nc" id="L225">    }</span>
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (closed.get()) {</span>
+<span class="nc" id="L230">            throw new RemotingException(this.getLocalAddress(), null, &quot;Failed to send message &quot; + message</span>
+<span class="nc" id="L231">                    + &quot;, cause: The server &quot; + getLocalAddress() + &quot; is closed!&quot;);</span>
+        }
+<span class="nc" id="L233">        server.send(message);</span>
+<span class="nc" id="L234">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (closed.get()) {</span>
+<span class="nc" id="L239">            throw new RemotingException(this.getLocalAddress(), null, &quot;Failed to send message &quot; + message</span>
+<span class="nc" id="L240">                    + &quot;, cause: The server &quot; + getLocalAddress() + &quot; is closed!&quot;);</span>
+        }
+<span class="nc" id="L242">        server.send(message, sent);</span>
+<span class="nc" id="L243">    }</span>
+
+    /**
+     * Each interval cannot be less than 1000ms.
+     */
+    private long calculateLeastDuration(int time) {
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (time / Constants.HEARTBEAT_CHECK_TICK &lt;= 0) {</span>
+<span class="nc" id="L250">            return Constants.LEAST_HEARTBEAT_DURATION;</span>
+        } else {
+<span class="nc" id="L252">            return time / Constants.HEARTBEAT_CHECK_TICK;</span>
+        }
+    }
+
+    private void startIdleCheckTask(URL url) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (!server.canHandleIdle()) {</span>
+<span class="nc" id="L258">            AbstractTimerTask.ChannelProvider cp = () -&gt; unmodifiableCollection(HeaderExchangeServer.this.getChannels());</span>
+<span class="nc" id="L259">            int idleTimeout = UrlUtils.getIdleTimeout(url);</span>
+<span class="nc" id="L260">            long idleTimeoutTick = calculateLeastDuration(idleTimeout);</span>
+<span class="nc" id="L261">            CloseTimerTask closeTimerTask = new CloseTimerTask(cp, idleTimeoutTick, idleTimeout);</span>
+<span class="nc" id="L262">            this.closeTimerTask = closeTimerTask;</span>
+
+            // init task and start timer.
+<span class="nc" id="L265">            IDLE_CHECK_TIMER.newTimeout(closeTimerTask, idleTimeoutTick, TimeUnit.MILLISECONDS);</span>
+        }
+<span class="nc" id="L267">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

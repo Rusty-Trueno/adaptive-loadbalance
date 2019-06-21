@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DubboRegistryFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-default</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.dubbo</a> &gt; <span class="el_source">DubboRegistryFactory.java</span></div><h1>DubboRegistryFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.dubbo;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.bytecode.Wrapper;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.registry.Registry;
+import org.apache.dubbo.registry.RegistryService;
+import org.apache.dubbo.registry.integration.RegistryDirectory;
+import org.apache.dubbo.registry.support.AbstractRegistryFactory;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.cluster.Cluster;
+import org.apache.dubbo.rpc.cluster.RouterChain;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+
+/**
+ * DubboRegistryFactory
+ *
+ */
+<span class="nc" id="L44">public class DubboRegistryFactory extends AbstractRegistryFactory {</span>
+
+    private Protocol protocol;
+    private ProxyFactory proxyFactory;
+    private Cluster cluster;
+
+    private static URL getRegistryURL(URL url) {
+<span class="nc" id="L51">        return URLBuilder.from(url)</span>
+<span class="nc" id="L52">                .setPath(RegistryService.class.getName())</span>
+<span class="nc" id="L53">                .removeParameter(Constants.EXPORT_KEY).removeParameter(Constants.REFER_KEY)</span>
+<span class="nc" id="L54">                .addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName())</span>
+<span class="nc" id="L55">                .addParameter(Constants.CLUSTER_STICKY_KEY, &quot;true&quot;)</span>
+<span class="nc" id="L56">                .addParameter(Constants.LAZY_CONNECT_KEY, &quot;true&quot;)</span>
+<span class="nc" id="L57">                .addParameter(Constants.RECONNECT_KEY, &quot;false&quot;)</span>
+<span class="nc" id="L58">                .addParameterIfAbsent(Constants.TIMEOUT_KEY, &quot;10000&quot;)</span>
+<span class="nc" id="L59">                .addParameterIfAbsent(Constants.CALLBACK_INSTANCES_LIMIT_KEY, &quot;10000&quot;)</span>
+<span class="nc" id="L60">                .addParameterIfAbsent(Constants.CONNECT_TIMEOUT_KEY, &quot;10000&quot;)</span>
+<span class="nc" id="L61">                .addParameter(Constants.METHODS_KEY, StringUtils.join(new HashSet&lt;&gt;(Arrays.asList(Wrapper.getWrapper(RegistryService.class).getDeclaredMethodNames())), &quot;,&quot;))</span>
+                //.addParameter(Constants.STUB_KEY, RegistryServiceStub.class.getName())
+                //.addParameter(Constants.STUB_EVENT_KEY, Boolean.TRUE.toString()) //for event dispatch
+                //.addParameter(Constants.ON_DISCONNECT_KEY, &quot;disconnect&quot;)
+<span class="nc" id="L65">                .addParameter(&quot;subscribe.1.callback&quot;, &quot;true&quot;)</span>
+<span class="nc" id="L66">                .addParameter(&quot;unsubscribe.1.callback&quot;, &quot;false&quot;)</span>
+<span class="nc" id="L67">                .build();</span>
+    }
+
+    public void setProtocol(Protocol protocol) {
+<span class="nc" id="L71">        this.protocol = protocol;</span>
+<span class="nc" id="L72">    }</span>
+
+    public void setProxyFactory(ProxyFactory proxyFactory) {
+<span class="nc" id="L75">        this.proxyFactory = proxyFactory;</span>
+<span class="nc" id="L76">    }</span>
+
+    public void setCluster(Cluster cluster) {
+<span class="nc" id="L79">        this.cluster = cluster;</span>
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public Registry createRegistry(URL url) {
+<span class="nc" id="L84">        url = getRegistryURL(url);</span>
+<span class="nc" id="L85">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L86">        urls.add(url.removeParameter(Constants.BACKUP_KEY));</span>
+<span class="nc" id="L87">        String backup = url.getParameter(Constants.BACKUP_KEY);</span>
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        if (backup != null &amp;&amp; backup.length() &gt; 0) {</span>
+<span class="nc" id="L89">            String[] addresses = Constants.COMMA_SPLIT_PATTERN.split(backup);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            for (String address : addresses) {</span>
+<span class="nc" id="L91">                urls.add(url.setAddress(address));</span>
+            }
+        }
+<span class="nc" id="L94">        RegistryDirectory&lt;RegistryService&gt; directory = new RegistryDirectory&lt;&gt;(RegistryService.class, url.addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName()).addParameterAndEncoded(Constants.REFER_KEY, url.toParameterString()));</span>
+<span class="nc" id="L95">        Invoker&lt;RegistryService&gt; registryInvoker = cluster.join(directory);</span>
+<span class="nc" id="L96">        RegistryService registryService = proxyFactory.getProxy(registryInvoker);</span>
+<span class="nc" id="L97">        DubboRegistry registry = new DubboRegistry(registryInvoker, registryService);</span>
+<span class="nc" id="L98">        directory.setRegistry(registry);</span>
+<span class="nc" id="L99">        directory.setProtocol(protocol);</span>
+<span class="nc" id="L100">        directory.setRouterChain(RouterChain.buildChain(url));</span>
+<span class="nc" id="L101">        directory.notify(urls);</span>
+<span class="nc" id="L102">        directory.subscribe(new URL(Constants.CONSUMER_PROTOCOL, NetUtils.getLocalHost(), 0, RegistryService.class.getName(), url.getParameters()));</span>
+<span class="nc" id="L103">        return registry;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

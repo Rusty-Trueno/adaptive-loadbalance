@@ -1,0 +1,16 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.SaveProperties,15,0,0,0,5,0,2,0,2,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport,746,0,64,0,141,0,50,0,18,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry.new Runnable() {...},61,0,6,0,11,0,5,0,2,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReportFactory,73,0,4,0,16,0,5,0,3,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry,73,0,4,0,17,0,5,0,3,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier,223,0,12,0,41,0,24,0,18,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier.KeyTypeEnum,24,0,0,0,2,0,1,0,1,0
+dubbo-metadata-report-zookeeper/dubbo-metadata-report-api,org.apache.dubbo.metadata.integration,MetadataReportService,209,0,10,0,41,0,10,0,5,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.support,AbstractZookeeperTransporter,208,0,24,0,40,0,20,0,8,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.support,AbstractZookeeperClient,286,0,36,0,81,0,34,0,16,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper,EventType,131,0,6,0,21,0,9,0,4,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.curator,CuratorZookeeperClient.CuratorWatcherImpl,124,0,16,0,44,0,17,0,6,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.curator,CuratorZookeeperTransporter,8,0,0,0,2,0,2,0,2,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.curator,CuratorZookeeperClient,387,0,14,0,105,0,27,0,20,0
+dubbo-metadata-report-zookeeper/dubbo-remoting-zookeeper,org.apache.dubbo.remoting.zookeeper.curator,CuratorZookeeperClient.new ConnectionStateListener() {...},30,0,6,0,8,0,5,0,2,0

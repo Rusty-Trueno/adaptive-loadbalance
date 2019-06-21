@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMetadataReportFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-report-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.support</a> &gt; <span class="el_source">AbstractMetadataReportFactory.java</span></div><h1>AbstractMetadataReportFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.metadata.store.MetadataReport;
+import org.apache.dubbo.metadata.store.MetadataReportFactory;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ */
+<span class="nc" id="L30">public abstract class AbstractMetadataReportFactory implements MetadataReportFactory {</span>
+
+    // The lock for the acquisition process of the registry
+<span class="nc" id="L33">    private static final ReentrantLock LOCK = new ReentrantLock();</span>
+
+    // Registry Collection Map&lt;RegistryAddress, Registry&gt;
+<span class="nc" id="L36">    private static final Map&lt;String, MetadataReport&gt; SERVICE_STORE_MAP = new ConcurrentHashMap&lt;String, MetadataReport&gt;();</span>
+
+    @Override
+    public MetadataReport getMetadataReport(URL url) {
+<span class="nc" id="L40">        url = url.setPath(MetadataReport.class.getName())</span>
+<span class="nc" id="L41">                .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);</span>
+<span class="nc" id="L42">        String key = url.toServiceString();</span>
+        // Lock the registry access process to ensure a single instance of the registry
+<span class="nc" id="L44">        LOCK.lock();</span>
+        try {
+<span class="nc" id="L46">            MetadataReport metadataReport = SERVICE_STORE_MAP.get(key);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">            if (metadataReport != null) {</span>
+<span class="nc" id="L48">                return metadataReport;</span>
+            }
+<span class="nc" id="L50">            metadataReport = createMetadataReport(url);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (metadataReport == null) {</span>
+<span class="nc" id="L52">                throw new IllegalStateException(&quot;Can not create metadata Report &quot; + url);</span>
+            }
+<span class="nc" id="L54">            SERVICE_STORE_MAP.put(key, metadataReport);</span>
+<span class="nc" id="L55">            return metadataReport;</span>
+        } finally {
+            // Release the lock
+<span class="nc" id="L58">            LOCK.unlock();</span>
+        }
+    }
+
+    protected abstract MetadataReport createMetadataReport(URL url);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

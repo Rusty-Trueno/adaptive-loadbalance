@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AccessLogFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.filter</a> &gt; <span class="el_source">AccessLogFilter.java</span></div><h1>AccessLogFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.support.AccessLogData;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Record access log for the service.
+ * &lt;p&gt;
+ * Logger key is &lt;code&gt;&lt;b&gt;dubbo.accesslog&lt;/b&gt;&lt;/code&gt;.
+ * In order to configure access log appear in the specified appender only, additivity need to be configured in log4j's
+ * config file, for example:
+ * &lt;code&gt;
+ * &lt;pre&gt;
+ * &amp;lt;logger name=&quot;&lt;b&gt;dubbo.accesslog&lt;/b&gt;&quot; &lt;font color=&quot;red&quot;&gt;additivity=&quot;false&quot;&lt;/font&gt;&amp;gt;
+ *    &amp;lt;level value=&quot;info&quot; /&amp;gt;
+ *    &amp;lt;appender-ref ref=&quot;foo&quot; /&amp;gt;
+ * &amp;lt;/logger&amp;gt;
+ * &lt;/pre&gt;&lt;/code&gt;
+ */
+@Activate(group = Constants.PROVIDER, value = Constants.ACCESS_LOG_KEY)
+public class AccessLogFilter implements Filter {
+
+<span class="nc" id="L65">    private static final Logger logger = LoggerFactory.getLogger(AccessLogFilter.class);</span>
+
+    private static final String ACCESS_LOG_KEY = &quot;dubbo.accesslog&quot;;
+
+    private static final int LOG_MAX_BUFFER = 5000;
+
+    private static final long LOG_OUTPUT_INTERVAL = 5000;
+
+    private static final String FILE_DATE_FORMAT = &quot;yyyyMMdd&quot;;
+
+    // It's safe to declare it as singleton since it runs on single thread only
+<span class="nc" id="L76">    private static final DateFormat FILE_NAME_FORMATTER = new SimpleDateFormat(FILE_DATE_FORMAT);</span>
+
+<span class="nc" id="L78">    private static final Map&lt;String, Set&lt;AccessLogData&gt;&gt; LOG_ENTRIES = new ConcurrentHashMap&lt;String, Set&lt;AccessLogData&gt;&gt;();</span>
+
+<span class="nc" id="L80">    private static final ScheduledExecutorService LOG_SCHEDULED = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(&quot;Dubbo-Access-Log&quot;, true));</span>
+
+    /**
+     * Default constructor initialize demon thread for writing into access log file with names with access log key
+     * defined in url &lt;b&gt;accesslog&lt;/b&gt;
+     */
+<span class="nc" id="L86">    public AccessLogFilter() {</span>
+<span class="nc" id="L87">        LOG_SCHEDULED.scheduleWithFixedDelay(this::writeLogToFile, LOG_OUTPUT_INTERVAL, LOG_OUTPUT_INTERVAL, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L88">    }</span>
+
+    /**
+     * This method logs the access log for service method invocation call.
+     *
+     * @param invoker service
+     * @param inv     Invocation service method.
+     * @return Result from service method.
+     * @throws RpcException
+     */
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation inv) throws RpcException {
+        try {
+<span class="nc" id="L101">            String accessLogKey = invoker.getUrl().getParameter(Constants.ACCESS_LOG_KEY);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (ConfigUtils.isNotEmpty(accessLogKey)) {</span>
+<span class="nc" id="L103">                AccessLogData logData = buildAccessLogData(invoker, inv);</span>
+<span class="nc" id="L104">                log(accessLogKey, logData);</span>
+            }
+<span class="nc" id="L106">        } catch (Throwable t) {</span>
+<span class="nc" id="L107">            logger.warn(&quot;Exception in AccessLogFilter of service(&quot; + invoker + &quot; -&gt; &quot; + inv + &quot;)&quot;, t);</span>
+<span class="nc" id="L108">        }</span>
+<span class="nc" id="L109">        return invoker.invoke(inv);</span>
+    }
+
+    private void log(String accessLog, AccessLogData accessLogData) {
+<span class="nc" id="L113">        Set&lt;AccessLogData&gt; logSet = LOG_ENTRIES.computeIfAbsent(accessLog, k -&gt; new ConcurrentHashSet&lt;&gt;());</span>
+
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (logSet.size() &lt; LOG_MAX_BUFFER) {</span>
+<span class="nc" id="L116">            logSet.add(accessLogData);</span>
+        } else {
+            //TODO we needs use force writing to file so that buffer gets clear and new log can be written.
+<span class="nc" id="L119">            logger.warn(&quot;AccessLog buffer is full skipping buffer &quot;);</span>
+        }
+<span class="nc" id="L121">    }</span>
+
+    private void writeLogToFile() {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (!LOG_ENTRIES.isEmpty()) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            for (Map.Entry&lt;String, Set&lt;AccessLogData&gt;&gt; entry : LOG_ENTRIES.entrySet()) {</span>
+                try {
+<span class="nc" id="L127">                    String accessLog = entry.getKey();</span>
+<span class="nc" id="L128">                    Set&lt;AccessLogData&gt; logSet = entry.getValue();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                    if (ConfigUtils.isDefault(accessLog)) {</span>
+<span class="nc" id="L130">                        processWithServiceLogger(logSet);</span>
+                    } else {
+<span class="nc" id="L132">                        File file = new File(accessLog);</span>
+<span class="nc" id="L133">                        createIfLogDirAbsent(file);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                        if (logger.isDebugEnabled()) {</span>
+<span class="nc" id="L135">                            logger.debug(&quot;Append log to &quot; + accessLog);</span>
+                        }
+<span class="nc" id="L137">                        renameFile(file);</span>
+<span class="nc" id="L138">                        processWithAccessKeyLogger(logSet, file);</span>
+                    }
+
+<span class="nc" id="L141">                } catch (Exception e) {</span>
+<span class="nc" id="L142">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L143">                }</span>
+<span class="nc" id="L144">            }</span>
+        }
+<span class="nc" id="L146">    }</span>
+
+    private void processWithAccessKeyLogger(Set&lt;AccessLogData&gt; logSet, File file) throws IOException {
+<span class="nc" id="L149">        try (FileWriter writer = new FileWriter(file, true)) {</span>
+<span class="nc" id="L150">            for (Iterator&lt;AccessLogData&gt; iterator = logSet.iterator();</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                 iterator.hasNext();</span>
+<span class="nc" id="L152">                 iterator.remove()) {</span>
+<span class="nc" id="L153">                writer.write(iterator.next().getLogMessage());</span>
+<span class="nc" id="L154">                writer.write(&quot;\r\n&quot;);</span>
+            }
+<span class="nc" id="L156">            writer.flush();</span>
+        }
+<span class="nc" id="L158">    }</span>
+
+    private AccessLogData buildAccessLogData(Invoker&lt;?&gt; invoker, Invocation inv) {
+<span class="nc" id="L161">        RpcContext context = RpcContext.getContext();</span>
+<span class="nc" id="L162">        AccessLogData logData = AccessLogData.newLogData();</span>
+<span class="nc" id="L163">        logData.setServiceName(invoker.getInterface().getName());</span>
+<span class="nc" id="L164">        logData.setMethodName(inv.getMethodName());</span>
+<span class="nc" id="L165">        logData.setVersion(invoker.getUrl().getParameter(Constants.VERSION_KEY));</span>
+<span class="nc" id="L166">        logData.setGroup(invoker.getUrl().getParameter(Constants.GROUP_KEY));</span>
+<span class="nc" id="L167">        logData.setInvocationTime(new Date());</span>
+<span class="nc" id="L168">        logData.setTypes(inv.getParameterTypes());</span>
+<span class="nc" id="L169">        logData.setArguments(inv.getArguments());</span>
+<span class="nc" id="L170">        return logData;</span>
+    }
+
+    private void processWithServiceLogger(Set&lt;AccessLogData&gt; logSet) {
+<span class="nc" id="L174">        for (Iterator&lt;AccessLogData&gt; iterator = logSet.iterator();</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">             iterator.hasNext();</span>
+<span class="nc" id="L176">             iterator.remove()) {</span>
+<span class="nc" id="L177">            AccessLogData logData = iterator.next();</span>
+<span class="nc" id="L178">            LoggerFactory.getLogger(ACCESS_LOG_KEY + &quot;.&quot; + logData.getServiceName()).info(logData.getLogMessage());</span>
+        }
+<span class="nc" id="L180">    }</span>
+
+    private void createIfLogDirAbsent(File file) {
+<span class="nc" id="L183">        File dir = file.getParentFile();</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (null != dir &amp;&amp; !dir.exists()) {</span>
+<span class="nc" id="L185">            dir.mkdirs();</span>
+        }
+<span class="nc" id="L187">    }</span>
+
+    private void renameFile(File file) {
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (file.exists()) {</span>
+<span class="nc" id="L191">            String now = FILE_NAME_FORMATTER.format(new Date());</span>
+<span class="nc" id="L192">            String last = FILE_NAME_FORMATTER.format(new Date(file.lastModified()));</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (!now.equals(last)) {</span>
+<span class="nc" id="L194">                File archive = new File(file.getAbsolutePath() + &quot;.&quot; + last);</span>
+<span class="nc" id="L195">                file.renameTo(archive);</span>
+            }
+        }
+<span class="nc" id="L198">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

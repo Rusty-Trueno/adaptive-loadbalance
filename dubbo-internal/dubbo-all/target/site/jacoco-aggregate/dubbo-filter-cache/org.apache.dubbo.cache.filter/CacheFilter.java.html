@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CacheFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-filter-cache</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.cache.filter</a> &gt; <span class="el_source">CacheFilter.java</span></div><h1>CacheFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.cache.filter;
+
+import org.apache.dubbo.cache.Cache;
+import org.apache.dubbo.cache.CacheFactory;
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+
+import java.io.Serializable;
+
+/**
+ * CacheFilter is a core component of dubbo.Enabling &lt;b&gt;cache&lt;/b&gt; key of service,method,consumer or provider dubbo will cache method return value.
+ * Along with cache key we need to configure cache type. Dubbo default implemented cache types are
+ * &lt;li&gt;lur&lt;/li&gt;
+ * &lt;li&gt;threadlocal&lt;/li&gt;
+ * &lt;li&gt;jcache&lt;/li&gt;
+ * &lt;li&gt;expiring&lt;/li&gt;
+ *
+ * &lt;pre&gt;
+ *   e.g. 1)&amp;lt;dubbo:service cache=&quot;lru&quot; /&amp;gt;
+ *        2)&amp;lt;dubbo:service /&amp;gt; &amp;lt;dubbo:method name=&quot;method2&quot; cache=&quot;threadlocal&quot; /&amp;gt; &amp;lt;dubbo:service/&amp;gt;
+ *        3)&amp;lt;dubbo:provider cache=&quot;expiring&quot; /&amp;gt;
+ *        4)&amp;lt;dubbo:consumer cache=&quot;jcache&quot; /&amp;gt;
+ *
+ *If cache type is defined in method level then method level type will get precedence. According to above provided
+ *example, if service has two method, method1 and method2, method2 will have cache type as &lt;b&gt;threadlocal&lt;/b&gt; where others will
+ *be backed by &lt;b&gt;lru&lt;/b&gt;
+ *&lt;/pre&gt;
+ *
+ * @see org.apache.dubbo.rpc.Filter
+ * @see org.apache.dubbo.cache.support.lru.LruCacheFactory
+ * @see org.apache.dubbo.cache.support.lru.LruCache
+ * @see org.apache.dubbo.cache.support.jcache.JCacheFactory
+ * @see org.apache.dubbo.cache.support.jcache.JCache
+ * @see org.apache.dubbo.cache.support.threadlocal.ThreadLocalCacheFactory
+ * @see org.apache.dubbo.cache.support.threadlocal.ThreadLocalCache
+ * @see org.apache.dubbo.cache.support.expiring.ExpiringCacheFactory
+ * @see org.apache.dubbo.cache.support.expiring.ExpiringCache
+ *
+ */
+@Activate(group = {Constants.CONSUMER, Constants.PROVIDER}, value = Constants.CACHE_KEY)
+<span class="nc" id="L65">public class CacheFilter implements Filter {</span>
+
+    private CacheFactory cacheFactory;
+
+    /**
+     * Dubbo will populate and set the cache factory instance based on service/method/consumer/provider configured
+     * cache attribute value. Dubbo will search for the class name implementing configured &lt;b&gt;cache&lt;/b&gt; in file org.apache.dubbo.cache.CacheFactory
+     * under META-INF sub folders.
+     *
+     * @param cacheFactory instance of CacheFactory based on &lt;b&gt;cache&lt;/b&gt; type
+     */
+    public void setCacheFactory(CacheFactory cacheFactory) {
+<span class="nc" id="L77">        this.cacheFactory = cacheFactory;</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * If cache is configured, dubbo will invoke method on each method call. If cache value is returned by cache store
+     * then it will return otherwise call the remote method and return value. If remote method's return valeu has error
+     * then it will not cache the value.
+     * @param invoker    service
+     * @param invocation invocation.
+     * @return Cache returned value if found by the underlying cache store. If cache miss it will call target method.
+     * @throws RpcException
+     */
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (cacheFactory != null &amp;&amp; ConfigUtils.isNotEmpty(invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.CACHE_KEY))) {</span>
+<span class="nc" id="L92">            Cache cache = cacheFactory.getCache(invoker.getUrl(), invocation);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (cache != null) {</span>
+<span class="nc" id="L94">                String key = StringUtils.toArgumentString(invocation.getArguments());</span>
+<span class="nc" id="L95">                Object value = cache.get(key);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    if (value instanceof ValueWrapper) {</span>
+<span class="nc" id="L98">                        return new RpcResult(((ValueWrapper)value).get());</span>
+                    } else {
+<span class="nc" id="L100">                        return new RpcResult(value);</span>
+                    }
+                }
+<span class="nc" id="L103">                Result result = invoker.invoke(invocation);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                if (!result.hasException()) {</span>
+<span class="nc" id="L105">                    cache.put(key, new ValueWrapper(result.getValue()));</span>
+                }
+<span class="nc" id="L107">                return result;</span>
+            }
+        }
+<span class="nc" id="L110">        return invoker.invoke(invocation);</span>
+    }
+
+    /**
+     * Cache value wrapper.
+     */
+    static class ValueWrapper implements Serializable{
+
+        private static final long serialVersionUID = -1777337318019193256L;
+
+        private final Object value;
+
+<span class="nc" id="L122">        public ValueWrapper(Object value){</span>
+<span class="nc" id="L123">            this.value = value;</span>
+<span class="nc" id="L124">        }</span>
+
+        public Object get() {
+<span class="nc" id="L127">            return this.value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

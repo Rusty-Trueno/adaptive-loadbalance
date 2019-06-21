@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractAnnotationConfigBeanBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">AbstractAnnotationConfigBeanBuilder.java</span></div><h1>AbstractAnnotationConfigBeanBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.dubbo.config.AbstractInterfaceConfig;
+import org.apache.dubbo.config.ApplicationConfig;
+import org.apache.dubbo.config.ModuleConfig;
+import org.apache.dubbo.config.MonitorConfig;
+import org.apache.dubbo.config.RegistryConfig;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.util.Assert;
+
+import java.lang.annotation.Annotation;
+import java.util.List;
+
+import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.getBeans;
+import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.getOptionalBean;
+
+/**
+ * Abstract Configurable {@link Annotation} Bean Builder
+ * @since 2.5.7
+ */
+abstract class AbstractAnnotationConfigBeanBuilder&lt;A extends Annotation, B extends AbstractInterfaceConfig&gt; {
+
+<span class="nc" id="L42">    protected final Log logger = LogFactory.getLog(getClass());</span>
+
+    protected final A annotation;
+
+    protected final ApplicationContext applicationContext;
+
+    protected final ClassLoader classLoader;
+
+    protected Object bean;
+
+    protected Class&lt;?&gt; interfaceClass;
+
+    protected AbstractAnnotationConfigBeanBuilder(A annotation, ClassLoader classLoader,
+<span class="nc" id="L55">                                                  ApplicationContext applicationContext) {</span>
+<span class="nc" id="L56">        Assert.notNull(annotation, &quot;The Annotation must not be null!&quot;);</span>
+<span class="nc" id="L57">        Assert.notNull(classLoader, &quot;The ClassLoader must not be null!&quot;);</span>
+<span class="nc" id="L58">        Assert.notNull(applicationContext, &quot;The ApplicationContext must not be null!&quot;);</span>
+<span class="nc" id="L59">        this.annotation = annotation;</span>
+<span class="nc" id="L60">        this.applicationContext = applicationContext;</span>
+<span class="nc" id="L61">        this.classLoader = classLoader;</span>
+
+<span class="nc" id="L63">    }</span>
+
+    /**
+     * Build {@link B}
+     *
+     * @return non-null
+     * @throws Exception
+     */
+    public final B build() throws Exception {
+
+<span class="nc" id="L73">        checkDependencies();</span>
+
+<span class="nc" id="L75">        B bean = doBuild();</span>
+
+<span class="nc" id="L77">        configureBean(bean);</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L80">            logger.info(&quot;The bean[type:&quot; + bean.getClass().getSimpleName() + &quot;] has been built.&quot;);</span>
+        }
+
+<span class="nc" id="L83">        return bean;</span>
+
+    }
+
+    private void checkDependencies() {
+
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Builds {@link B Bean}
+     *
+     * @return {@link B Bean}
+     */
+    protected abstract B doBuild();
+
+
+    protected void configureBean(B bean) throws Exception {
+
+<span class="nc" id="L101">        preConfigureBean(annotation, bean);</span>
+
+<span class="nc" id="L103">        configureRegistryConfigs(bean);</span>
+
+<span class="nc" id="L105">        configureMonitorConfig(bean);</span>
+
+<span class="nc" id="L107">        configureApplicationConfig(bean);</span>
+
+<span class="nc" id="L109">        configureModuleConfig(bean);</span>
+
+<span class="nc" id="L111">        postConfigureBean(annotation, bean);</span>
+
+<span class="nc" id="L113">    }</span>
+
+    protected abstract void preConfigureBean(A annotation, B bean) throws Exception;
+
+
+    private void configureRegistryConfigs(B bean) {
+
+<span class="nc" id="L120">        String[] registryConfigBeanIds = resolveRegistryConfigBeanNames(annotation);</span>
+
+<span class="nc" id="L122">        List&lt;RegistryConfig&gt; registryConfigs = getBeans(applicationContext, registryConfigBeanIds, RegistryConfig.class);</span>
+
+<span class="nc" id="L124">        bean.setRegistries(registryConfigs);</span>
+
+<span class="nc" id="L126">    }</span>
+
+    private void configureMonitorConfig(B bean) {
+
+<span class="nc" id="L130">        String monitorBeanName = resolveMonitorConfigBeanName(annotation);</span>
+
+<span class="nc" id="L132">        MonitorConfig monitorConfig = getOptionalBean(applicationContext, monitorBeanName, MonitorConfig.class);</span>
+
+<span class="nc" id="L134">        bean.setMonitor(monitorConfig);</span>
+
+<span class="nc" id="L136">    }</span>
+
+    private void configureApplicationConfig(B bean) {
+
+<span class="nc" id="L140">        String applicationConfigBeanName = resolveApplicationConfigBeanName(annotation);</span>
+
+<span class="nc" id="L142">        ApplicationConfig applicationConfig =</span>
+<span class="nc" id="L143">                getOptionalBean(applicationContext, applicationConfigBeanName, ApplicationConfig.class);</span>
+
+<span class="nc" id="L145">        bean.setApplication(applicationConfig);</span>
+
+<span class="nc" id="L147">    }</span>
+
+    private void configureModuleConfig(B bean) {
+
+<span class="nc" id="L151">        String moduleConfigBeanName = resolveModuleConfigBeanName(annotation);</span>
+
+<span class="nc" id="L153">        ModuleConfig moduleConfig =</span>
+<span class="nc" id="L154">                getOptionalBean(applicationContext, moduleConfigBeanName, ModuleConfig.class);</span>
+
+<span class="nc" id="L156">        bean.setModule(moduleConfig);</span>
+
+<span class="nc" id="L158">    }</span>
+
+    /**
+     * Resolves the bean name of {@link ModuleConfig}
+     *
+     * @param annotation {@link A}
+     * @return
+     */
+    protected abstract String resolveModuleConfigBeanName(A annotation);
+
+    /**
+     * Resolves the bean name of {@link ApplicationConfig}
+     *
+     * @param annotation {@link A}
+     * @return
+     */
+    protected abstract String resolveApplicationConfigBeanName(A annotation);
+
+
+    /**
+     * Resolves the bean ids of {@link RegistryConfig}
+     *
+     * @param annotation {@link A}
+     * @return non-empty array
+     */
+    protected abstract String[] resolveRegistryConfigBeanNames(A annotation);
+
+    /**
+     * Resolves the bean name of {@link MonitorConfig}
+     *
+     * @param annotation {@link A}
+     * @return
+     */
+    protected abstract String resolveMonitorConfigBeanName(A annotation);
+
+    /**
+     * Configures Bean
+     *
+     * @param annotation
+     * @param bean
+     */
+    protected abstract void postConfigureBean(A annotation, B bean) throws Exception;
+
+
+    public &lt;T extends AbstractAnnotationConfigBeanBuilder&lt;A, B&gt;&gt; T bean(Object bean) {
+<span class="nc" id="L203">        this.bean = bean;</span>
+<span class="nc" id="L204">        return (T) this;</span>
+    }
+
+    public &lt;T extends AbstractAnnotationConfigBeanBuilder&lt;A, B&gt;&gt; T interfaceClass(Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L208">        this.interfaceClass = interfaceClass;</span>
+<span class="nc" id="L209">        return (T) this;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

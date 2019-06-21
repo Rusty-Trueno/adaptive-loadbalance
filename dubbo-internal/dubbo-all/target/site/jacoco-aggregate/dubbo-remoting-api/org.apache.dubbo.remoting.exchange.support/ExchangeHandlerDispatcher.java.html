@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExchangeHandlerDispatcher.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.exchange.support</a> &gt; <span class="el_source">ExchangeHandlerDispatcher.java</span></div><h1>ExchangeHandlerDispatcher.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.exchange.support;
+
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.exchange.ExchangeChannel;
+import org.apache.dubbo.remoting.exchange.ExchangeHandler;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.TelnetHandlerAdapter;
+import org.apache.dubbo.remoting.transport.ChannelHandlerDispatcher;
+
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * ExchangeHandlerDispatcher
+ */
+public class ExchangeHandlerDispatcher implements ExchangeHandler {
+
+    private final ReplierDispatcher replierDispatcher;
+
+    private final ChannelHandlerDispatcher handlerDispatcher;
+
+    private final TelnetHandler telnetHandler;
+
+<span class="nc" id="L41">    public ExchangeHandlerDispatcher() {</span>
+<span class="nc" id="L42">        replierDispatcher = new ReplierDispatcher();</span>
+<span class="nc" id="L43">        handlerDispatcher = new ChannelHandlerDispatcher();</span>
+<span class="nc" id="L44">        telnetHandler = new TelnetHandlerAdapter();</span>
+<span class="nc" id="L45">    }</span>
+
+<span class="nc" id="L47">    public ExchangeHandlerDispatcher(Replier&lt;?&gt; replier) {</span>
+<span class="nc" id="L48">        replierDispatcher = new ReplierDispatcher(replier);</span>
+<span class="nc" id="L49">        handlerDispatcher = new ChannelHandlerDispatcher();</span>
+<span class="nc" id="L50">        telnetHandler = new TelnetHandlerAdapter();</span>
+<span class="nc" id="L51">    }</span>
+
+<span class="nc" id="L53">    public ExchangeHandlerDispatcher(ChannelHandler... handlers) {</span>
+<span class="nc" id="L54">        replierDispatcher = new ReplierDispatcher();</span>
+<span class="nc" id="L55">        handlerDispatcher = new ChannelHandlerDispatcher(handlers);</span>
+<span class="nc" id="L56">        telnetHandler = new TelnetHandlerAdapter();</span>
+<span class="nc" id="L57">    }</span>
+
+<span class="nc" id="L59">    public ExchangeHandlerDispatcher(Replier&lt;?&gt; replier, ChannelHandler... handlers) {</span>
+<span class="nc" id="L60">        replierDispatcher = new ReplierDispatcher(replier);</span>
+<span class="nc" id="L61">        handlerDispatcher = new ChannelHandlerDispatcher(handlers);</span>
+<span class="nc" id="L62">        telnetHandler = new TelnetHandlerAdapter();</span>
+<span class="nc" id="L63">    }</span>
+
+    public ExchangeHandlerDispatcher addChannelHandler(ChannelHandler handler) {
+<span class="nc" id="L66">        handlerDispatcher.addChannelHandler(handler);</span>
+<span class="nc" id="L67">        return this;</span>
+    }
+
+    public ExchangeHandlerDispatcher removeChannelHandler(ChannelHandler handler) {
+<span class="nc" id="L71">        handlerDispatcher.removeChannelHandler(handler);</span>
+<span class="nc" id="L72">        return this;</span>
+    }
+
+    public &lt;T&gt; ExchangeHandlerDispatcher addReplier(Class&lt;T&gt; type, Replier&lt;T&gt; replier) {
+<span class="nc" id="L76">        replierDispatcher.addReplier(type, replier);</span>
+<span class="nc" id="L77">        return this;</span>
+    }
+
+    public &lt;T&gt; ExchangeHandlerDispatcher removeReplier(Class&lt;T&gt; type) {
+<span class="nc" id="L81">        replierDispatcher.removeReplier(type);</span>
+<span class="nc" id="L82">        return this;</span>
+    }
+
+    @Override
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+    public CompletableFuture&lt;Object&gt; reply(ExchangeChannel channel, Object request) throws RemotingException {
+<span class="nc" id="L88">        return CompletableFuture.completedFuture(((Replier) replierDispatcher).reply(channel, request));</span>
+    }
+
+    @Override
+    public void connected(Channel channel) {
+<span class="nc" id="L93">        handlerDispatcher.connected(channel);</span>
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public void disconnected(Channel channel) {
+<span class="nc" id="L98">        handlerDispatcher.disconnected(channel);</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    public void sent(Channel channel, Object message) {
+<span class="nc" id="L103">        handlerDispatcher.sent(channel, message);</span>
+<span class="nc" id="L104">    }</span>
+
+    @Override
+    public void received(Channel channel, Object message) {
+<span class="nc" id="L108">        handlerDispatcher.received(channel, message);</span>
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void caught(Channel channel, Throwable exception) {
+<span class="nc" id="L113">        handlerDispatcher.caught(channel, exception);</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public String telnet(Channel channel, String message) throws RemotingException {
+<span class="nc" id="L118">        return telnetHandler.telnet(channel, message);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RestProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-rest</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.rest</a> &gt; <span class="el_source">RestProtocol.java</span></div><h1>RestProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.rest;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.http.HttpBinder;
+import org.apache.dubbo.remoting.http.servlet.BootstrapListener;
+import org.apache.dubbo.remoting.http.servlet.ServletManager;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.protocol.AbstractProxyProtocol;
+
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicHeaderElementIterator;
+import org.apache.http.protocol.HTTP;
+import org.jboss.resteasy.client.jaxrs.ResteasyClient;
+import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
+import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
+import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
+import org.jboss.resteasy.util.GetRestful;
+
+import javax.servlet.ServletContext;
+import javax.ws.rs.ProcessingException;
+import javax.ws.rs.WebApplicationException;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
+public class RestProtocol extends AbstractProxyProtocol {
+
+    private static final int DEFAULT_PORT = 80;
+    private static final String DEFAULT_SERVER = &quot;jetty&quot;;
+
+    private static final int HTTPCLIENTCONNECTIONMANAGER_MAXPERROUTE = 20;
+    private static final int HTTPCLIENTCONNECTIONMANAGER_MAXTOTAL = 20;
+    private static final int HTTPCLIENT_KEEPALIVEDURATION = 30 * 1000;
+    private static final int HTTPCLIENTCONNECTIONMANAGER_CLOSEWAITTIME_MS = 1000;
+    private static final int HTTPCLIENTCONNECTIONMANAGER_CLOSEIDLETIME_S = 30;
+
+<span class="nc" id="L65">    private final Map&lt;String, RestServer&gt; servers = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L67">    private final RestServerFactory serverFactory = new RestServerFactory();</span>
+
+    // TODO in the future maybe we can just use a single rest client and connection manager
+<span class="nc" id="L70">    private final List&lt;ResteasyClient&gt; clients = Collections.synchronizedList(new LinkedList&lt;&gt;());</span>
+
+    private volatile ConnectionMonitor connectionMonitor;
+
+    public RestProtocol() {
+<span class="nc" id="L75">        super(WebApplicationException.class, ProcessingException.class);</span>
+<span class="nc" id="L76">    }</span>
+
+    public void setHttpBinder(HttpBinder httpBinder) {
+<span class="nc" id="L79">        serverFactory.setHttpBinder(httpBinder);</span>
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L84">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    protected &lt;T&gt; Runnable doExport(T impl, Class&lt;T&gt; type, URL url) throws RpcException {
+<span class="nc" id="L89">        String addr = getAddr(url);</span>
+<span class="nc" id="L90">        Class implClass = ApplicationModel.getProviderModel(url.getPathKey()).getServiceInstance().getClass();</span>
+<span class="nc" id="L91">        RestServer server = servers.computeIfAbsent(addr, restServer -&gt; {</span>
+<span class="nc" id="L92">            RestServer s = serverFactory.createServer(url.getParameter(Constants.SERVER_KEY, DEFAULT_SERVER));</span>
+<span class="nc" id="L93">            s.start(url);</span>
+<span class="nc" id="L94">            return s;</span>
+        });
+
+<span class="nc" id="L97">        String contextPath = getContextPath(url);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (&quot;servlet&quot;.equalsIgnoreCase(url.getParameter(Constants.SERVER_KEY, DEFAULT_SERVER))) {</span>
+<span class="nc" id="L99">            ServletContext servletContext = ServletManager.getInstance().getServletContext(ServletManager.EXTERNAL_SERVER_PORT);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (servletContext == null) {</span>
+<span class="nc" id="L101">                throw new RpcException(&quot;No servlet context found. Since you are using server='servlet', &quot; +</span>
+<span class="nc" id="L102">                        &quot;make sure that you've configured &quot; + BootstrapListener.class.getName() + &quot; in web.xml&quot;);</span>
+            }
+<span class="nc" id="L104">            String webappPath = servletContext.getContextPath();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(webappPath)) {</span>
+<span class="nc" id="L106">                webappPath = webappPath.substring(1);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                if (!contextPath.startsWith(webappPath)) {</span>
+<span class="nc" id="L108">                    throw new RpcException(&quot;Since you are using server='servlet', &quot; +</span>
+                            &quot;make sure that the 'contextpath' property starts with the path of external webapp&quot;);
+                }
+<span class="nc" id="L111">                contextPath = contextPath.substring(webappPath.length());</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (contextPath.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L113">                    contextPath = contextPath.substring(1);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        final Class resourceDef = GetRestful.getRootResourceClass(implClass) != null ? implClass : type;</span>
+
+<span class="nc" id="L120">        server.deploy(resourceDef, impl, contextPath);</span>
+
+<span class="nc" id="L122">        final RestServer s = server;</span>
+<span class="nc" id="L123">        return () -&gt; {</span>
+            // TODO due to dubbo's current architecture,
+            // it will be called from registry protocol in the shutdown process and won't appear in logs
+<span class="nc" id="L126">            s.undeploy(resourceDef);</span>
+<span class="nc" id="L127">        };</span>
+    }
+
+    @Override
+    protected &lt;T&gt; T doRefer(Class&lt;T&gt; serviceType, URL url) throws RpcException {
+
+        // TODO more configs to add
+<span class="nc" id="L134">        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();</span>
+        // 20 is the default maxTotal of current PoolingClientConnectionManager
+<span class="nc" id="L136">        connectionManager.setMaxTotal(url.getParameter(Constants.CONNECTIONS_KEY, HTTPCLIENTCONNECTIONMANAGER_MAXTOTAL));</span>
+<span class="nc" id="L137">        connectionManager.setDefaultMaxPerRoute(url.getParameter(Constants.CONNECTIONS_KEY, HTTPCLIENTCONNECTIONMANAGER_MAXPERROUTE));</span>
+
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (connectionMonitor == null) {</span>
+<span class="nc" id="L140">            connectionMonitor = new ConnectionMonitor();</span>
+<span class="nc" id="L141">            connectionMonitor.start();</span>
+        }
+<span class="nc" id="L143">        connectionMonitor.addConnectionManager(connectionManager);</span>
+<span class="nc" id="L144">        RequestConfig requestConfig = RequestConfig.custom()</span>
+<span class="nc" id="L145">                .setConnectTimeout(url.getParameter(Constants.CONNECT_TIMEOUT_KEY, Constants.DEFAULT_CONNECT_TIMEOUT))</span>
+<span class="nc" id="L146">                .setSocketTimeout(url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT))</span>
+<span class="nc" id="L147">                .build();</span>
+
+<span class="nc" id="L149">        SocketConfig socketConfig = SocketConfig.custom()</span>
+<span class="nc" id="L150">                .setSoKeepAlive(true)</span>
+<span class="nc" id="L151">                .setTcpNoDelay(true)</span>
+<span class="nc" id="L152">                .build();</span>
+
+<span class="nc" id="L154">        CloseableHttpClient httpClient = HttpClientBuilder.create()</span>
+<span class="nc" id="L155">                .setKeepAliveStrategy((response, context) -&gt; {</span>
+<span class="nc" id="L156">                    HeaderElementIterator it = new BasicHeaderElementIterator(response.headerIterator(HTTP.CONN_KEEP_ALIVE));</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                    while (it.hasNext()) {</span>
+<span class="nc" id="L158">                        HeaderElement he = it.nextElement();</span>
+<span class="nc" id="L159">                        String param = he.getName();</span>
+<span class="nc" id="L160">                        String value = he.getValue();</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">                        if (value != null &amp;&amp; param.equalsIgnoreCase(Constants.TIMEOUT_KEY)) {</span>
+<span class="nc" id="L162">                            return Long.parseLong(value) * 1000;</span>
+                        }
+<span class="nc" id="L164">                    }</span>
+<span class="nc" id="L165">                    return HTTPCLIENT_KEEPALIVEDURATION;</span>
+                })
+<span class="nc" id="L167">                .setDefaultRequestConfig(requestConfig)</span>
+<span class="nc" id="L168">                .setDefaultSocketConfig(socketConfig)</span>
+<span class="nc" id="L169">                .build();</span>
+
+<span class="nc" id="L171">        ApacheHttpClient4Engine engine = new ApacheHttpClient4Engine(httpClient/*, localContext*/);</span>
+
+<span class="nc" id="L173">        ResteasyClient client = new ResteasyClientBuilder().httpEngine(engine).build();</span>
+<span class="nc" id="L174">        clients.add(client);</span>
+
+<span class="nc" id="L176">        client.register(RpcContextFilter.class);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        for (String clazz : Constants.COMMA_SPLIT_PATTERN.split(url.getParameter(Constants.EXTENSION_KEY, &quot;&quot;))) {</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (!StringUtils.isEmpty(clazz)) {</span>
+                try {
+<span class="nc" id="L180">                    client.register(Thread.currentThread().getContextClassLoader().loadClass(clazz.trim()));</span>
+<span class="nc" id="L181">                } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L182">                    throw new RpcException(&quot;Error loading JAX-RS extension class: &quot; + clazz.trim(), e);</span>
+<span class="nc" id="L183">                }</span>
+            }
+        }
+
+        // TODO protocol
+<span class="nc" id="L188">        ResteasyWebTarget target = client.target(&quot;http://&quot; + url.getHost() + &quot;:&quot; + url.getPort() + &quot;/&quot; + getContextPath(url));</span>
+<span class="nc" id="L189">        return target.proxy(serviceType);</span>
+    }
+
+    @Override
+    protected int getErrorCode(Throwable e) {
+        // TODO
+<span class="nc" id="L195">        return super.getErrorCode(e);</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L200">        super.destroy();</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (connectionMonitor != null) {</span>
+<span class="nc" id="L203">            connectionMonitor.shutdown();</span>
+        }
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        for (Map.Entry&lt;String, RestServer&gt; entry : servers.entrySet()) {</span>
+            try {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L209">                    logger.info(&quot;Closing the rest server at &quot; + entry.getKey());</span>
+                }
+<span class="nc" id="L211">                entry.getValue().stop();</span>
+<span class="nc" id="L212">            } catch (Throwable t) {</span>
+<span class="nc" id="L213">                logger.warn(&quot;Error closing rest server&quot;, t);</span>
+<span class="nc" id="L214">            }</span>
+<span class="nc" id="L215">        }</span>
+<span class="nc" id="L216">        servers.clear();</span>
+
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L219">            logger.info(&quot;Closing rest clients&quot;);</span>
+        }
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        for (ResteasyClient client : clients) {</span>
+            try {
+<span class="nc" id="L223">                client.close();</span>
+<span class="nc" id="L224">            } catch (Throwable t) {</span>
+<span class="nc" id="L225">                logger.warn(&quot;Error closing rest client&quot;, t);</span>
+<span class="nc" id="L226">            }</span>
+<span class="nc" id="L227">        }</span>
+<span class="nc" id="L228">        clients.clear();</span>
+<span class="nc" id="L229">    }</span>
+
+    /**
+     *  getPath() will return: [contextpath + &quot;/&quot; +] path
+     *  1. contextpath is empty if user does not set through ProtocolConfig or ProviderConfig
+     *  2. path will never be empty, it's default value is the interface name.
+     *
+     * @return return path only if user has explicitly gave then a value.
+     */
+    protected String getContextPath(URL url) {
+<span class="nc" id="L239">        String contextPath = url.getPath();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (contextPath != null) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (contextPath.equalsIgnoreCase(url.getParameter(Constants.INTERFACE_KEY))) {</span>
+<span class="nc" id="L242">                return &quot;&quot;;</span>
+            }
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (contextPath.endsWith(url.getParameter(Constants.INTERFACE_KEY))) {</span>
+<span class="nc" id="L245">                contextPath = contextPath.substring(0, contextPath.lastIndexOf(url.getParameter(Constants.INTERFACE_KEY)));</span>
+            }
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            return contextPath.endsWith(&quot;/&quot;) ? contextPath.substring(0, contextPath.length() - 1) : contextPath;</span>
+        } else {
+<span class="nc" id="L249">            return &quot;&quot;;</span>
+        }
+    }
+
+<span class="nc" id="L253">    protected class ConnectionMonitor extends Thread {</span>
+        private volatile boolean shutdown;
+<span class="nc" id="L255">        private final List&lt;PoolingHttpClientConnectionManager&gt; connectionManagers = Collections.synchronizedList(new LinkedList&lt;&gt;());</span>
+
+        public void addConnectionManager(PoolingHttpClientConnectionManager connectionManager) {
+<span class="nc" id="L258">            connectionManagers.add(connectionManager);</span>
+<span class="nc" id="L259">        }</span>
+
+        @Override
+        public void run() {
+            try {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                while (!shutdown) {</span>
+<span class="nc" id="L265">                    synchronized (this) {</span>
+<span class="nc" id="L266">                        wait(HTTPCLIENTCONNECTIONMANAGER_CLOSEWAITTIME_MS);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                        for (PoolingHttpClientConnectionManager connectionManager : connectionManagers) {</span>
+<span class="nc" id="L268">                            connectionManager.closeExpiredConnections();</span>
+<span class="nc" id="L269">                            connectionManager.closeIdleConnections(HTTPCLIENTCONNECTIONMANAGER_CLOSEIDLETIME_S, TimeUnit.SECONDS);</span>
+<span class="nc" id="L270">                        }</span>
+<span class="nc" id="L271">                    }</span>
+                }
+<span class="nc" id="L273">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L274">                shutdown();</span>
+<span class="nc" id="L275">            }</span>
+<span class="nc" id="L276">        }</span>
+
+        public void shutdown() {
+<span class="nc" id="L279">            shutdown = true;</span>
+<span class="nc" id="L280">            connectionManagers.clear();</span>
+<span class="nc" id="L281">            synchronized (this) {</span>
+<span class="nc" id="L282">                notifyAll();</span>
+<span class="nc" id="L283">            }</span>
+<span class="nc" id="L284">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

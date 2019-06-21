@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MultiServiceProcessor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift.ext</a> &gt; <span class="el_source">MultiServiceProcessor.java</span></div><h1>MultiServiceProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift.ext;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.rpc.protocol.thrift.ThriftCodec;
+
+import org.apache.thrift.TException;
+import org.apache.thrift.TProcessor;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.protocol.TProtocolFactory;
+import org.apache.thrift.transport.TIOStreamTransport;
+
+import java.io.ByteArrayOutputStream;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift to instead of this module
+ */
+@Deprecated
+public class MultiServiceProcessor implements TProcessor {
+
+<span class="nc" id="L40">    private static final Logger logger = LoggerFactory.getLogger(MultiServiceProcessor.class);</span>
+
+<span class="nc" id="L42">    private ConcurrentMap&lt;String, TProcessor&gt; processorMap = new ConcurrentHashMap&lt;String, TProcessor&gt;();</span>
+
+<span class="nc" id="L44">    private TProtocolFactory protocolFactory = new TBinaryProtocol.Factory();</span>
+
+<span class="nc" id="L46">    public MultiServiceProcessor() {</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public boolean process(TProtocol in, TProtocol out) throws TException {
+
+<span class="nc" id="L52">        short magic = in.readI16();</span>
+
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (magic != ThriftCodec.MAGIC) {</span>
+<span class="nc" id="L55">            logger.error(&quot;Unsupported magic &quot; + magic);</span>
+<span class="nc" id="L56">            return false;</span>
+        }
+
+<span class="nc" id="L59">        in.readI32();</span>
+<span class="nc" id="L60">        in.readI16();</span>
+<span class="nc" id="L61">        byte version = in.readByte();</span>
+<span class="nc" id="L62">        String serviceName = in.readString();</span>
+<span class="nc" id="L63">        long id = in.readI64();</span>
+
+<span class="nc" id="L65">        ByteArrayOutputStream bos = new ByteArrayOutputStream(1024);</span>
+
+<span class="nc" id="L67">        TIOStreamTransport transport = new TIOStreamTransport(bos);</span>
+
+<span class="nc" id="L69">        TProtocol protocol = protocolFactory.getProtocol(transport);</span>
+
+<span class="nc" id="L71">        TProcessor processor = processorMap.get(serviceName);</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (processor == null) {</span>
+<span class="nc" id="L74">            logger.error(&quot;Could not find processor for service &quot; + serviceName);</span>
+<span class="nc" id="L75">            return false;</span>
+        }
+
+        // todo if exception
+<span class="nc" id="L79">        boolean result = processor.process(in, protocol);</span>
+
+<span class="nc" id="L81">        ByteArrayOutputStream header = new ByteArrayOutputStream(512);</span>
+
+<span class="nc" id="L83">        TIOStreamTransport headerTransport = new TIOStreamTransport(header);</span>
+
+<span class="nc" id="L85">        TProtocol headerProtocol = protocolFactory.getProtocol(headerTransport);</span>
+
+<span class="nc" id="L87">        headerProtocol.writeI16(magic);</span>
+<span class="nc" id="L88">        headerProtocol.writeI32(Integer.MAX_VALUE);</span>
+<span class="nc" id="L89">        headerProtocol.writeI16(Short.MAX_VALUE);</span>
+<span class="nc" id="L90">        headerProtocol.writeByte(version);</span>
+<span class="nc" id="L91">        headerProtocol.writeString(serviceName);</span>
+<span class="nc" id="L92">        headerProtocol.writeI64(id);</span>
+<span class="nc" id="L93">        headerProtocol.getTransport().flush();</span>
+
+<span class="nc" id="L95">        out.writeI16(magic);</span>
+<span class="nc" id="L96">        out.writeI32(bos.size() + header.size());</span>
+<span class="nc" id="L97">        out.writeI16((short) (0xffff &amp; header.size()));</span>
+<span class="nc" id="L98">        out.writeByte(version);</span>
+<span class="nc" id="L99">        out.writeString(serviceName);</span>
+<span class="nc" id="L100">        out.writeI64(id);</span>
+
+<span class="nc" id="L102">        out.getTransport().write(bos.toByteArray());</span>
+<span class="nc" id="L103">        out.getTransport().flush();</span>
+
+<span class="nc" id="L105">        return result;</span>
+
+    }
+
+    public TProcessor addProcessor(Class service, TProcessor processor) {
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (service != null &amp;&amp; processor != null) {</span>
+<span class="nc" id="L111">            return processorMap.putIfAbsent(service.getName(), processor);</span>
+        }
+<span class="nc" id="L113">        return processor;</span>
+    }
+
+    public void setProtocolFactory(TProtocolFactory factory) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (factory != null) {</span>
+<span class="nc" id="L118">            this.protocolFactory = factory;</span>
+        }
+<span class="nc" id="L120">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

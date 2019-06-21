@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMonitorFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-monitor-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.monitor.support</a> &gt; <span class="el_source">AbstractMonitorFactory.java</span></div><h1>AbstractMonitorFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.monitor.support;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.monitor.Monitor;
+import org.apache.dubbo.monitor.MonitorFactory;
+import org.apache.dubbo.monitor.MonitorService;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * AbstractMonitorFactory. (SPI, Singleton, ThreadSafe)
+ */
+<span class="nc" id="L44">public abstract class AbstractMonitorFactory implements MonitorFactory {</span>
+<span class="nc" id="L45">    private static final Logger logger = LoggerFactory.getLogger(AbstractMonitorFactory.class);</span>
+
+    /**
+     * The lock for getting monitor center
+     */
+<span class="nc" id="L50">    private static final ReentrantLock LOCK = new ReentrantLock();</span>
+
+    /**
+     * The monitor centers Map&lt;RegistryAddress, Registry&gt;
+     */
+<span class="nc" id="L55">    private static final Map&lt;String, Monitor&gt; MONITORS = new ConcurrentHashMap&lt;String, Monitor&gt;();</span>
+
+<span class="nc" id="L57">    private static final Map&lt;String, CompletableFuture&lt;Monitor&gt;&gt; FUTURES = new ConcurrentHashMap&lt;String, CompletableFuture&lt;Monitor&gt;&gt;();</span>
+
+    /**
+     * The monitor create executor
+     */
+<span class="nc" id="L62">    private static final ExecutorService executor = new ThreadPoolExecutor(0, 10, 60L, TimeUnit.SECONDS, new SynchronousQueue&lt;Runnable&gt;(), new NamedThreadFactory(&quot;DubboMonitorCreator&quot;, true));</span>
+
+    public static Collection&lt;Monitor&gt; getMonitors() {
+<span class="nc" id="L65">        return Collections.unmodifiableCollection(MONITORS.values());</span>
+    }
+
+    @Override
+    public Monitor getMonitor(URL url) {
+<span class="nc" id="L70">        url = url.setPath(MonitorService.class.getName()).addParameter(Constants.INTERFACE_KEY, MonitorService.class.getName());</span>
+<span class="nc" id="L71">        String key = url.toServiceStringWithoutResolving();</span>
+<span class="nc" id="L72">        Monitor monitor = MONITORS.get(key);</span>
+<span class="nc" id="L73">        Future&lt;Monitor&gt; future = FUTURES.get(key);</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (monitor != null || future != null) {</span>
+<span class="nc" id="L75">            return monitor;</span>
+        }
+
+<span class="nc" id="L78">        LOCK.lock();</span>
+        try {
+<span class="nc" id="L80">            monitor = MONITORS.get(key);</span>
+<span class="nc" id="L81">            future = FUTURES.get(key);</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">            if (monitor != null || future != null) {</span>
+<span class="nc" id="L83">                return monitor;</span>
+            }
+
+<span class="nc" id="L86">            final URL monitorUrl = url;</span>
+<span class="nc" id="L87">            final CompletableFuture&lt;Monitor&gt; completableFuture = CompletableFuture.supplyAsync(() -&gt; AbstractMonitorFactory.this.createMonitor(monitorUrl));</span>
+<span class="nc" id="L88">            FUTURES.put(key, completableFuture);</span>
+<span class="nc" id="L89">            completableFuture.thenRunAsync(new MonitorListener(key), executor);</span>
+
+<span class="nc" id="L91">            return null;</span>
+        } finally {
+            // unlock
+<span class="nc" id="L94">            LOCK.unlock();</span>
+        }
+    }
+
+    protected abstract Monitor createMonitor(URL url);
+
+
+    class MonitorListener implements Runnable {
+
+        private String key;
+
+<span class="nc" id="L105">        public MonitorListener(String key) {</span>
+<span class="nc" id="L106">            this.key = key;</span>
+<span class="nc" id="L107">        }</span>
+
+        @Override
+        public void run() {
+            try {
+<span class="nc" id="L112">                CompletableFuture&lt;Monitor&gt; completableFuture = AbstractMonitorFactory.FUTURES.get(key);</span>
+<span class="nc" id="L113">                AbstractMonitorFactory.MONITORS.put(key, completableFuture.get());</span>
+<span class="nc" id="L114">                AbstractMonitorFactory.FUTURES.remove(key);</span>
+<span class="nc" id="L115">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L116">                logger.warn(&quot;Thread was interrupted unexpectedly, monitor will never be got.&quot;);</span>
+<span class="nc" id="L117">                AbstractMonitorFactory.FUTURES.remove(key);</span>
+<span class="nc" id="L118">            } catch (ExecutionException e) {</span>
+<span class="nc" id="L119">                logger.warn(&quot;Create monitor failed, monitor data will not be collected until you fix this problem. &quot;, e);</span>
+<span class="nc" id="L120">            }</span>
+<span class="nc" id="L121">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProviderConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">ProviderConfig.java</span></div><h1>ProviderConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.status.StatusChecker;
+import org.apache.dubbo.common.threadpool.ThreadPool;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.remoting.Dispatcher;
+import org.apache.dubbo.remoting.Transporter;
+import org.apache.dubbo.remoting.exchange.Exchanger;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+
+/**
+ * The service provider default configuration
+ *
+ * @export
+ * @see org.apache.dubbo.config.ProtocolConfig
+ * @see org.apache.dubbo.config.ServiceConfig
+ */
+<span class="nc" id="L38">public class ProviderConfig extends AbstractServiceConfig {</span>
+
+    private static final long serialVersionUID = 6913423882496634749L;
+
+    // ======== protocol default values, it'll take effect when protocol's attributes are not set ========
+
+    /**
+     * Service ip addresses (used when there are multiple network cards available)
+     */
+    private String host;
+
+    /**
+     * Service port
+     */
+    private Integer port;
+
+    /**
+     * Context path
+     */
+    private String contextpath;
+
+    /**
+     * Thread pool
+     */
+    private String threadpool;
+
+    /**
+     * Thread pool size (fixed size)
+     */
+    private Integer threads;
+
+    /**
+     * IO thread pool size (fixed size)
+     */
+    private Integer iothreads;
+
+    /**
+     * Thread pool queue length
+     */
+    private Integer queues;
+
+    /**
+     * Max acceptable connections
+     */
+    private Integer accepts;
+
+    /**
+     * Protocol codec
+     */
+    private String codec;
+
+    /**
+     * The serialization charset
+     */
+    private String charset;
+
+    /**
+     * Payload max length
+     */
+    private Integer payload;
+
+    /**
+     * The network io buffer size
+     */
+    private Integer buffer;
+
+    /**
+     * Transporter
+     */
+    private String transporter;
+
+    /**
+     * How information gets exchanged
+     */
+    private String exchanger;
+
+    /**
+     * Thread dispatching mode
+     */
+    private String dispatcher;
+
+    /**
+     * Networker
+     */
+    private String networker;
+
+    /**
+     * The server-side implementation model of the protocol
+     */
+    private String server;
+
+    /**
+     * The client-side implementation model of the protocol
+     */
+    private String client;
+
+    /**
+     * Supported telnet commands, separated with comma.
+     */
+    private String telnet;
+
+    /**
+     * Command line prompt
+     */
+    private String prompt;
+
+    /**
+     * Status check
+     */
+    private String status;
+
+    /**
+     * Wait time when stop
+     */
+    private Integer wait;
+
+    /**
+     * Whether to use the default protocol
+     */
+    private Boolean isDefault;
+
+    @Deprecated
+    public void setProtocol(String protocol) {
+<span class="nc" id="L161">        this.protocols = new ArrayList&lt;&gt;(Arrays.asList(new ProtocolConfig(protocol)));</span>
+<span class="nc" id="L162">    }</span>
+
+    @Parameter(excluded = true)
+    public Boolean isDefault() {
+<span class="nc" id="L166">        return isDefault;</span>
+    }
+
+    @Deprecated
+    public void setDefault(Boolean isDefault) {
+<span class="nc" id="L171">        this.isDefault = isDefault;</span>
+<span class="nc" id="L172">    }</span>
+
+    @Parameter(excluded = true)
+    public String getHost() {
+<span class="nc" id="L176">        return host;</span>
+    }
+
+    public void setHost(String host) {
+<span class="nc" id="L180">        this.host = host;</span>
+<span class="nc" id="L181">    }</span>
+
+    @Parameter(excluded = true)
+    public Integer getPort() {
+<span class="nc" id="L185">        return port;</span>
+    }
+
+    @Deprecated
+    public void setPort(Integer port) {
+<span class="nc" id="L190">        this.port = port;</span>
+<span class="nc" id="L191">    }</span>
+
+    @Deprecated
+    @Parameter(excluded = true)
+    public String getPath() {
+<span class="nc" id="L196">        return getContextpath();</span>
+    }
+
+    @Deprecated
+    public void setPath(String path) {
+<span class="nc" id="L201">        setContextpath(path);</span>
+<span class="nc" id="L202">    }</span>
+
+    @Parameter(excluded = true)
+    public String getContextpath() {
+<span class="nc" id="L206">        return contextpath;</span>
+    }
+
+    public void setContextpath(String contextpath) {
+<span class="nc" id="L210">        checkPathName(Constants.CONTEXTPATH_KEY, contextpath);</span>
+<span class="nc" id="L211">        this.contextpath = contextpath;</span>
+<span class="nc" id="L212">    }</span>
+
+    public String getThreadpool() {
+<span class="nc" id="L215">        return threadpool;</span>
+    }
+
+    public void setThreadpool(String threadpool) {
+<span class="nc" id="L219">        checkExtension(ThreadPool.class, Constants.THREADPOOL_KEY, threadpool);</span>
+<span class="nc" id="L220">        this.threadpool = threadpool;</span>
+<span class="nc" id="L221">    }</span>
+
+    public Integer getThreads() {
+<span class="nc" id="L224">        return threads;</span>
+    }
+
+    public void setThreads(Integer threads) {
+<span class="nc" id="L228">        this.threads = threads;</span>
+<span class="nc" id="L229">    }</span>
+
+    public Integer getIothreads() {
+<span class="nc" id="L232">        return iothreads;</span>
+    }
+
+    public void setIothreads(Integer iothreads) {
+<span class="nc" id="L236">        this.iothreads = iothreads;</span>
+<span class="nc" id="L237">    }</span>
+
+    public Integer getQueues() {
+<span class="nc" id="L240">        return queues;</span>
+    }
+
+    public void setQueues(Integer queues) {
+<span class="nc" id="L244">        this.queues = queues;</span>
+<span class="nc" id="L245">    }</span>
+
+    public Integer getAccepts() {
+<span class="nc" id="L248">        return accepts;</span>
+    }
+
+    public void setAccepts(Integer accepts) {
+<span class="nc" id="L252">        this.accepts = accepts;</span>
+<span class="nc" id="L253">    }</span>
+
+    public String getCodec() {
+<span class="nc" id="L256">        return codec;</span>
+    }
+
+    public void setCodec(String codec) {
+<span class="nc" id="L260">        this.codec = codec;</span>
+<span class="nc" id="L261">    }</span>
+
+    public String getCharset() {
+<span class="nc" id="L264">        return charset;</span>
+    }
+
+    public void setCharset(String charset) {
+<span class="nc" id="L268">        this.charset = charset;</span>
+<span class="nc" id="L269">    }</span>
+
+    public Integer getPayload() {
+<span class="nc" id="L272">        return payload;</span>
+    }
+
+    public void setPayload(Integer payload) {
+<span class="nc" id="L276">        this.payload = payload;</span>
+<span class="nc" id="L277">    }</span>
+
+    public Integer getBuffer() {
+<span class="nc" id="L280">        return buffer;</span>
+    }
+
+    public void setBuffer(Integer buffer) {
+<span class="nc" id="L284">        this.buffer = buffer;</span>
+<span class="nc" id="L285">    }</span>
+
+    public String getServer() {
+<span class="nc" id="L288">        return server;</span>
+    }
+
+    public void setServer(String server) {
+<span class="nc" id="L292">        this.server = server;</span>
+<span class="nc" id="L293">    }</span>
+
+    public String getClient() {
+<span class="nc" id="L296">        return client;</span>
+    }
+
+    public void setClient(String client) {
+<span class="nc" id="L300">        this.client = client;</span>
+<span class="nc" id="L301">    }</span>
+
+    public String getTelnet() {
+<span class="nc" id="L304">        return telnet;</span>
+    }
+
+    public void setTelnet(String telnet) {
+<span class="nc" id="L308">        checkMultiExtension(TelnetHandler.class, Constants.TELNET, telnet);</span>
+<span class="nc" id="L309">        this.telnet = telnet;</span>
+<span class="nc" id="L310">    }</span>
+
+    @Parameter(escaped = true)
+    public String getPrompt() {
+<span class="nc" id="L314">        return prompt;</span>
+    }
+
+    public void setPrompt(String prompt) {
+<span class="nc" id="L318">        this.prompt = prompt;</span>
+<span class="nc" id="L319">    }</span>
+
+    public String getStatus() {
+<span class="nc" id="L322">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="nc" id="L326">        checkMultiExtension(StatusChecker.class, Constants.STATUS_KEY, status);</span>
+<span class="nc" id="L327">        this.status = status;</span>
+<span class="nc" id="L328">    }</span>
+
+    @Override
+    public String getCluster() {
+<span class="nc" id="L332">        return super.getCluster();</span>
+    }
+
+    @Override
+    public Integer getConnections() {
+<span class="nc" id="L337">        return super.getConnections();</span>
+    }
+
+    @Override
+    public Integer getTimeout() {
+<span class="nc" id="L342">        return super.getTimeout();</span>
+    }
+
+    @Override
+    public Integer getRetries() {
+<span class="nc" id="L347">        return super.getRetries();</span>
+    }
+
+    @Override
+    public String getLoadbalance() {
+<span class="nc" id="L352">        return super.getLoadbalance();</span>
+    }
+
+    @Override
+    public Boolean isAsync() {
+<span class="nc" id="L357">        return super.isAsync();</span>
+    }
+
+    @Override
+    public Integer getActives() {
+<span class="nc" id="L362">        return super.getActives();</span>
+    }
+
+    public String getTransporter() {
+<span class="nc" id="L366">        return transporter;</span>
+    }
+
+    public void setTransporter(String transporter) {
+<span class="nc" id="L370">        checkExtension(Transporter.class, Constants.TRANSPORTER_KEY, transporter);</span>
+<span class="nc" id="L371">        this.transporter = transporter;</span>
+<span class="nc" id="L372">    }</span>
+
+    public String getExchanger() {
+<span class="nc" id="L375">        return exchanger;</span>
+    }
+
+    public void setExchanger(String exchanger) {
+<span class="nc" id="L379">        checkExtension(Exchanger.class, Constants.EXCHANGER_KEY, exchanger);</span>
+<span class="nc" id="L380">        this.exchanger = exchanger;</span>
+<span class="nc" id="L381">    }</span>
+
+    /**
+     * typo, switch to use {@link #getDispatcher()}
+     *
+     * @deprecated {@link #getDispatcher()}
+     */
+    @Deprecated
+    @Parameter(excluded = true)
+    public String getDispather() {
+<span class="nc" id="L391">        return getDispatcher();</span>
+    }
+
+    /**
+     * typo, switch to use {@link #getDispatcher()}
+     *
+     * @deprecated {@link #setDispatcher(String)}
+     */
+    @Deprecated
+    public void setDispather(String dispather) {
+<span class="nc" id="L401">        setDispatcher(dispather);</span>
+<span class="nc" id="L402">    }</span>
+
+    public String getDispatcher() {
+<span class="nc" id="L405">        return dispatcher;</span>
+    }
+
+    public void setDispatcher(String dispatcher) {
+<span class="nc" id="L409">        checkExtension(Dispatcher.class, Constants.DISPATCHER_KEY, dispatcher);</span>
+<span class="nc" id="L410">        checkExtension(Dispatcher.class, &quot;dispather&quot;, dispatcher);</span>
+<span class="nc" id="L411">        this.dispatcher = dispatcher;</span>
+<span class="nc" id="L412">    }</span>
+
+    public String getNetworker() {
+<span class="nc" id="L415">        return networker;</span>
+    }
+
+    public void setNetworker(String networker) {
+<span class="nc" id="L419">        this.networker = networker;</span>
+<span class="nc" id="L420">    }</span>
+
+    public Integer getWait() {
+<span class="nc" id="L423">        return wait;</span>
+    }
+
+    public void setWait(Integer wait) {
+<span class="nc" id="L427">        this.wait = wait;</span>
+<span class="nc" id="L428">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

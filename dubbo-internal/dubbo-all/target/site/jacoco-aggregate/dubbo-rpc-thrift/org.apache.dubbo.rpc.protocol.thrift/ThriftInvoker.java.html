@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ThriftInvoker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-thrift</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.thrift</a> &gt; <span class="el_source">ThriftInvoker.java</span></div><h1>ThriftInvoker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.thrift;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.utils.AtomicPositiveInteger;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.TimeoutException;
+import org.apache.dubbo.remoting.exchange.ExchangeClient;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.protocol.AbstractInvoker;
+
+import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+/**
+ * @since 2.7.0, use https://github.com/dubbo/dubbo-rpc-native-thrift instead
+ */
+@Deprecated
+public class ThriftInvoker&lt;T&gt; extends AbstractInvoker&lt;T&gt; {
+
+    private final ExchangeClient[] clients;
+
+<span class="nc" id="L43">    private final AtomicPositiveInteger index = new AtomicPositiveInteger();</span>
+
+<span class="nc" id="L45">    private final ReentrantLock destroyLock = new ReentrantLock();</span>
+
+    private final Set&lt;Invoker&lt;?&gt;&gt; invokers;
+
+    public ThriftInvoker(Class&lt;T&gt; service, URL url, ExchangeClient[] clients) {
+<span class="nc" id="L50">        this(service, url, clients, null);</span>
+<span class="nc" id="L51">    }</span>
+
+    public ThriftInvoker(Class&lt;T&gt; type, URL url, ExchangeClient[] clients, Set&lt;Invoker&lt;?&gt;&gt; invokers) {
+<span class="nc" id="L54">        super(type, url,</span>
+                new String[]{Constants.INTERFACE_KEY, Constants.GROUP_KEY,
+                        Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});
+<span class="nc" id="L57">        this.clients = clients;</span>
+<span class="nc" id="L58">        this.invokers = invokers;</span>
+<span class="nc" id="L59">    }</span>
+
+    @Override
+    protected Result doInvoke(Invocation invocation) throws Throwable {
+
+<span class="nc" id="L64">        RpcInvocation inv = (RpcInvocation) invocation;</span>
+
+        final String methodName;
+
+<span class="nc" id="L68">        methodName = invocation.getMethodName();</span>
+
+<span class="nc" id="L70">        inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());</span>
+
+        // for thrift codec
+<span class="nc" id="L73">        inv.setAttachment(ThriftCodec.PARAMETER_CLASS_NAME_GENERATOR, getUrl().getParameter(</span>
+                ThriftCodec.PARAMETER_CLASS_NAME_GENERATOR, DubboClassNameGenerator.NAME));
+
+        ExchangeClient currentClient;
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (clients.length == 1) {</span>
+<span class="nc" id="L79">            currentClient = clients[0];</span>
+        } else {
+<span class="nc" id="L81">            currentClient = clients[index.getAndIncrement() % clients.length];</span>
+        }
+
+        try {
+<span class="nc" id="L85">            int timeout = getUrl().getMethodParameter(</span>
+                    methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+
+<span class="nc" id="L88">            RpcContext.getContext().setFuture(null);</span>
+
+<span class="nc" id="L90">            return (Result) currentClient.request(inv, timeout).get();</span>
+
+<span class="nc" id="L92">        } catch (TimeoutException e) {</span>
+<span class="nc" id="L93">            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, e.getMessage(), e);</span>
+<span class="nc" id="L94">        } catch (RemotingException e) {</span>
+<span class="nc" id="L95">            throw new RpcException(RpcException.NETWORK_EXCEPTION, e.getMessage(), e);</span>
+        }
+
+    }
+
+    @Override
+    public boolean isAvailable() {
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (!super.isAvailable()) {</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        for (ExchangeClient client : clients) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (client.isConnected()</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                    &amp;&amp; !client.hasAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY)) {</span>
+                //cannot write == not Available ?
+<span class="nc" id="L111">                return true;</span>
+            }
+        }
+<span class="nc" id="L114">        return false;</span>
+    }
+
+    @Override
+    public void destroy() {
+        // in order to avoid closing a client multiple times, a counter is used in case of connection per jvm, every
+        // time when client.close() is called, counter counts down once, and when counter reaches zero, client will be
+        // closed.
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (super.isDestroyed()) {</span>
+<span class="nc" id="L123">            return;</span>
+        } else {
+            // double check to avoid dup close
+<span class="nc" id="L126">            destroyLock.lock();</span>
+
+            try {
+
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                if (super.isDestroyed()) {</span>
+<span class="nc" id="L131">                    return;</span>
+                }
+
+<span class="nc" id="L134">                super.destroy();</span>
+
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                if (invokers != null) {</span>
+<span class="nc" id="L137">                    invokers.remove(this);</span>
+                }
+
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                for (ExchangeClient client : clients) {</span>
+
+                    try {
+<span class="nc" id="L143">                        client.close();</span>
+<span class="nc" id="L144">                    } catch (Throwable t) {</span>
+<span class="nc" id="L145">                        logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L146">                    }</span>
+
+                }
+
+            } finally {
+<span class="nc" id="L151">                destroyLock.unlock();</span>
+            }
+
+        }
+
+<span class="nc" id="L156">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

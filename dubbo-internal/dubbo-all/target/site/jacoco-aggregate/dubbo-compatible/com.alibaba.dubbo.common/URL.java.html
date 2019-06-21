@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>URL.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-compatible</a> &gt; <a href="index.source.html" class="el_package">com.alibaba.dubbo.common</a> &gt; <span class="el_source">URL.java</span></div><h1>URL.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.alibaba.dubbo.common;
+
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.Map;
+
+@Deprecated
+public class URL extends org.apache.dubbo.common.URL {
+
+    protected URL() {
+<span class="nc" id="L31">        super();</span>
+<span class="nc" id="L32">    }</span>
+
+    public URL(org.apache.dubbo.common.URL url) {
+<span class="nc" id="L35">        super(url.getProtocol(), url.getUsername(), url.getPassword(), url.getHost(), url.getPort(), url.getPath(), url.getParameters());</span>
+<span class="nc" id="L36">    }</span>
+
+    public URL(String protocol, String host, int port) {
+<span class="nc" id="L39">        super(protocol, null, null, host, port, null, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L40">    }</span>
+
+    public URL(String protocol, String host, int port, String[] pairs) {
+<span class="nc" id="L43">        super(protocol, null, null, host, port, null, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L44">    }</span>
+
+    public URL(String protocol, String host, int port, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L47">        super(protocol, null, null, host, port, null, parameters);</span>
+<span class="nc" id="L48">    }</span>
+
+    public URL(String protocol, String host, int port, String path) {
+<span class="nc" id="L51">        super(protocol, null, null, host, port, path, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L52">    }</span>
+
+    public URL(String protocol, String host, int port, String path, String... pairs) {
+<span class="nc" id="L55">        super(protocol, null, null, host, port, path, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L56">    }</span>
+
+    public URL(String protocol, String host, int port, String path, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L59">        super(protocol, null, null, host, port, path, parameters);</span>
+<span class="nc" id="L60">    }</span>
+
+    public URL(String protocol, String username, String password, String host, int port, String path) {
+<span class="nc" id="L63">        super(protocol, username, password, host, port, path, (Map&lt;String, String&gt;) null);</span>
+<span class="nc" id="L64">    }</span>
+
+    public URL(String protocol, String username, String password, String host, int port, String path, String... pairs) {
+<span class="nc" id="L67">        super(protocol, username, password, host, port, path, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L68">    }</span>
+
+    public URL(String protocol, String username, String password, String host, int port, String path, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L71">        super(protocol, username, password, host, port, path, parameters);</span>
+<span class="nc" id="L72">    }</span>
+
+    public static URL valueOf(String url) {
+<span class="nc" id="L75">        org.apache.dubbo.common.URL result = org.apache.dubbo.common.URL.valueOf(url);</span>
+<span class="nc" id="L76">        return new URL(result);</span>
+    }
+
+    public static String encode(String value) {
+<span class="nc" id="L80">        return org.apache.dubbo.common.URL.encode(value);</span>
+    }
+
+    public static String decode(String value) {
+<span class="nc" id="L84">        return org.apache.dubbo.common.URL.decode(value);</span>
+    }
+
+    @Override
+    public String getProtocol() {
+<span class="nc" id="L89">        return super.getProtocol();</span>
+    }
+
+    @Override
+    public URL setProtocol(String protocol) {
+<span class="nc" id="L94">        return new URL(protocol, super.getUsername(), super.getPassword(), super.getHost(), super.getPort(), super.getPath(), super.getParameters());</span>
+    }
+
+    @Override
+    public String getUsername() {
+<span class="nc" id="L99">        return super.getUsername();</span>
+    }
+
+    @Override
+    public URL setUsername(String username) {
+<span class="nc" id="L104">        return new URL(super.getProtocol(), username, super.getPassword(), super.getHost(), super.getPort(), super.getPath(), super.getParameters());</span>
+    }
+
+    @Override
+    public String getPassword() {
+<span class="nc" id="L109">        return super.getPassword();</span>
+    }
+
+    @Override
+    public URL setPassword(String password) {
+<span class="nc" id="L114">        return new URL(super.getProtocol(), super.getUsername(), password, super.getHost(), super.getPort(), super.getPath(), super.getParameters());</span>
+    }
+
+    @Override
+    public String getAuthority() {
+<span class="nc" id="L119">        return super.getAuthority();</span>
+    }
+
+    @Override
+    public String getHost() {
+<span class="nc" id="L124">        return super.getHost();</span>
+    }
+
+    @Override
+    public URL setHost(String host) {
+<span class="nc" id="L129">        return new URL(super.getProtocol(), super.getUsername(), super.getPassword(), host, super.getPort(), super.getPath(), super.getParameters());</span>
+    }
+
+    @Override
+    public String getIp() {
+<span class="nc" id="L134">        return super.getIp();</span>
+    }
+
+    @Override
+    public int getPort() {
+<span class="nc" id="L139">        return super.getPort();</span>
+    }
+
+    @Override
+    public URL setPort(int port) {
+<span class="nc" id="L144">        return new URL(super.getProtocol(), super.getUsername(), super.getPassword(), super.getHost(), port, super.getPath(), super.getParameters());</span>
+    }
+
+    @Override
+    public int getPort(int defaultPort) {
+<span class="nc" id="L149">        return super.getPort();</span>
+    }
+
+    @Override
+    public String getAddress() {
+<span class="nc" id="L154">        return super.getAddress();</span>
+    }
+
+    @Override
+    public URL setAddress(String address) {
+<span class="nc" id="L159">        org.apache.dubbo.common.URL result = super.setAddress(address);</span>
+<span class="nc" id="L160">        return new URL(result);</span>
+    }
+
+    @Override
+    public String getBackupAddress() {
+<span class="nc" id="L165">        return super.getBackupAddress();</span>
+    }
+
+    @Override
+    public String getBackupAddress(int defaultPort) {
+<span class="nc" id="L170">        return super.getBackupAddress(defaultPort);</span>
+    }
+
+//    public List&lt;URL&gt; getBackupUrls() {
+//        List&lt;org.apache.dubbo.common.URL&gt; res = super.getBackupUrls();
+//        return res.stream().map(url -&gt; new URL(url)).collect(Collectors.toList());
+//    }
+
+    @Override
+    public String getPath() {
+<span class="nc" id="L180">        return super.getPath();</span>
+    }
+
+    @Override
+    public URL setPath(String path) {
+<span class="nc" id="L185">        return new URL(super.getProtocol(), super.getUsername(), super.getPassword(), super.getHost(), super.getPort(), path, super.getParameters());</span>
+    }
+
+    @Override
+    public String getAbsolutePath() {
+<span class="nc" id="L190">        return super.getAbsolutePath();</span>
+    }
+
+    @Override
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L195">        return super.getParameters();</span>
+    }
+
+    @Override
+    public String getParameterAndDecoded(String key) {
+<span class="nc" id="L200">        return super.getParameterAndDecoded(key);</span>
+    }
+
+    @Override
+    public String getParameterAndDecoded(String key, String defaultValue) {
+<span class="nc" id="L205">        return org.apache.dubbo.common.URL.decode(getParameter(key, defaultValue));</span>
+    }
+
+    @Override
+    public String getParameter(String key) {
+<span class="nc" id="L210">        return super.getParameter(key);</span>
+    }
+
+    @Override
+    public String getParameter(String key, String defaultValue) {
+<span class="nc" id="L215">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public String[] getParameter(String key, String[] defaultValue) {
+<span class="nc" id="L220">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public URL getUrlParameter(String key) {
+<span class="nc" id="L225">        org.apache.dubbo.common.URL result = super.getUrlParameter(key);</span>
+<span class="nc" id="L226">        return new URL(result);</span>
+    }
+
+    @Override
+    public double getParameter(String key, double defaultValue) {
+<span class="nc" id="L231">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public float getParameter(String key, float defaultValue) {
+<span class="nc" id="L236">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public long getParameter(String key, long defaultValue) {
+<span class="nc" id="L241">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public int getParameter(String key, int defaultValue) {
+<span class="nc" id="L246">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public short getParameter(String key, short defaultValue) {
+<span class="nc" id="L251">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public byte getParameter(String key, byte defaultValue) {
+<span class="nc" id="L256">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public float getPositiveParameter(String key, float defaultValue) {
+<span class="nc" id="L261">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public double getPositiveParameter(String key, double defaultValue) {
+<span class="nc" id="L266">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public long getPositiveParameter(String key, long defaultValue) {
+<span class="nc" id="L271">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public int getPositiveParameter(String key, int defaultValue) {
+<span class="nc" id="L276">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public short getPositiveParameter(String key, short defaultValue) {
+<span class="nc" id="L281">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public byte getPositiveParameter(String key, byte defaultValue) {
+<span class="nc" id="L286">        return super.getPositiveParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public char getParameter(String key, char defaultValue) {
+<span class="nc" id="L291">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public boolean getParameter(String key, boolean defaultValue) {
+<span class="nc" id="L296">        return super.getParameter(key, defaultValue);</span>
+    }
+
+    @Override
+    public boolean hasParameter(String key) {
+<span class="nc" id="L301">        return super.hasParameter(key);</span>
+    }
+
+    @Override
+    public String getMethodParameterAndDecoded(String method, String key) {
+<span class="nc" id="L306">        return super.getMethodParameterAndDecoded(method, key);</span>
+    }
+
+    @Override
+    public String getMethodParameterAndDecoded(String method, String key, String defaultValue) {
+<span class="nc" id="L311">        return super.getMethodParameterAndDecoded(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public String getMethodParameter(String method, String key) {
+<span class="nc" id="L316">        return super.getMethodParameter(method, key);</span>
+    }
+
+    @Override
+    public String getMethodParameter(String method, String key, String defaultValue) {
+<span class="nc" id="L321">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public double getMethodParameter(String method, String key, double defaultValue) {
+<span class="nc" id="L326">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public float getMethodParameter(String method, String key, float defaultValue) {
+<span class="nc" id="L331">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public long getMethodParameter(String method, String key, long defaultValue) {
+<span class="nc" id="L336">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public int getMethodParameter(String method, String key, int defaultValue) {
+<span class="nc" id="L341">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public short getMethodParameter(String method, String key, short defaultValue) {
+<span class="nc" id="L346">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public byte getMethodParameter(String method, String key, byte defaultValue) {
+<span class="nc" id="L351">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public double getMethodPositiveParameter(String method, String key, double defaultValue) {
+<span class="nc" id="L356">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public float getMethodPositiveParameter(String method, String key, float defaultValue) {
+<span class="nc" id="L361">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public long getMethodPositiveParameter(String method, String key, long defaultValue) {
+<span class="nc" id="L366">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public int getMethodPositiveParameter(String method, String key, int defaultValue) {
+<span class="nc" id="L371">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public short getMethodPositiveParameter(String method, String key, short defaultValue) {
+<span class="nc" id="L376">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public byte getMethodPositiveParameter(String method, String key, byte defaultValue) {
+<span class="nc" id="L381">        return super.getMethodPositiveParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public char getMethodParameter(String method, String key, char defaultValue) {
+<span class="nc" id="L386">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public boolean getMethodParameter(String method, String key, boolean defaultValue) {
+<span class="nc" id="L391">        return super.getMethodParameter(method, key, defaultValue);</span>
+    }
+
+    @Override
+    public boolean hasMethodParameter(String method, String key) {
+<span class="nc" id="L396">        return super.hasMethodParameter(method, key);</span>
+    }
+
+    @Override
+    public boolean isLocalHost() {
+<span class="nc" id="L401">        return super.isLocalHost();</span>
+    }
+
+    @Override
+    public boolean isAnyHost() {
+<span class="nc" id="L406">        return super.isAnyHost();</span>
+    }
+
+    @Override
+    public URL addParameterAndEncoded(String key, String value) {
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L412">            return this;</span>
+        }
+<span class="nc" id="L414">        return addParameter(key, encode(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, boolean value) {
+<span class="nc" id="L419">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, char value) {
+<span class="nc" id="L424">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, byte value) {
+<span class="nc" id="L429">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, short value) {
+<span class="nc" id="L434">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, int value) {
+<span class="nc" id="L439">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, long value) {
+<span class="nc" id="L444">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, float value) {
+<span class="nc" id="L449">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, double value) {
+<span class="nc" id="L454">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, Enum&lt;?&gt; value) {
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L460">            return this;</span>
+        }
+<span class="nc" id="L462">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, Number value) {
+<span class="nc bnc" id="L467" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L468">            return this;</span>
+        }
+<span class="nc" id="L470">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, CharSequence value) {
+<span class="nc bnc" id="L475" title="All 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L476">            return this;</span>
+        }
+<span class="nc" id="L478">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    @Override
+    public URL addParameter(String key, String value) {
+<span class="nc" id="L483">        org.apache.dubbo.common.URL result = super.addParameter(key, value);</span>
+<span class="nc" id="L484">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL addParameterIfAbsent(String key, String value) {
+<span class="nc" id="L489">        org.apache.dubbo.common.URL result = super.addParameterIfAbsent(key, value);</span>
+<span class="nc" id="L490">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL addParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L495">        org.apache.dubbo.common.URL result = super.addParameters(parameters);</span>
+<span class="nc" id="L496">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL addParametersIfAbsent(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L501">        org.apache.dubbo.common.URL result = super.addParametersIfAbsent(parameters);</span>
+<span class="nc" id="L502">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL addParameters(String... pairs) {
+<span class="nc" id="L507">        org.apache.dubbo.common.URL result = super.addParameters(pairs);</span>
+<span class="nc" id="L508">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL addParameterString(String query) {
+<span class="nc" id="L513">        org.apache.dubbo.common.URL result = super.addParameterString(query);</span>
+<span class="nc" id="L514">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL removeParameter(String key) {
+<span class="nc" id="L519">        org.apache.dubbo.common.URL result = super.removeParameter(key);</span>
+<span class="nc" id="L520">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL removeParameters(Collection&lt;String&gt; keys) {
+<span class="nc" id="L525">        org.apache.dubbo.common.URL result = super.removeParameters(keys);</span>
+<span class="nc" id="L526">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL removeParameters(String... keys) {
+<span class="nc" id="L531">        org.apache.dubbo.common.URL result = super.removeParameters(keys);</span>
+<span class="nc" id="L532">        return new URL(result);</span>
+    }
+
+    @Override
+    public URL clearParameters() {
+<span class="nc" id="L537">        org.apache.dubbo.common.URL result = super.clearParameters();</span>
+<span class="nc" id="L538">        return new URL(result);</span>
+    }
+
+    @Override
+    public String getRawParameter(String key) {
+<span class="nc" id="L543">        return super.getRawParameter(key);</span>
+    }
+
+    @Override
+    public Map&lt;String, String&gt; toMap() {
+<span class="nc" id="L548">        return super.toMap();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L553">        return super.toString();</span>
+    }
+
+    @Override
+    public String toString(String... parameters) {
+<span class="nc" id="L558">        return super.toString(parameters);</span>
+    }
+
+    @Override
+    public String toIdentityString() {
+<span class="nc" id="L563">        return super.toIdentityString();</span>
+    }
+
+    @Override
+    public String toIdentityString(String... parameters) {
+<span class="nc" id="L568">        return super.toIdentityString(parameters);</span>
+    }
+
+    @Override
+    public String toFullString() {
+<span class="nc" id="L573">        return super.toFullString();</span>
+    }
+
+    @Override
+    public String toFullString(String... parameters) {
+<span class="nc" id="L578">        return super.toFullString(parameters);</span>
+    }
+
+    @Override
+    public String toParameterString() {
+<span class="nc" id="L583">        return super.toParameterString();</span>
+    }
+
+    @Override
+    public String toParameterString(String... parameters) {
+<span class="nc" id="L588">        return super.toParameterString(parameters);</span>
+    }
+
+    @Override
+    public java.net.URL toJavaURL() {
+<span class="nc" id="L593">        return super.toJavaURL();</span>
+    }
+
+    @Override
+    public InetSocketAddress toInetSocketAddress() {
+<span class="nc" id="L598">        return super.toInetSocketAddress();</span>
+    }
+
+    @Override
+    public String getServiceKey() {
+<span class="nc" id="L603">        return super.getServiceKey();</span>
+    }
+
+    @Override
+    public String toServiceStringWithoutResolving() {
+<span class="nc" id="L608">        return super.toServiceStringWithoutResolving();</span>
+    }
+
+    @Override
+    public String toServiceString() {
+<span class="nc" id="L613">        return super.toServiceString();</span>
+    }
+
+    @Override
+    public String getServiceInterface() {
+<span class="nc" id="L618">        return super.getServiceInterface();</span>
+    }
+
+    @Override
+    public URL setServiceInterface(String service) {
+<span class="nc" id="L623">        org.apache.dubbo.common.URL result = super.setServiceInterface(service);</span>
+<span class="nc" id="L624">        return new URL(result);</span>
+    }
+
+    public org.apache.dubbo.common.URL getOriginalURL() {
+<span class="nc" id="L628">        return new org.apache.dubbo.common.URL(super.getProtocol(), super.getUsername(), super.getPassword(),</span>
+<span class="nc" id="L629">                super.getHost(), super.getPort(), super.getPath(), super.getParameters());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

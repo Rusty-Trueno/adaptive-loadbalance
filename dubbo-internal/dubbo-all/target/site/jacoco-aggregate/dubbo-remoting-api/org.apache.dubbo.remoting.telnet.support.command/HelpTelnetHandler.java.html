@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HelpTelnetHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.telnet.support.command</a> &gt; <span class="el_source">HelpTelnetHandler.java</span></div><h1>HelpTelnetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.telnet.support.command;
+
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.telnet.TelnetHandler;
+import org.apache.dubbo.remoting.telnet.support.Help;
+import org.apache.dubbo.remoting.telnet.support.TelnetUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * HelpTelnetHandler
+ */
+@Activate
+@Help(parameter = &quot;[command]&quot;, summary = &quot;Show help.&quot;, detail = &quot;Show help.&quot;)
+<span class="nc" id="L35">public class HelpTelnetHandler implements TelnetHandler {</span>
+
+<span class="nc" id="L37">    private final ExtensionLoader&lt;TelnetHandler&gt; extensionLoader = ExtensionLoader.getExtensionLoader(TelnetHandler.class);</span>
+
+    @Override
+    public String telnet(Channel channel, String message) {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (message.length() &gt; 0) {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            if (!extensionLoader.hasExtension(message)) {</span>
+<span class="nc" id="L43">                return &quot;No such command &quot; + message;</span>
+            }
+<span class="nc" id="L45">            TelnetHandler handler = extensionLoader.getExtension(message);</span>
+<span class="nc" id="L46">            Help help = handler.getClass().getAnnotation(Help.class);</span>
+<span class="nc" id="L47">            StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L48">            buf.append(&quot;Command:\r\n    &quot;);</span>
+<span class="nc" id="L49">            buf.append(message + &quot; &quot; + help.parameter().replace(&quot;\r\n&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;));</span>
+<span class="nc" id="L50">            buf.append(&quot;\r\nSummary:\r\n    &quot;);</span>
+<span class="nc" id="L51">            buf.append(help.summary().replace(&quot;\r\n&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;));</span>
+<span class="nc" id="L52">            buf.append(&quot;\r\nDetail:\r\n    &quot;);</span>
+<span class="nc" id="L53">            buf.append(help.detail().replace(&quot;\r\n&quot;, &quot;    \r\n&quot;).replace(&quot;\n&quot;, &quot;    \n&quot;));</span>
+<span class="nc" id="L54">            return buf.toString();</span>
+        } else {
+<span class="nc" id="L56">            List&lt;List&lt;String&gt;&gt; table = new ArrayList&lt;List&lt;String&gt;&gt;();</span>
+<span class="nc" id="L57">            List&lt;TelnetHandler&gt; handlers = extensionLoader.getActivateExtension(channel.getUrl(), &quot;telnet&quot;);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            if (CollectionUtils.isNotEmpty(handlers)) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                for (TelnetHandler handler : handlers) {</span>
+<span class="nc" id="L60">                    Help help = handler.getClass().getAnnotation(Help.class);</span>
+<span class="nc" id="L61">                    List&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                    String parameter = &quot; &quot; + extensionLoader.getExtensionName(handler) + &quot; &quot; + (help != null ? help.parameter().replace(&quot;\r\n&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;) : &quot;&quot;);</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    row.add(parameter.length() &gt; 55 ? parameter.substring(0, 55) + &quot;...&quot; : parameter);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    String summary = help != null ? help.summary().replace(&quot;\r\n&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;) : &quot;&quot;;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                    row.add(summary.length() &gt; 55 ? summary.substring(0, 55) + &quot;...&quot; : summary);</span>
+<span class="nc" id="L66">                    table.add(row);</span>
+<span class="nc" id="L67">                }</span>
+            }
+<span class="nc" id="L69">            return &quot;Please input \&quot;help [command]\&quot; show detail.\r\n&quot; + TelnetUtils.toList(table);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

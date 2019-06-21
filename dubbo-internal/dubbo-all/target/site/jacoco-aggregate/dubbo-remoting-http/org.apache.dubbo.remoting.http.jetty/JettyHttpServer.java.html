@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JettyHttpServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-http</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.http.jetty</a> &gt; <span class="el_source">JettyHttpServer.java</span></div><h1>JettyHttpServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.http.jetty;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.remoting.http.HttpHandler;
+import org.apache.dubbo.remoting.http.servlet.DispatcherServlet;
+import org.apache.dubbo.remoting.http.servlet.ServletManager;
+import org.apache.dubbo.remoting.http.support.AbstractHttpServer;
+
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.StdErrLog;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+
+public class JettyHttpServer extends AbstractHttpServer {
+
+<span class="nc" id="L40">    private static final Logger logger = LoggerFactory.getLogger(JettyHttpServer.class);</span>
+
+    private Server server;
+
+    private URL url;
+
+    public JettyHttpServer(URL url, final HttpHandler handler) {
+<span class="nc" id="L47">        super(url, handler);</span>
+<span class="nc" id="L48">        this.url = url;</span>
+        // TODO we should leave this setting to slf4j
+        // we must disable the debug logging for production use
+<span class="nc" id="L51">        Log.setLog(new StdErrLog());</span>
+<span class="nc" id="L52">        Log.getLog().setDebugEnabled(false);</span>
+
+<span class="nc" id="L54">        DispatcherServlet.addHttpHandler(url.getParameter(Constants.BIND_PORT_KEY, url.getPort()), handler);</span>
+
+<span class="nc" id="L56">        int threads = url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS);</span>
+<span class="nc" id="L57">        QueuedThreadPool threadPool = new QueuedThreadPool();</span>
+<span class="nc" id="L58">        threadPool.setDaemon(true);</span>
+<span class="nc" id="L59">        threadPool.setMaxThreads(threads);</span>
+<span class="nc" id="L60">        threadPool.setMinThreads(threads);</span>
+
+<span class="nc" id="L62">        server = new Server(threadPool);</span>
+
+<span class="nc" id="L64">        ServerConnector connector = new ServerConnector(server);</span>
+
+<span class="nc" id="L66">        String bindIp = url.getParameter(Constants.BIND_IP_KEY, url.getHost());</span>
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        if (!url.isAnyHost() &amp;&amp; NetUtils.isValidLocalHost(bindIp)) {</span>
+<span class="nc" id="L68">            connector.setHost(bindIp);</span>
+        }
+<span class="nc" id="L70">        connector.setPort(url.getParameter(Constants.BIND_PORT_KEY, url.getPort()));</span>
+
+<span class="nc" id="L72">        server.addConnector(connector);</span>
+
+<span class="nc" id="L74">        ServletHandler servletHandler = new ServletHandler();</span>
+<span class="nc" id="L75">        ServletHolder servletHolder = servletHandler.addServletWithMapping(DispatcherServlet.class, &quot;/*&quot;);</span>
+<span class="nc" id="L76">        servletHolder.setInitOrder(2);</span>
+
+        // dubbo's original impl can't support the use of ServletContext
+        //        server.addHandler(servletHandler);
+        // TODO Context.SESSIONS is the best option here? (In jetty 9.x, it becomes ServletContextHandler.SESSIONS)
+<span class="nc" id="L81">        ServletContextHandler context = new ServletContextHandler(server, &quot;/&quot;, ServletContextHandler.SESSIONS);</span>
+<span class="nc" id="L82">        context.setServletHandler(servletHandler);</span>
+<span class="nc" id="L83">        ServletManager.getInstance().addServletContext(url.getParameter(Constants.BIND_PORT_KEY, url.getPort()), context.getServletContext());</span>
+
+        try {
+<span class="nc" id="L86">            server.start();</span>
+<span class="nc" id="L87">        } catch (Exception e) {</span>
+<span class="nc" id="L88">            throw new IllegalStateException(&quot;Failed to start jetty server on &quot; + url.getParameter(Constants.BIND_IP_KEY) + &quot;:&quot; + url.getParameter(Constants.BIND_PORT_KEY) + &quot;, cause: &quot;</span>
+<span class="nc" id="L89">                + e.getMessage(), e);</span>
+<span class="nc" id="L90">        }</span>
+<span class="nc" id="L91">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L95">        super.close();</span>
+
+        //
+<span class="nc" id="L98">        ServletManager.getInstance().removeServletContext(url.getParameter(Constants.BIND_PORT_KEY, url.getPort()));</span>
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (server != null) {</span>
+            try {
+<span class="nc" id="L102">                server.stop();</span>
+<span class="nc" id="L103">            } catch (Exception e) {</span>
+<span class="nc" id="L104">                logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L105">            }</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

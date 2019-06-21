@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FastJsonObjectInput.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-serialization-fastjson</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.serialize.fastjson</a> &gt; <span class="el_source">FastJsonObjectInput.java</span></div><h1>FastJsonObjectInput.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.serialize.fastjson;
+
+import org.apache.dubbo.common.serialize.ObjectInput;
+
+import com.alibaba.fastjson.JSON;
+
+import java.io.BufferedReader;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Type;
+
+/**
+ * FastJson object input implementation
+ */
+public class FastJsonObjectInput implements ObjectInput {
+
+    private final BufferedReader reader;
+
+    public FastJsonObjectInput(InputStream in) {
+<span class="nc" id="L39">        this(new InputStreamReader(in));</span>
+<span class="nc" id="L40">    }</span>
+
+<span class="nc" id="L42">    public FastJsonObjectInput(Reader reader) {</span>
+<span class="nc" id="L43">        this.reader = new BufferedReader(reader);</span>
+<span class="nc" id="L44">    }</span>
+
+    @Override
+    public boolean readBool() throws IOException {
+<span class="nc" id="L48">        return read(boolean.class);</span>
+    }
+
+    @Override
+    public byte readByte() throws IOException {
+<span class="nc" id="L53">        return read(byte.class);</span>
+    }
+
+    @Override
+    public short readShort() throws IOException {
+<span class="nc" id="L58">        return read(short.class);</span>
+    }
+
+    @Override
+    public int readInt() throws IOException {
+<span class="nc" id="L63">        return read(int.class);</span>
+    }
+
+    @Override
+    public long readLong() throws IOException {
+<span class="nc" id="L68">        return read(long.class);</span>
+    }
+
+    @Override
+    public float readFloat() throws IOException {
+<span class="nc" id="L73">        return read(float.class);</span>
+    }
+
+    @Override
+    public double readDouble() throws IOException {
+<span class="nc" id="L78">        return read(double.class);</span>
+    }
+
+    @Override
+    public String readUTF() throws IOException {
+<span class="nc" id="L83">        return read(String.class);</span>
+    }
+
+    @Override
+    public byte[] readBytes() throws IOException {
+<span class="nc" id="L88">        return readLine().getBytes();</span>
+    }
+
+    @Override
+    public Object readObject() throws IOException, ClassNotFoundException {
+<span class="nc" id="L93">        String json = readLine();</span>
+<span class="nc" id="L94">        return JSON.parse(json);</span>
+    }
+
+    @Override
+    public &lt;T&gt; T readObject(Class&lt;T&gt; cls) throws IOException, ClassNotFoundException {
+<span class="nc" id="L99">        return read(cls);</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T readObject(Class&lt;T&gt; cls, Type type) throws IOException, ClassNotFoundException {
+<span class="nc" id="L105">        String json = readLine();</span>
+<span class="nc" id="L106">        return (T) JSON.parseObject(json, type);</span>
+    }
+
+    private String readLine() throws IOException, EOFException {
+<span class="nc" id="L110">        String line = reader.readLine();</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">        if (line == null || line.trim().length() == 0) {</span>
+<span class="nc" id="L112">            throw new EOFException();</span>
+        }
+<span class="nc" id="L114">        return line;</span>
+    }
+
+    private &lt;T&gt; T read(Class&lt;T&gt; cls) throws IOException {
+<span class="nc" id="L118">        String json = readLine();</span>
+<span class="nc" id="L119">        return JSON.parseObject(json, cls);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

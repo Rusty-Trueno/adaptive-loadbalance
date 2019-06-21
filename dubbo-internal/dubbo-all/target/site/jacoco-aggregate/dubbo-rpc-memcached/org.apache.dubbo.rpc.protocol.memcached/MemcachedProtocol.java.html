@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MemcachedProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-memcached</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.memcached</a> &gt; <span class="el_source">MemcachedProtocol.java</span></div><h1>MemcachedProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.memcached;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Exporter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.protocol.AbstractInvoker;
+import org.apache.dubbo.rpc.protocol.AbstractProtocol;
+
+import net.rubyeye.xmemcached.MemcachedClient;
+import net.rubyeye.xmemcached.MemcachedClientBuilder;
+import net.rubyeye.xmemcached.XMemcachedClientBuilder;
+import net.rubyeye.xmemcached.exception.MemcachedException;
+import net.rubyeye.xmemcached.utils.AddrUtil;
+
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * MemcachedProtocol
+ */
+<span class="nc" id="L44">public class MemcachedProtocol extends AbstractProtocol {</span>
+
+    public static final int DEFAULT_PORT = 11211;
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L50">        return DEFAULT_PORT;</span>
+    }
+
+    @Override
+    public &lt;T&gt; Exporter&lt;T&gt; export(final Invoker&lt;T&gt; invoker) throws RpcException {
+<span class="nc" id="L55">        throw new UnsupportedOperationException(&quot;Unsupported export memcached service. url: &quot; + invoker.getUrl());</span>
+    }
+
+    @Override
+    public &lt;T&gt; Invoker&lt;T&gt; refer(final Class&lt;T&gt; type, final URL url) throws RpcException {
+        try {
+<span class="nc" id="L61">            String address = url.getAddress();</span>
+<span class="nc" id="L62">            String backup = url.getParameter(Constants.BACKUP_KEY);</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">            if (backup != null &amp;&amp; backup.length() &gt; 0) {</span>
+<span class="nc" id="L64">                address += &quot;,&quot; + backup;</span>
+            }
+<span class="nc" id="L66">            MemcachedClientBuilder builder = new XMemcachedClientBuilder(AddrUtil.getAddresses(address));</span>
+<span class="nc" id="L67">            final MemcachedClient memcachedClient = builder.build();</span>
+<span class="nc" id="L68">            final int expiry = url.getParameter(&quot;expiry&quot;, 0);</span>
+<span class="nc" id="L69">            final String get = url.getParameter(&quot;get&quot;, &quot;get&quot;);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            final String set = url.getParameter(&quot;set&quot;, Map.class.equals(type) ? &quot;put&quot; : &quot;set&quot;);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            final String delete = url.getParameter(&quot;delete&quot;, Map.class.equals(type) ? &quot;remove&quot; : &quot;delete&quot;);</span>
+<span class="nc" id="L72">            return new AbstractInvoker&lt;T&gt;(type, url) {</span>
+                @Override
+                protected Result doInvoke(Invocation invocation) throws Throwable {
+                    try {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                        if (get.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                            if (invocation.getArguments().length != 1) {</span>
+<span class="nc" id="L78">                                throw new IllegalArgumentException(&quot;The memcached get method arguments mismatch, must only one arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L80">                            return new RpcResult(memcachedClient.get(String.valueOf(invocation.getArguments()[0])));</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                        } else if (set.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                            if (invocation.getArguments().length != 2) {</span>
+<span class="nc" id="L83">                                throw new IllegalArgumentException(&quot;The memcached set method arguments mismatch, must be two arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L85">                            memcachedClient.set(String.valueOf(invocation.getArguments()[0]), expiry, invocation.getArguments()[1]);</span>
+<span class="nc" id="L86">                            return new RpcResult();</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                        } else if (delete.equals(invocation.getMethodName())) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                            if (invocation.getArguments().length != 1) {</span>
+<span class="nc" id="L89">                                throw new IllegalArgumentException(&quot;The memcached delete method arguments mismatch, must only one arguments. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url);</span>
+                            }
+<span class="nc" id="L91">                            memcachedClient.delete(String.valueOf(invocation.getArguments()[0]));</span>
+<span class="nc" id="L92">                            return new RpcResult();</span>
+                        } else {
+<span class="nc" id="L94">                            throw new UnsupportedOperationException(&quot;Unsupported method &quot; + invocation.getMethodName() + &quot; in memcached service.&quot;);</span>
+                        }
+<span class="nc" id="L96">                    } catch (Throwable t) {</span>
+<span class="nc" id="L97">                        RpcException re = new RpcException(&quot;Failed to invoke memcached service method. interface: &quot; + type.getName() + &quot;, method: &quot; + invocation.getMethodName() + &quot;, url: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">                        if (t instanceof TimeoutException || t instanceof SocketTimeoutException) {</span>
+<span class="nc" id="L99">                            re.setCode(RpcException.TIMEOUT_EXCEPTION);</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">                        } else if (t instanceof MemcachedException || t instanceof IOException) {</span>
+<span class="nc" id="L101">                            re.setCode(RpcException.NETWORK_EXCEPTION);</span>
+                        }
+<span class="nc" id="L103">                        throw re;</span>
+                    }
+                }
+
+                @Override
+                public void destroy() {
+<span class="nc" id="L109">                    super.destroy();</span>
+                    try {
+<span class="nc" id="L111">                        memcachedClient.shutdown();</span>
+<span class="nc" id="L112">                    } catch (Throwable e) {</span>
+<span class="nc" id="L113">                        logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L114">                    }</span>
+<span class="nc" id="L115">                }</span>
+            };
+<span class="nc" id="L117">        } catch (Throwable t) {</span>
+<span class="nc" id="L118">            throw new RpcException(&quot;Failed to refer memcached service. interface: &quot; + type.getName() + &quot;, url: &quot; + url + &quot;, cause: &quot; + t.getMessage(), t);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

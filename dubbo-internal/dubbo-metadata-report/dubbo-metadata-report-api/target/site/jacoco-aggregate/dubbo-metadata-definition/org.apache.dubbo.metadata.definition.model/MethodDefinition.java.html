@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MethodDefinition.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-metadata-definition</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.metadata.definition.model</a> &gt; <span class="el_source">MethodDefinition.java</span></div><h1>MethodDefinition.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.metadata.definition.model;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * 2015/1/27.
+ */
+<span class="nc" id="L27">public class MethodDefinition {</span>
+
+    private String name;
+    private String[] parameterTypes;
+    private String returnType;
+    private List&lt;TypeDefinition&gt; parameters;
+
+    public String getName() {
+<span class="nc" id="L35">        return name;</span>
+    }
+
+    public List&lt;TypeDefinition&gt; getParameters() {
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (parameters == null) {</span>
+<span class="nc" id="L40">            parameters = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L42">        return parameters;</span>
+    }
+
+    public String[] getParameterTypes() {
+<span class="nc" id="L46">        return parameterTypes;</span>
+    }
+
+    public String getReturnType() {
+<span class="nc" id="L50">        return returnType;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L54">        this.name = name;</span>
+<span class="nc" id="L55">    }</span>
+
+    public void setParameters(List&lt;TypeDefinition&gt; parameters) {
+<span class="nc" id="L58">        this.parameters = parameters;</span>
+<span class="nc" id="L59">    }</span>
+
+    public void setParameterTypes(String[] parameterTypes) {
+<span class="nc" id="L62">        this.parameterTypes = parameterTypes;</span>
+<span class="nc" id="L63">    }</span>
+
+    public void setReturnType(String returnType) {
+<span class="nc" id="L66">        this.returnType = returnType;</span>
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L71">        return &quot;MethodDefinition [name=&quot; + name + &quot;, parameterTypes=&quot; + Arrays.toString(parameterTypes)</span>
+                + &quot;, returnType=&quot; + returnType + &quot;]&quot;;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L78">            return true;</span>
+        }
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (!(o instanceof MethodDefinition)) {</span>
+<span class="nc" id="L81">            return false;</span>
+        }
+<span class="nc" id="L83">        MethodDefinition that = (MethodDefinition) o;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        return Objects.equals(getName(), that.getName()) &amp;&amp;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                Arrays.equals(getParameterTypes(), that.getParameterTypes()) &amp;&amp;</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                Objects.equals(getReturnType(), that.getReturnType()) &amp;&amp;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                Objects.equals(getParameters(), that.getParameters());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L92">        int result = Objects.hash(getName(), getReturnType(), getParameters());</span>
+<span class="nc" id="L93">        result = 31 * result + Arrays.hashCode(getParameterTypes());</span>
+<span class="nc" id="L94">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

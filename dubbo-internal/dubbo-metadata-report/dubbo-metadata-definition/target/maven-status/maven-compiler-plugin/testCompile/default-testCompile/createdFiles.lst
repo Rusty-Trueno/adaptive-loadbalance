@@ -1,0 +1,15 @@
+org/apache/dubbo/metadata/definition/common/OuterClass.class
+org/apache/dubbo/metadata/definition/common/TestService.class
+org/apache/dubbo/metadata/definition/service/ComplexObject$InnerObject2.class
+org/apache/dubbo/metadata/definition/common/ResultWithRawCollections.class
+org/apache/dubbo/metadata/definition/MetadataUtils.class
+org/apache/dubbo/metadata/definition/service/ComplexObject$InnerObject.class
+org/apache/dubbo/metadata/definition/common/OuterClass$InnerClass.class
+org/apache/dubbo/metadata/definition/service/ComplexObject$TestEnum.class
+org/apache/dubbo/metadata/definition/MetadataTest.class
+org/apache/dubbo/metadata/definition/service/DemoService.class
+org/apache/dubbo/metadata/definition/service/ComplexObject.class
+org/apache/dubbo/metadata/definition/ServiceDefinitionBuildderTest.class
+org/apache/dubbo/metadata/definition/common/ClassExtendsMap.class
+org/apache/dubbo/metadata/definition/common/ColorEnum.class
+org/apache/dubbo/metadata/definition/service/ComplexObject$InnerObject3.class

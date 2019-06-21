@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeastActiveLoadBalance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.loadbalance</a> &gt; <span class="el_source">LeastActiveLoadBalance.java</span></div><h1>LeastActiveLoadBalance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.loadbalance;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcStatus;
+
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * LeastActiveLoadBalance
+ * &lt;p&gt;
+ * Filter the number of invokers with the least number of active calls and count the weights and quantities of these invokers.
+ * If there is only one invoker, use the invoker directly;
+ * if there are multiple invokers and the weights are not the same, then random according to the total weight;
+ * if there are multiple invokers and the same weight, then randomly called.
+ */
+<span class="nc" id="L35">public class LeastActiveLoadBalance extends AbstractLoadBalance {</span>
+
+    public static final String NAME = &quot;leastactive&quot;;
+
+    @Override
+    protected &lt;T&gt; Invoker&lt;T&gt; doSelect(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) {
+        // Number of invokers
+<span class="nc" id="L42">        int length = invokers.size();</span>
+        // The least active value of all invokers
+<span class="nc" id="L44">        int leastActive = -1;</span>
+        // The number of invokers having the same least active value (leastActive)
+<span class="nc" id="L46">        int leastCount = 0;</span>
+        // The index of invokers having the same least active value (leastActive)
+<span class="nc" id="L48">        int[] leastIndexes = new int[length];</span>
+        // the weight of every invokers
+<span class="nc" id="L50">        int[] weights = new int[length];</span>
+        // The sum of the warmup weights of all the least active invokes
+<span class="nc" id="L52">        int totalWeight = 0;</span>
+        // The weight of the first least active invoke
+<span class="nc" id="L54">        int firstWeight = 0;</span>
+        // Every least active invoker has the same weight value?
+<span class="nc" id="L56">        boolean sameWeight = true;</span>
+
+
+        // Filter out all the least active invokers
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L61">            Invoker&lt;T&gt; invoker = invokers.get(i);</span>
+            // Get the active number of the invoke
+<span class="nc" id="L63">            int active = RpcStatus.getStatus(invoker.getUrl(), invocation.getMethodName()).getActive();</span>
+            // Get the weight of the invoke configuration. The default value is 100.
+<span class="nc" id="L65">            int afterWarmup = getWeight(invoker, invocation);</span>
+            // save for later use
+<span class="nc" id="L67">            weights[i] = afterWarmup;</span>
+            // If it is the first invoker or the active number of the invoker is less than the current least active number
+<span class="nc bnc" id="L69" title="All 4 branches missed.">            if (leastActive == -1 || active &lt; leastActive) {</span>
+                // Reset the active number of the current invoker to the least active number
+<span class="nc" id="L71">                leastActive = active;</span>
+                // Reset the number of least active invokers
+<span class="nc" id="L73">                leastCount = 1;</span>
+                // Put the first least active invoker first in leastIndexes
+<span class="nc" id="L75">                leastIndexes[0] = i;</span>
+                // Reset totalWeight
+<span class="nc" id="L77">                totalWeight = afterWarmup;</span>
+                // Record the weight the first least active invoker
+<span class="nc" id="L79">                firstWeight = afterWarmup;</span>
+                // Each invoke has the same weight (only one invoker here)
+<span class="nc" id="L81">                sameWeight = true;</span>
+                // If current invoker's active value equals with leaseActive, then accumulating.
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            } else if (active == leastActive) {</span>
+                // Record the index of the least active invoker in leastIndexes order
+<span class="nc" id="L85">                leastIndexes[leastCount++] = i;</span>
+                // Accumulate the total weight of the least active invoker
+<span class="nc" id="L87">                totalWeight += afterWarmup;</span>
+                // If every invoker has the same weight?
+<span class="nc bnc" id="L89" title="All 6 branches missed.">                if (sameWeight &amp;&amp; i &gt; 0</span>
+                        &amp;&amp; afterWarmup != firstWeight) {
+<span class="nc" id="L91">                    sameWeight = false;</span>
+                }
+            }
+        }
+        // Choose an invoker from all the least active invokers
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (leastCount == 1) {</span>
+            // If we got exactly one invoker having the least active value, return this invoker directly.
+<span class="nc" id="L98">            return invokers.get(leastIndexes[0]);</span>
+        }
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        if (!sameWeight &amp;&amp; totalWeight &gt; 0) {</span>
+            // If (not every invoker has the same weight &amp; at least one invoker's weight&gt;0), select randomly based on 
+            // totalWeight.
+<span class="nc" id="L103">            int offsetWeight = ThreadLocalRandom.current().nextInt(totalWeight);</span>
+            // Return a invoker based on the random value.
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            for (int i = 0; i &lt; leastCount; i++) {</span>
+<span class="nc" id="L106">                int leastIndex = leastIndexes[i];</span>
+<span class="nc" id="L107">                offsetWeight -= weights[leastIndex];</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (offsetWeight &lt; 0) {</span>
+<span class="nc" id="L109">                    return invokers.get(leastIndex);</span>
+                }
+            }
+        }
+        // If all invokers have the same weight value or totalWeight=0, return evenly.
+<span class="nc" id="L114">        return invokers.get(leastIndexes[ThreadLocalRandom.current().nextInt(leastCount)]);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

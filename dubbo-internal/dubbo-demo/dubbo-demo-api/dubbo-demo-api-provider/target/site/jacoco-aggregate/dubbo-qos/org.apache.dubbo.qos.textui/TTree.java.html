@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TTree.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.textui</a> &gt; <span class="el_source">TTree.java</span></div><h1>TTree.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.textui;
+
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+import static java.lang.System.currentTimeMillis;
+import static org.apache.dubbo.common.utils.StringUtils.EMPTY;
+import static org.apache.dubbo.common.utils.StringUtils.length;
+import static org.apache.dubbo.common.utils.StringUtils.repeat;
+
+/**
+ * tree
+ */
+public class TTree implements TComponent {
+
+    private static final String STEP_FIRST_CHAR = &quot;`---&quot;;
+    private static final String STEP_NORMAL_CHAR = &quot;+---&quot;;
+    private static final String STEP_HAS_BOARD = &quot;|   &quot;;
+    private static final String STEP_EMPTY_BOARD = &quot;    &quot;;
+
+    // should output cost or not
+    private final boolean isPrintCost;
+
+    // tree node
+    private final Node root;
+
+    // current node
+    private Node current;
+
+
+<span class="nc" id="L49">    public TTree(boolean isPrintCost, String title) {</span>
+<span class="nc" id="L50">        this.root = new Node(title).markBegin().markEnd();</span>
+<span class="nc" id="L51">        this.current = root;</span>
+<span class="nc" id="L52">        this.isPrintCost = isPrintCost;</span>
+<span class="nc" id="L53">    }</span>
+
+
+    @Override
+    public String rendering() {
+
+<span class="nc" id="L59">        final StringBuilder treeSB = new StringBuilder();</span>
+<span class="nc" id="L60">        recursive(0, true, &quot;&quot;, root, new Callback() {</span>
+
+            @Override
+            public void callback(int deep, boolean isLast, String prefix, Node node) {
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                final boolean hasChild = !node.children.isEmpty();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                final String stepString = isLast ? STEP_FIRST_CHAR : STEP_NORMAL_CHAR;</span>
+<span class="nc" id="L67">                final int stepStringLength = length(stepString);</span>
+<span class="nc" id="L68">                treeSB.append(prefix).append(stepString);</span>
+
+<span class="nc" id="L70">                int costPrefixLength = 0;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                if (hasChild) {</span>
+<span class="nc" id="L72">                    treeSB.append(&quot;+&quot;);</span>
+                }
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (isPrintCost</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                        &amp;&amp; !node.isRoot()) {</span>
+<span class="nc" id="L76">                    final String costPrefix = String.format(&quot;[%s,%sms]&quot;, (node.endTimestamp - root.beginTimestamp), (node.endTimestamp - node.beginTimestamp));</span>
+<span class="nc" id="L77">                    costPrefixLength = length(costPrefix);</span>
+<span class="nc" id="L78">                    treeSB.append(costPrefix);</span>
+                }
+
+<span class="nc" id="L81">                try (Scanner scanner = new Scanner(new StringReader(node.data.toString()))) {</span>
+<span class="nc" id="L82">                    boolean isFirst = true;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                    while (scanner.hasNextLine()) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                        if (isFirst) {</span>
+<span class="nc" id="L85">                            treeSB.append(scanner.nextLine()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L86">                            isFirst = false;</span>
+                        } else {
+<span class="nc" id="L88">                            treeSB.append(prefix)</span>
+<span class="nc" id="L89">                                    .append(repeat(' ', stepStringLength))</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                                    .append(hasChild ? &quot;|&quot; : EMPTY)</span>
+<span class="nc" id="L91">                                    .append(repeat(' ', costPrefixLength))</span>
+<span class="nc" id="L92">                                    .append(scanner.nextLine())</span>
+<span class="nc" id="L93">                                    .append(System.lineSeparator());</span>
+                        }
+                    }
+                }
+
+<span class="nc" id="L98">            }</span>
+
+        });
+
+<span class="nc" id="L102">        return treeSB.toString();</span>
+    }
+
+    /**
+     * recursive visit
+     */
+    private void recursive(int deep, boolean isLast, String prefix, Node node, Callback callback) {
+<span class="nc" id="L109">        callback.callback(deep, isLast, prefix, node);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (!node.isLeaf()) {</span>
+<span class="nc" id="L111">            final int size = node.children.size();</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            for (int index = 0; index &lt; size; index++) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                final boolean isLastFlag = index == size - 1;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                final String currentPrefix = isLast ? prefix + STEP_EMPTY_BOARD : prefix + STEP_HAS_BOARD;</span>
+<span class="nc" id="L115">                recursive(</span>
+                        deep + 1,
+                        isLastFlag,
+                        currentPrefix,
+<span class="nc" id="L119">                        node.children.get(index),</span>
+                        callback
+                );
+            }
+        }
+<span class="nc" id="L124">    }</span>
+
+    public boolean isTop() {
+<span class="nc" id="L127">        return current.isRoot();</span>
+    }
+
+    /**
+     * create a branch node
+     *
+     * @param data node data
+     * @return this
+     */
+    public TTree begin(Object data) {
+<span class="nc" id="L137">        current = new Node(current, data);</span>
+<span class="nc" id="L138">        current.markBegin();</span>
+<span class="nc" id="L139">        return this;</span>
+    }
+
+    public TTree begin() {
+<span class="nc" id="L143">        return begin(null);</span>
+    }
+
+    public Object get() {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (current.isRoot()) {</span>
+<span class="nc" id="L148">            throw new IllegalStateException(&quot;current node is root.&quot;);</span>
+        }
+<span class="nc" id="L150">        return current.data;</span>
+    }
+
+    public TTree set(Object data) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (current.isRoot()) {</span>
+<span class="nc" id="L155">            throw new IllegalStateException(&quot;current node is root.&quot;);</span>
+        }
+<span class="nc" id="L157">        current.data = data;</span>
+<span class="nc" id="L158">        return this;</span>
+    }
+
+    /**
+     * end a branch node
+     *
+     * @return this
+     */
+    public TTree end() {
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (current.isRoot()) {</span>
+<span class="nc" id="L168">            throw new IllegalStateException(&quot;current node is root.&quot;);</span>
+        }
+<span class="nc" id="L170">        current.markEnd();</span>
+<span class="nc" id="L171">        current = current.parent;</span>
+<span class="nc" id="L172">        return this;</span>
+    }
+
+
+    /**
+     * tree node
+     */
+    private static class Node {
+
+        /**
+         * parent node
+         */
+        final Node parent;
+
+        /**
+         * node data
+         */
+        Object data;
+
+        /**
+         * child nodes
+         */
+<span class="nc" id="L194">        final List&lt;Node&gt; children = new ArrayList&lt;Node&gt;();</span>
+
+        /**
+         * begin timestamp
+         */
+        private long beginTimestamp;
+
+        /**
+         * end timestamp
+         */
+        private long endTimestamp;
+
+        /**
+         * construct root node
+         */
+<span class="nc" id="L209">        private Node(Object data) {</span>
+<span class="nc" id="L210">            this.parent = null;</span>
+<span class="nc" id="L211">            this.data = data;</span>
+<span class="nc" id="L212">        }</span>
+
+        /**
+         * construct a regular node
+         *
+         * @param parent parent node
+         * @param data   node data
+         */
+<span class="nc" id="L220">        private Node(Node parent, Object data) {</span>
+<span class="nc" id="L221">            this.parent = parent;</span>
+<span class="nc" id="L222">            this.data = data;</span>
+<span class="nc" id="L223">            parent.children.add(this);</span>
+<span class="nc" id="L224">        }</span>
+
+        /**
+         * is the current node the root node
+         *
+         * @return true / false
+         */
+        boolean isRoot() {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            return null == parent;</span>
+        }
+
+        /**
+         * if the current node the leaf node
+         *
+         * @return true / false
+         */
+        boolean isLeaf() {
+<span class="nc" id="L241">            return children.isEmpty();</span>
+        }
+
+        Node markBegin() {
+<span class="nc" id="L245">            beginTimestamp = currentTimeMillis();</span>
+<span class="nc" id="L246">            return this;</span>
+        }
+
+        Node markEnd() {
+<span class="nc" id="L250">            endTimestamp = currentTimeMillis();</span>
+<span class="nc" id="L251">            return this;</span>
+        }
+
+    }
+
+
+    /**
+     * callback interface for recursive visit
+     */
+    private interface Callback {
+
+        void callback(int deep, boolean isLast, String prefix, Node node);
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport</a> &gt; <span class="el_source">AbstractServer.java</span></div><h1>AbstractServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.store.DataStore;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Server;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+
+/**
+ * AbstractServer
+ */
+public abstract class AbstractServer extends AbstractEndpoint implements Server {
+
+    protected static final String SERVER_THREAD_POOL_NAME = &quot;DubboServerHandler&quot;;
+<span class="nc" id="L43">    private static final Logger logger = LoggerFactory.getLogger(AbstractServer.class);</span>
+    ExecutorService executor;
+    private InetSocketAddress localAddress;
+    private InetSocketAddress bindAddress;
+    private int accepts;
+    private int idleTimeout;
+
+    public AbstractServer(URL url, ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L51">        super(url, handler);</span>
+<span class="nc" id="L52">        localAddress = getUrl().toInetSocketAddress();</span>
+
+<span class="nc" id="L54">        String bindIp = getUrl().getParameter(Constants.BIND_IP_KEY, getUrl().getHost());</span>
+<span class="nc" id="L55">        int bindPort = getUrl().getParameter(Constants.BIND_PORT_KEY, getUrl().getPort());</span>
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        if (url.getParameter(Constants.ANYHOST_KEY, false) || NetUtils.isInvalidLocalHost(bindIp)) {</span>
+<span class="nc" id="L57">            bindIp = Constants.ANYHOST_VALUE;</span>
+        }
+<span class="nc" id="L59">        bindAddress = new InetSocketAddress(bindIp, bindPort);</span>
+<span class="nc" id="L60">        this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);</span>
+<span class="nc" id="L61">        this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);</span>
+        try {
+<span class="nc" id="L63">            doOpen();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L65">                logger.info(&quot;Start &quot; + getClass().getSimpleName() + &quot; bind &quot; + getBindAddress() + &quot;, export &quot; + getLocalAddress());</span>
+            }
+<span class="nc" id="L67">        } catch (Throwable t) {</span>
+<span class="nc" id="L68">            throw new RemotingException(url.toInetSocketAddress(), null, &quot;Failed to bind &quot; + getClass().getSimpleName()</span>
+<span class="nc" id="L69">                    + &quot; on &quot; + getLocalAddress() + &quot;, cause: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L70">        }</span>
+        //fixme replace this with better method
+<span class="nc" id="L72">        DataStore dataStore = ExtensionLoader.getExtensionLoader(DataStore.class).getDefaultExtension();</span>
+<span class="nc" id="L73">        executor = (ExecutorService) dataStore.get(Constants.EXECUTOR_SERVICE_COMPONENT_KEY, Integer.toString(url.getPort()));</span>
+<span class="nc" id="L74">    }</span>
+
+    protected abstract void doOpen() throws Throwable;
+
+    protected abstract void doClose() throws Throwable;
+
+    @Override
+    public void reset(URL url) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L83">            return;</span>
+        }
+        try {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (url.hasParameter(Constants.ACCEPTS_KEY)) {</span>
+<span class="nc" id="L87">                int a = url.getParameter(Constants.ACCEPTS_KEY, 0);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                if (a &gt; 0) {</span>
+<span class="nc" id="L89">                    this.accepts = a;</span>
+                }
+            }
+<span class="nc" id="L92">        } catch (Throwable t) {</span>
+<span class="nc" id="L93">            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L94">        }</span>
+        try {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (url.hasParameter(Constants.IDLE_TIMEOUT_KEY)) {</span>
+<span class="nc" id="L97">                int t = url.getParameter(Constants.IDLE_TIMEOUT_KEY, 0);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (t &gt; 0) {</span>
+<span class="nc" id="L99">                    this.idleTimeout = t;</span>
+                }
+            }
+<span class="nc" id="L102">        } catch (Throwable t) {</span>
+<span class="nc" id="L103">            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L104">        }</span>
+        try {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">            if (url.hasParameter(Constants.THREADS_KEY)</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    &amp;&amp; executor instanceof ThreadPoolExecutor &amp;&amp; !executor.isShutdown()) {</span>
+<span class="nc" id="L108">                ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;</span>
+<span class="nc" id="L109">                int threads = url.getParameter(Constants.THREADS_KEY, 0);</span>
+<span class="nc" id="L110">                int max = threadPoolExecutor.getMaximumPoolSize();</span>
+<span class="nc" id="L111">                int core = threadPoolExecutor.getCorePoolSize();</span>
+<span class="nc bnc" id="L112" title="All 6 branches missed.">                if (threads &gt; 0 &amp;&amp; (threads != max || threads != core)) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    if (threads &lt; core) {</span>
+<span class="nc" id="L114">                        threadPoolExecutor.setCorePoolSize(threads);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                        if (core == max) {</span>
+<span class="nc" id="L116">                            threadPoolExecutor.setMaximumPoolSize(threads);</span>
+                        }
+                    } else {
+<span class="nc" id="L119">                        threadPoolExecutor.setMaximumPoolSize(threads);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                        if (core == max) {</span>
+<span class="nc" id="L121">                            threadPoolExecutor.setCorePoolSize(threads);</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L126">        } catch (Throwable t) {</span>
+<span class="nc" id="L127">            logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L128">        }</span>
+<span class="nc" id="L129">        super.setUrl(getUrl().addParameters(url.getParameters()));</span>
+<span class="nc" id="L130">    }</span>
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L134">        Collection&lt;Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        for (Channel channel : channels) {</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (channel.isConnected()) {</span>
+<span class="nc" id="L137">                channel.send(message, sent);</span>
+            }
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L145">            logger.info(&quot;Close &quot; + getClass().getSimpleName() + &quot; bind &quot; + getBindAddress() + &quot;, export &quot; + getLocalAddress());</span>
+        }
+<span class="nc" id="L147">        ExecutorUtil.shutdownNow(executor, 100);</span>
+        try {
+<span class="nc" id="L149">            super.close();</span>
+<span class="nc" id="L150">        } catch (Throwable e) {</span>
+<span class="nc" id="L151">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L152">        }</span>
+        try {
+<span class="nc" id="L154">            doClose();</span>
+<span class="nc" id="L155">        } catch (Throwable e) {</span>
+<span class="nc" id="L156">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L157">        }</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    public void close(int timeout) {
+<span class="nc" id="L162">        ExecutorUtil.gracefulShutdown(executor, timeout);</span>
+<span class="nc" id="L163">        close();</span>
+<span class="nc" id="L164">    }</span>
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L168">        return localAddress;</span>
+    }
+
+    public InetSocketAddress getBindAddress() {
+<span class="nc" id="L172">        return bindAddress;</span>
+    }
+
+    public int getAccepts() {
+<span class="nc" id="L176">        return accepts;</span>
+    }
+
+    public int getIdleTimeout() {
+<span class="nc" id="L180">        return idleTimeout;</span>
+    }
+
+    @Override
+    public void connected(Channel ch) throws RemotingException {
+        // If the server has entered the shutdown process, reject any new connection
+<span class="nc bnc" id="L186" title="All 4 branches missed.">        if (this.isClosing() || this.isClosed()) {</span>
+<span class="nc" id="L187">            logger.warn(&quot;Close new channel &quot; + ch + &quot;, cause: server is closing or has been closed. For example, receive a new connect request while in shutdown process.&quot;);</span>
+<span class="nc" id="L188">            ch.close();</span>
+<span class="nc" id="L189">            return;</span>
+        }
+
+<span class="nc" id="L192">        Collection&lt;Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        if (accepts &gt; 0 &amp;&amp; channels.size() &gt; accepts) {</span>
+<span class="nc" id="L194">            logger.error(&quot;Close channel &quot; + ch + &quot;, cause: The server &quot; + ch.getLocalAddress() + &quot; connections greater than max config &quot; + accepts);</span>
+<span class="nc" id="L195">            ch.close();</span>
+<span class="nc" id="L196">            return;</span>
+        }
+<span class="nc" id="L198">        super.connected(ch);</span>
+<span class="nc" id="L199">    }</span>
+
+    @Override
+    public void disconnected(Channel ch) throws RemotingException {
+<span class="nc" id="L203">        Collection&lt;Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (channels.isEmpty()) {</span>
+<span class="nc" id="L205">            logger.warn(&quot;All clients has disconnected from &quot; + ch.getLocalAddress() + &quot;. You can graceful shutdown now.&quot;);</span>
+        }
+<span class="nc" id="L207">        super.disconnected(ch);</span>
+<span class="nc" id="L208">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

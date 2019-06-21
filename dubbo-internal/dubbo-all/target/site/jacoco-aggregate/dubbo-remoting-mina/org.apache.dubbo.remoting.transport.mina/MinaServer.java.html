@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MinaServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-mina</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.mina</a> &gt; <span class="el_source">MinaServer.java</span></div><h1>MinaServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.mina;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractServer;
+import org.apache.dubbo.remoting.transport.dispatcher.ChannelHandlers;
+
+import org.apache.mina.common.IoSession;
+import org.apache.mina.common.ThreadModel;
+import org.apache.mina.filter.codec.ProtocolCodecFilter;
+import org.apache.mina.transport.socket.nio.SocketAcceptor;
+import org.apache.mina.transport.socket.nio.SocketAcceptorConfig;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.Executors;
+
+/**
+ * MinaServer
+ */
+public class MinaServer extends AbstractServer {
+
+<span class="nc" id="L48">    private static final Logger logger = LoggerFactory.getLogger(MinaServer.class);</span>
+
+    private SocketAcceptor acceptor;
+
+    public MinaServer(URL url, ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L53">        super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    protected void doOpen() throws Throwable {
+        // set thread pool.
+<span class="nc" id="L59">        acceptor = new SocketAcceptor(getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS),</span>
+<span class="nc" id="L60">                Executors.newCachedThreadPool(new NamedThreadFactory(&quot;MinaServerWorker&quot;,</span>
+                        true)));
+        // config
+<span class="nc" id="L63">        SocketAcceptorConfig cfg = acceptor.getDefaultConfig();</span>
+<span class="nc" id="L64">        cfg.setThreadModel(ThreadModel.MANUAL);</span>
+        // set codec.
+<span class="nc" id="L66">        acceptor.getFilterChain().addLast(&quot;codec&quot;, new ProtocolCodecFilter(new MinaCodecAdapter(getCodec(), getUrl(), this)));</span>
+
+<span class="nc" id="L68">        acceptor.bind(getBindAddress(), new MinaHandler(getUrl(), this));</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    protected void doClose() throws Throwable {
+        try {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (acceptor != null) {</span>
+<span class="nc" id="L75">                acceptor.unbind(getBindAddress());</span>
+            }
+<span class="nc" id="L77">        } catch (Throwable e) {</span>
+<span class="nc" id="L78">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L79">        }</span>
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public Collection&lt;Channel&gt; getChannels() {
+<span class="nc" id="L84">        Set&lt;IoSession&gt; sessions = acceptor.getManagedSessions(getBindAddress());</span>
+<span class="nc" id="L85">        Collection&lt;Channel&gt; channels = new HashSet&lt;Channel&gt;();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (IoSession session : sessions) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (session.isConnected()) {</span>
+<span class="nc" id="L88">                channels.add(MinaChannel.getOrAddChannel(session, getUrl(), this));</span>
+            }
+<span class="nc" id="L90">        }</span>
+<span class="nc" id="L91">        return channels;</span>
+    }
+
+    @Override
+    public Channel getChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L96">        Set&lt;IoSession&gt; sessions = acceptor.getManagedSessions(getBindAddress());</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (IoSession session : sessions) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (session.getRemoteAddress().equals(remoteAddress)) {</span>
+<span class="nc" id="L99">                return MinaChannel.getOrAddChannel(session, getUrl(), this);</span>
+            }
+<span class="nc" id="L101">        }</span>
+<span class="nc" id="L102">        return null;</span>
+    }
+
+    @Override
+    public boolean isBound() {
+<span class="nc" id="L107">        return acceptor.isManaged(getBindAddress());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExceptionFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.filter</a> &gt; <span class="el_source">ExceptionFilter.java</span></div><h1>ExceptionFilter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.filter;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ReflectUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Filter;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Result;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.service.GenericService;
+
+import java.lang.reflect.Method;
+
+
+/**
+ * ExceptionInvokerFilter
+ * &lt;p&gt;
+ * Functions:
+ * &lt;ol&gt;
+ * &lt;li&gt;unexpected exception will be logged in ERROR level on provider side. Unexpected exception are unchecked
+ * exception not declared on the interface&lt;/li&gt;
+ * &lt;li&gt;Wrap the exception not introduced in API package into RuntimeException. Framework will serialize the outer exception but stringnize its cause in order to avoid of possible serialization problem on client side&lt;/li&gt;
+ * &lt;/ol&gt;
+ */
+@Activate(group = Constants.PROVIDER)
+public class ExceptionFilter implements Filter {
+
+    private final Logger logger;
+
+    public ExceptionFilter() {
+<span class="nc" id="L53">        this(LoggerFactory.getLogger(ExceptionFilter.class));</span>
+<span class="nc" id="L54">    }</span>
+
+<span class="nc" id="L56">    public ExceptionFilter(Logger logger) {</span>
+<span class="nc" id="L57">        this.logger = logger;</span>
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public Result invoke(Invoker&lt;?&gt; invoker, Invocation invocation) throws RpcException {
+        try {
+<span class="nc" id="L63">            return invoker.invoke(invocation);</span>
+<span class="nc" id="L64">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L65">            logger.error(&quot;Got unchecked and undeclared exception which called by &quot; + RpcContext.getContext().getRemoteHost()</span>
+<span class="nc" id="L66">                    + &quot;. service: &quot; + invoker.getInterface().getName() + &quot;, method: &quot; + invocation.getMethodName()</span>
+<span class="nc" id="L67">                    + &quot;, exception: &quot; + e.getClass().getName() + &quot;: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L68">            throw e;</span>
+        }
+    }
+
+    @Override
+    public Result onResponse(Result result, Invoker&lt;?&gt; invoker, Invocation invocation) {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (result.hasException() &amp;&amp; GenericService.class != invoker.getInterface()) {</span>
+            try {
+<span class="nc" id="L76">                Throwable exception = result.getException();</span>
+
+                // directly throw if it's checked exception
+<span class="nc bnc" id="L79" title="All 4 branches missed.">                if (!(exception instanceof RuntimeException) &amp;&amp; (exception instanceof Exception)) {</span>
+<span class="nc" id="L80">                    return result;</span>
+                }
+                // directly throw if the exception appears in the signature
+                try {
+<span class="nc" id="L84">                    Method method = invoker.getInterface().getMethod(invocation.getMethodName(), invocation.getParameterTypes());</span>
+<span class="nc" id="L85">                    Class&lt;?&gt;[] exceptionClassses = method.getExceptionTypes();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                    for (Class&lt;?&gt; exceptionClass : exceptionClassses) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                        if (exception.getClass().equals(exceptionClass)) {</span>
+<span class="nc" id="L88">                            return result;</span>
+                        }
+                    }
+<span class="nc" id="L91">                } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L92">                    return result;</span>
+<span class="nc" id="L93">                }</span>
+
+                // for the exception not found in method's signature, print ERROR message in server's log.
+<span class="nc" id="L96">                logger.error(&quot;Got unchecked and undeclared exception which called by &quot; + RpcContext.getContext().getRemoteHost()</span>
+<span class="nc" id="L97">                        + &quot;. service: &quot; + invoker.getInterface().getName() + &quot;, method: &quot; + invocation.getMethodName()</span>
+<span class="nc" id="L98">                        + &quot;, exception: &quot; + exception.getClass().getName() + &quot;: &quot; + exception.getMessage(), exception);</span>
+
+                // directly throw if exception class and interface class are in the same jar file.
+<span class="nc" id="L101">                String serviceFile = ReflectUtils.getCodeBase(invoker.getInterface());</span>
+<span class="nc" id="L102">                String exceptionFile = ReflectUtils.getCodeBase(exception.getClass());</span>
+<span class="nc bnc" id="L103" title="All 6 branches missed.">                if (serviceFile == null || exceptionFile == null || serviceFile.equals(exceptionFile)) {</span>
+<span class="nc" id="L104">                    return result;</span>
+                }
+                // directly throw if it's JDK exception
+<span class="nc" id="L107">                String className = exception.getClass().getName();</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">                if (className.startsWith(&quot;java.&quot;) || className.startsWith(&quot;javax.&quot;)) {</span>
+<span class="nc" id="L109">                    return result;</span>
+                }
+                // directly throw if it's dubbo exception
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (exception instanceof RpcException) {</span>
+<span class="nc" id="L113">                    return result;</span>
+                }
+
+                // otherwise, wrap with RuntimeException and throw back to the client
+<span class="nc" id="L117">                return new RpcResult(new RuntimeException(StringUtils.toString(exception)));</span>
+<span class="nc" id="L118">            } catch (Throwable e) {</span>
+<span class="nc" id="L119">                logger.warn(&quot;Fail to ExceptionFilter when called by &quot; + RpcContext.getContext().getRemoteHost()</span>
+<span class="nc" id="L120">                        + &quot;. service: &quot; + invoker.getInterface().getName() + &quot;, method: &quot; + invocation.getMethodName()</span>
+<span class="nc" id="L121">                        + &quot;, exception: &quot; + e.getClass().getName() + &quot;: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L122">                return result;</span>
+            }
+        }
+<span class="nc" id="L125">        return result;</span>
+    }
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Main.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-container-logback</a> &gt; <a href="../index.html" class="el_bundle">dubbo-container-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.container</a> &gt; <span class="el_source">Main.java</span></div><h1>Main.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.container;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.common.utils.ConfigUtils;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Main. (API, Static, ThreadSafe)
+ *
+ * This class is entry point loading containers.
+ */
+<span class="nc" id="L39">public class Main {</span>
+
+    public static final String CONTAINER_KEY = &quot;dubbo.container&quot;;
+
+    public static final String SHUTDOWN_HOOK_KEY = &quot;dubbo.shutdown.hook&quot;;
+
+<span class="nc" id="L45">    private static final Logger logger = LoggerFactory.getLogger(Main.class);</span>
+
+<span class="nc" id="L47">    private static final ExtensionLoader&lt;Container&gt; loader = ExtensionLoader.getExtensionLoader(Container.class);</span>
+
+<span class="nc" id="L49">    private static final ReentrantLock LOCK = new ReentrantLock();</span>
+
+<span class="nc" id="L51">    private static final Condition STOP = LOCK.newCondition();</span>
+
+    public static void main(String[] args) {
+        try {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (ArrayUtils.isEmpty(args)) {</span>
+<span class="nc" id="L56">                String config = ConfigUtils.getProperty(CONTAINER_KEY, loader.getDefaultExtensionName());</span>
+<span class="nc" id="L57">                args = Constants.COMMA_SPLIT_PATTERN.split(config);</span>
+            }
+
+<span class="nc" id="L60">            final List&lt;Container&gt; containers = new ArrayList&lt;Container&gt;();</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc" id="L62">                containers.add(loader.getExtension(args[i]));</span>
+            }
+<span class="nc" id="L64">            logger.info(&quot;Use container type(&quot; + Arrays.toString(args) + &quot;) to run dubbo serivce.&quot;);</span>
+
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (&quot;true&quot;.equals(System.getProperty(SHUTDOWN_HOOK_KEY))) {</span>
+<span class="nc" id="L67">                Runtime.getRuntime().addShutdownHook(new Thread(&quot;dubbo-container-shutdown-hook&quot;) {</span>
+                    @Override
+                    public void run() {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                        for (Container container : containers) {</span>
+                            try {
+<span class="nc" id="L72">                                container.stop();</span>
+<span class="nc" id="L73">                                logger.info(&quot;Dubbo &quot; + container.getClass().getSimpleName() + &quot; stopped!&quot;);</span>
+<span class="nc" id="L74">                            } catch (Throwable t) {</span>
+<span class="nc" id="L75">                                logger.error(t.getMessage(), t);</span>
+<span class="nc" id="L76">                            }</span>
+                            try {
+<span class="nc" id="L78">                                LOCK.lock();</span>
+<span class="nc" id="L79">                                STOP.signal();</span>
+                            } finally {
+<span class="nc" id="L81">                                LOCK.unlock();</span>
+                            }
+<span class="nc" id="L83">                        }</span>
+<span class="nc" id="L84">                    }</span>
+                });
+            }
+
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            for (Container container : containers) {</span>
+<span class="nc" id="L89">                container.start();</span>
+<span class="nc" id="L90">                logger.info(&quot;Dubbo &quot; + container.getClass().getSimpleName() + &quot; started!&quot;);</span>
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">            System.out.println(new SimpleDateFormat(&quot;[yyyy-MM-dd HH:mm:ss]&quot;).format(new Date()) + &quot; Dubbo service server started!&quot;);</span>
+<span class="nc" id="L93">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L94">            logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L95">            System.exit(1);</span>
+<span class="nc" id="L96">        }</span>
+        try {
+<span class="nc" id="L98">            LOCK.lock();</span>
+<span class="nc" id="L99">            STOP.await();</span>
+<span class="nc" id="L100">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L101">            logger.warn(&quot;Dubbo service server stopped, interrupted by other thread!&quot;, e);</span>
+        } finally {
+<span class="nc" id="L103">            LOCK.unlock();</span>
+        }
+<span class="nc" id="L105">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

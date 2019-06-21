@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MethodBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">MethodBuilder.java</span></div><h1>MethodBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import org.apache.dubbo.config.ArgumentConfig;
+import org.apache.dubbo.config.MethodConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * This is a builder for build {@link MethodConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L30">public class MethodBuilder extends AbstractMethodBuilder&lt;MethodConfig, MethodBuilder&gt; {</span>
+    /**
+     * The method name
+     */
+    private String name;
+
+    /**
+     * Stat
+     */
+    private Integer stat;
+
+    /**
+     * Whether to retry
+     */
+    private Boolean retry;
+
+    /**
+     * If it's reliable
+     */
+    private Boolean reliable;
+
+    /**
+     * Thread limits for method invocations
+     */
+    private Integer executes;
+
+    /**
+     * If it's deprecated
+     */
+    private Boolean deprecated;
+
+    /**
+     * Whether to enable sticky
+     */
+    private Boolean sticky;
+
+    /**
+     * Whether need to return
+     */
+    private Boolean isReturn;
+
+    /**
+     * Callback instance when async-call is invoked
+     */
+    private Object oninvoke;
+
+    /**
+     * Callback method when async-call is invoked
+     */
+    private String oninvokeMethod;
+
+    /**
+     * Callback instance when async-call is returned
+     */
+    private Object onreturn;
+
+    /**
+     * Callback method when async-call is returned
+     */
+    private String onreturnMethod;
+
+    /**
+     * Callback instance when async-call has exception thrown
+     */
+    private Object onthrow;
+
+    /**
+     * Callback method when async-call has exception thrown
+     */
+    private String onthrowMethod;
+
+    /**
+     * The method arguments
+     */
+    private List&lt;ArgumentConfig&gt; arguments;
+
+    /**
+     * These properties come from MethodConfig's parent Config module, they will neither be collected directly from xml or API nor be delivered to url
+     */
+    private String service;
+    private String serviceId;
+
+    public MethodBuilder name(String name) {
+<span class="nc" id="L113">        this.name = name;</span>
+<span class="nc" id="L114">        return getThis();</span>
+    }
+
+    public MethodBuilder stat(Integer stat) {
+<span class="nc" id="L118">        this.stat = stat;</span>
+<span class="nc" id="L119">        return getThis();</span>
+    }
+
+    public MethodBuilder retry(Boolean retry) {
+<span class="nc" id="L123">        this.retry = retry;</span>
+<span class="nc" id="L124">        return getThis();</span>
+    }
+
+    public MethodBuilder reliable(Boolean reliable) {
+<span class="nc" id="L128">        this.reliable = reliable;</span>
+<span class="nc" id="L129">        return getThis();</span>
+    }
+
+    public MethodBuilder executes(Integer executes) {
+<span class="nc" id="L133">        this.executes = executes;</span>
+<span class="nc" id="L134">        return getThis();</span>
+    }
+
+    public MethodBuilder deprecated(Boolean deprecated) {
+<span class="nc" id="L138">        this.deprecated = deprecated;</span>
+<span class="nc" id="L139">        return getThis();</span>
+    }
+
+    public MethodBuilder sticky(Boolean sticky) {
+<span class="nc" id="L143">        this.sticky = sticky;</span>
+<span class="nc" id="L144">        return getThis();</span>
+    }
+
+    public MethodBuilder isReturn(Boolean isReturn) {
+<span class="nc" id="L148">        this.isReturn = isReturn;</span>
+<span class="nc" id="L149">        return getThis();</span>
+    }
+
+    public MethodBuilder oninvoke(Object oninvoke) {
+<span class="nc" id="L153">        this.oninvoke = oninvoke;</span>
+<span class="nc" id="L154">        return getThis();</span>
+    }
+
+    public MethodBuilder oninvokeMethod(String oninvokeMethod) {
+<span class="nc" id="L158">        this.oninvokeMethod = oninvokeMethod;</span>
+<span class="nc" id="L159">        return getThis();</span>
+    }
+
+    public MethodBuilder onreturn(Object onreturn) {
+<span class="nc" id="L163">        this.onreturn = onreturn;</span>
+<span class="nc" id="L164">        return getThis();</span>
+    }
+
+    public MethodBuilder onreturnMethod(String onreturnMethod) {
+<span class="nc" id="L168">        this.onreturnMethod = onreturnMethod;</span>
+<span class="nc" id="L169">        return getThis();</span>
+    }
+
+    public MethodBuilder onthrow(Object onthrow) {
+<span class="nc" id="L173">        this.onthrow = onthrow;</span>
+<span class="nc" id="L174">        return getThis();</span>
+    }
+
+    public MethodBuilder onthrowMethod(String onthrowMethod) {
+<span class="nc" id="L178">        this.onthrowMethod = onthrowMethod;</span>
+<span class="nc" id="L179">        return getThis();</span>
+    }
+
+    public MethodBuilder addArguments(List&lt;? extends ArgumentConfig&gt; arguments) {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (this.arguments == null) {</span>
+<span class="nc" id="L184">            this.arguments = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L186">        this.arguments.addAll(arguments);</span>
+<span class="nc" id="L187">        return getThis();</span>
+    }
+
+    public MethodBuilder addArgument(ArgumentConfig argument) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (this.arguments == null) {</span>
+<span class="nc" id="L192">            this.arguments = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L194">        this.arguments.add(argument);</span>
+<span class="nc" id="L195">        return getThis();</span>
+    }
+
+    public MethodBuilder service(String service) {
+<span class="nc" id="L199">        this.service = service;</span>
+<span class="nc" id="L200">        return getThis();</span>
+    }
+
+    public MethodBuilder serviceId(String serviceId) {
+<span class="nc" id="L204">        this.serviceId = serviceId;</span>
+<span class="nc" id="L205">        return getThis();</span>
+    }
+
+    public MethodConfig build() {
+<span class="nc" id="L209">        MethodConfig methodConfig = new MethodConfig();</span>
+<span class="nc" id="L210">        super.build(methodConfig);</span>
+
+<span class="nc" id="L212">        methodConfig.setArguments(arguments);</span>
+<span class="nc" id="L213">        methodConfig.setDeprecated(deprecated);</span>
+<span class="nc" id="L214">        methodConfig.setExecutes(executes);</span>
+<span class="nc" id="L215">        methodConfig.setName(name);</span>
+<span class="nc" id="L216">        methodConfig.setOninvoke(oninvoke);</span>
+<span class="nc" id="L217">        methodConfig.setOninvokeMethod(oninvokeMethod);</span>
+<span class="nc" id="L218">        methodConfig.setOnreturn(onreturn);</span>
+<span class="nc" id="L219">        methodConfig.setOnreturnMethod(onreturnMethod);</span>
+<span class="nc" id="L220">        methodConfig.setOnthrow(onthrow);</span>
+<span class="nc" id="L221">        methodConfig.setOnthrowMethod(onthrowMethod);</span>
+<span class="nc" id="L222">        methodConfig.setReturn(isReturn);</span>
+<span class="nc" id="L223">        methodConfig.setService(service);</span>
+<span class="nc" id="L224">        methodConfig.setServiceId(serviceId);</span>
+<span class="nc" id="L225">        methodConfig.setSticky(sticky);</span>
+<span class="nc" id="L226">        methodConfig.setReliable(reliable);</span>
+<span class="nc" id="L227">        methodConfig.setStat(stat);</span>
+<span class="nc" id="L228">        methodConfig.setRetry(retry);</span>
+
+<span class="nc" id="L230">        return methodConfig;</span>
+    }
+
+    @Override
+    protected MethodBuilder getThis() {
+<span class="nc" id="L235">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

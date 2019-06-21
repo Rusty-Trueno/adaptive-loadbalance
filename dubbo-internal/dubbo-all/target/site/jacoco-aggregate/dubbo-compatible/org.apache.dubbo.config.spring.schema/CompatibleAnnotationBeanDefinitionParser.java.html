@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CompatibleAnnotationBeanDefinitionParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-compatible</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.schema</a> &gt; <span class="el_source">CompatibleAnnotationBeanDefinitionParser.java</span></div><h1>CompatibleAnnotationBeanDefinitionParser.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.schema;
+
+import org.apache.dubbo.config.spring.beans.factory.annotation.CompatibleReferenceAnnotationBeanPostProcessor;
+import org.apache.dubbo.config.spring.beans.factory.annotation.CompatibleServiceAnnotationBeanPostProcessor;
+import org.apache.dubbo.config.spring.util.BeanRegistrar;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.xml.AbstractSingleBeanDefinitionParser;
+import org.springframework.beans.factory.xml.BeanDefinitionParser;
+import org.springframework.beans.factory.xml.ParserContext;
+import org.w3c.dom.Element;
+
+import static org.springframework.util.StringUtils.commaDelimitedListToStringArray;
+import static org.springframework.util.StringUtils.trimArrayElements;
+
+/**
+ * {@link BeanDefinitionParser}
+ *
+ * @see CompatibleServiceAnnotationBeanPostProcessor
+ * @see CompatibleReferenceAnnotationBeanPostProcessor
+ * @since 2.5.9 deprecated since 2.7.0
+ */
+@Deprecated
+<span class="nc" id="L42">public class CompatibleAnnotationBeanDefinitionParser extends AbstractSingleBeanDefinitionParser {</span>
+
+    /**
+     * parse
+     * &lt;prev&gt;
+     * &amp;lt;dubbo:annotation package=&quot;&quot; /&amp;gt;
+     * &lt;/prev&gt;
+     *
+     * @param element
+     * @param parserContext
+     * @param builder
+     */
+    @Override
+    protected void doParse(Element element, ParserContext parserContext, BeanDefinitionBuilder builder) {
+
+<span class="nc" id="L57">        String packageToScan = element.getAttribute(&quot;package&quot;);</span>
+
+<span class="nc" id="L59">        String[] packagesToScan = trimArrayElements(commaDelimitedListToStringArray(packageToScan));</span>
+
+<span class="nc" id="L61">        builder.addConstructorArgValue(packagesToScan);</span>
+
+<span class="nc" id="L63">        builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);</span>
+
+        // Registers CompatibleReferenceAnnotationBeanPostProcessor
+<span class="nc" id="L66">        registerReferenceAnnotationBeanPostProcessor(parserContext.getRegistry());</span>
+
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    protected boolean shouldGenerateIdAsFallback() {
+<span class="nc" id="L72">        return true;</span>
+    }
+
+    /**
+     * Registers {@link CompatibleReferenceAnnotationBeanPostProcessor} into {@link BeanFactory}
+     *
+     * @param registry {@link BeanDefinitionRegistry}
+     */
+    private void registerReferenceAnnotationBeanPostProcessor(BeanDefinitionRegistry registry) {
+
+        // Register @Reference Annotation Bean Processor
+<span class="nc" id="L83">        BeanRegistrar.registerInfrastructureBean(registry,</span>
+                CompatibleReferenceAnnotationBeanPostProcessor.BEAN_NAME, CompatibleReferenceAnnotationBeanPostProcessor.class);
+
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    protected Class&lt;?&gt; getBeanClass(Element element) {
+<span class="nc" id="L90">        return CompatibleServiceAnnotationBeanPostProcessor.class;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

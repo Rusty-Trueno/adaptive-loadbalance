@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4</a> &gt; <span class="el_source">NettyServer.java</span></div><h1>NettyServer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ExecutorUtil;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.Server;
+import org.apache.dubbo.remoting.transport.AbstractServer;
+import org.apache.dubbo.remoting.transport.dispatcher.ChannelHandlers;
+
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.concurrent.DefaultThreadFactory;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
+/**
+ * NettyServer
+ */
+public class NettyServer extends AbstractServer implements Server {
+
+<span class="nc" id="L57">    private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);</span>
+
+    private Map&lt;String, Channel&gt; channels; // &lt;ip:port, channel&gt;
+
+    private ServerBootstrap bootstrap;
+
+    private io.netty.channel.Channel channel;
+
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+
+    public NettyServer(URL url, ChannelHandler handler) throws RemotingException {
+<span class="nc" id="L69">        super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));</span>
+<span class="nc" id="L70">    }</span>
+
+    @Override
+    protected void doOpen() throws Throwable {
+<span class="nc" id="L74">        bootstrap = new ServerBootstrap();</span>
+
+<span class="nc" id="L76">        bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory(&quot;NettyServerBoss&quot;, true));</span>
+<span class="nc" id="L77">        workerGroup = new NioEventLoopGroup(getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS),</span>
+                new DefaultThreadFactory(&quot;NettyServerWorker&quot;, true));
+
+<span class="nc" id="L80">        final NettyServerHandler nettyServerHandler = new NettyServerHandler(getUrl(), this);</span>
+<span class="nc" id="L81">        channels = nettyServerHandler.getChannels();</span>
+
+<span class="nc" id="L83">        bootstrap.group(bossGroup, workerGroup)</span>
+<span class="nc" id="L84">                .channel(NioServerSocketChannel.class)</span>
+<span class="nc" id="L85">                .childOption(ChannelOption.TCP_NODELAY, Boolean.TRUE)</span>
+<span class="nc" id="L86">                .childOption(ChannelOption.SO_REUSEADDR, Boolean.TRUE)</span>
+<span class="nc" id="L87">                .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)</span>
+<span class="nc" id="L88">                .childHandler(new ChannelInitializer&lt;NioSocketChannel&gt;() {</span>
+                    @Override
+                    protected void initChannel(NioSocketChannel ch) throws Exception {
+                        // FIXME: should we use getTimeout()?
+<span class="nc" id="L92">                        int idleTimeout = UrlUtils.getIdleTimeout(getUrl());</span>
+<span class="nc" id="L93">                        NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(), NettyServer.this);</span>
+<span class="nc" id="L94">                        ch.pipeline()//.addLast(&quot;logging&quot;,new LoggingHandler(LogLevel.INFO))//for debug</span>
+<span class="nc" id="L95">                                .addLast(&quot;decoder&quot;, adapter.getDecoder())</span>
+<span class="nc" id="L96">                                .addLast(&quot;encoder&quot;, adapter.getEncoder())</span>
+<span class="nc" id="L97">                                .addLast(&quot;server-idle-handler&quot;, new IdleStateHandler(0, 0, idleTimeout, MILLISECONDS))</span>
+<span class="nc" id="L98">                                .addLast(&quot;handler&quot;, nettyServerHandler);</span>
+<span class="nc" id="L99">                    }</span>
+                });
+        // bind
+<span class="nc" id="L102">        ChannelFuture channelFuture = bootstrap.bind(getBindAddress());</span>
+<span class="nc" id="L103">        channelFuture.syncUninterruptibly();</span>
+<span class="nc" id="L104">        channel = channelFuture.channel();</span>
+
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    protected void doClose() throws Throwable {
+        try {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (channel != null) {</span>
+                // unbind.
+<span class="nc" id="L113">                channel.close();</span>
+            }
+<span class="nc" id="L115">        } catch (Throwable e) {</span>
+<span class="nc" id="L116">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L117">        }</span>
+        try {
+<span class="nc" id="L119">            Collection&lt;org.apache.dubbo.remoting.Channel&gt; channels = getChannels();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">            if (channels != null &amp;&amp; channels.size() &gt; 0) {</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                for (org.apache.dubbo.remoting.Channel channel : channels) {</span>
+                    try {
+<span class="nc" id="L123">                        channel.close();</span>
+<span class="nc" id="L124">                    } catch (Throwable e) {</span>
+<span class="nc" id="L125">                        logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L126">                    }</span>
+<span class="nc" id="L127">                }</span>
+            }
+<span class="nc" id="L129">        } catch (Throwable e) {</span>
+<span class="nc" id="L130">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L131">        }</span>
+        try {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (bootstrap != null) {</span>
+<span class="nc" id="L134">                bossGroup.shutdownGracefully();</span>
+<span class="nc" id="L135">                workerGroup.shutdownGracefully();</span>
+            }
+<span class="nc" id="L137">        } catch (Throwable e) {</span>
+<span class="nc" id="L138">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L139">        }</span>
+        try {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (channels != null) {</span>
+<span class="nc" id="L142">                channels.clear();</span>
+            }
+<span class="nc" id="L144">        } catch (Throwable e) {</span>
+<span class="nc" id="L145">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L146">        }</span>
+<span class="nc" id="L147">    }</span>
+
+    @Override
+    public Collection&lt;Channel&gt; getChannels() {
+<span class="nc" id="L151">        Collection&lt;Channel&gt; chs = new HashSet&lt;Channel&gt;();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        for (Channel channel : this.channels.values()) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (channel.isConnected()) {</span>
+<span class="nc" id="L154">                chs.add(channel);</span>
+            } else {
+<span class="nc" id="L156">                channels.remove(NetUtils.toAddressString(channel.getRemoteAddress()));</span>
+            }
+<span class="nc" id="L158">        }</span>
+<span class="nc" id="L159">        return chs;</span>
+    }
+
+    @Override
+    public Channel getChannel(InetSocketAddress remoteAddress) {
+<span class="nc" id="L164">        return channels.get(NetUtils.toAddressString(remoteAddress));</span>
+    }
+
+    @Override
+    public boolean canHandleIdle() {
+<span class="nc" id="L169">        return true;</span>
+    }
+
+    @Override
+    public boolean isBound() {
+<span class="nc" id="L174">        return channel.isActive();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

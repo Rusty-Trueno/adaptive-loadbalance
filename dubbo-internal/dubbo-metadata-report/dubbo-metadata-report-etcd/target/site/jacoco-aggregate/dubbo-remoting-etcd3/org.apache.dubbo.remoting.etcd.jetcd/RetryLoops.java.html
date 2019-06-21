@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RetryLoops.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-etcd</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-etcd3</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.etcd.jetcd</a> &gt; <span class="el_source">RetryLoops.java</span></div><h1>RetryLoops.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.etcd.jetcd;
+
+import io.grpc.Status;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.etcd.RetryPolicy;
+import org.apache.dubbo.remoting.etcd.option.OptionUtil;
+
+import java.util.concurrent.Callable;
+
+<span class="nc" id="L44">public class RetryLoops {</span>
+
+<span class="nc" id="L46">    private final long startTimeMs = System.currentTimeMillis();</span>
+<span class="nc" id="L47">    private boolean isDone = false;</span>
+<span class="nc" id="L48">    private int retriedCount = 0;</span>
+<span class="nc" id="L49">    private Logger logger = LoggerFactory.getLogger(RetryLoops.class);</span>
+
+    public static &lt;R&gt; R invokeWithRetry(Callable&lt;R&gt; task, RetryPolicy retryPolicy) throws Exception {
+<span class="nc" id="L52">        R result = null;</span>
+<span class="nc" id="L53">        RetryLoops retryLoop = new RetryLoops();</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        while (retryLoop.shouldContinue()) {</span>
+            try {
+<span class="nc" id="L56">                result = task.call();</span>
+<span class="nc" id="L57">                retryLoop.complete();</span>
+<span class="nc" id="L58">            } catch (Exception e) {</span>
+<span class="nc" id="L59">                retryLoop.fireException(e, retryPolicy);</span>
+<span class="nc" id="L60">            }</span>
+        }
+<span class="nc" id="L62">        return result;</span>
+    }
+
+    public void fireException(Exception e, RetryPolicy retryPolicy) throws Exception {
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (e instanceof InterruptedException) {</span>
+<span class="nc" id="L68">            Thread.currentThread().interrupt();</span>
+        }
+
+<span class="nc" id="L71">        boolean rethrow = true;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (isRetryException(e)</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                &amp;&amp; retryPolicy.shouldRetry(retriedCount++, System.currentTimeMillis() - startTimeMs, true)) {</span>
+<span class="nc" id="L74">            rethrow = false;</span>
+        }
+
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (rethrow) {</span>
+<span class="nc" id="L78">            throw e;</span>
+        }
+<span class="nc" id="L80">    }</span>
+
+    private boolean isRetryException(Throwable e) {
+<span class="nc" id="L83">        Status status = Status.fromThrowable(e);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (OptionUtil.isRecoverable(status)) {</span>
+<span class="nc" id="L85">            return true;</span>
+        }
+
+<span class="nc" id="L88">        return false;</span>
+    }
+
+    public boolean shouldContinue() {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        return !isDone;</span>
+    }
+
+    public void complete() {
+<span class="nc" id="L96">        isDone = true;</span>
+<span class="nc" id="L97">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

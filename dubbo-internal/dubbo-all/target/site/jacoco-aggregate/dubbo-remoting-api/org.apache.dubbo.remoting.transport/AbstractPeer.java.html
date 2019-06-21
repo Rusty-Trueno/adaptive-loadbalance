@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractPeer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport</a> &gt; <span class="el_source">AbstractPeer.java</span></div><h1>AbstractPeer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Endpoint;
+import org.apache.dubbo.remoting.RemotingException;
+
+/**
+ * AbstractPeer
+ */
+public abstract class AbstractPeer implements Endpoint, ChannelHandler {
+
+    private final ChannelHandler handler;
+
+    private volatile URL url;
+
+    // closing closed means the process is being closed and close is finished
+    private volatile boolean closing;
+
+    private volatile boolean closed;
+
+<span class="nc" id="L40">    public AbstractPeer(URL url, ChannelHandler handler) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (handler == null) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;handler == null&quot;);</span>
+        }
+<span class="nc" id="L47">        this.url = url;</span>
+<span class="nc" id="L48">        this.handler = handler;</span>
+<span class="nc" id="L49">    }</span>
+
+    @Override
+    public void send(Object message) throws RemotingException {
+<span class="nc" id="L53">        send(message, url.getParameter(Constants.SENT_KEY, false));</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L58">        closed = true;</span>
+<span class="nc" id="L59">    }</span>
+
+    @Override
+    public void close(int timeout) {
+<span class="nc" id="L63">        close();</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    public void startClose() {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (isClosed()) {</span>
+<span class="nc" id="L69">            return;</span>
+        }
+<span class="nc" id="L71">        closing = true;</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public URL getUrl() {
+<span class="nc" id="L76">        return url;</span>
+    }
+
+    protected void setUrl(URL url) {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;url == null&quot;);</span>
+        }
+<span class="nc" id="L83">        this.url = url;</span>
+<span class="nc" id="L84">    }</span>
+
+    @Override
+    public ChannelHandler getChannelHandler() {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (handler instanceof ChannelHandlerDelegate) {</span>
+<span class="nc" id="L89">            return ((ChannelHandlerDelegate) handler).getHandler();</span>
+        } else {
+<span class="nc" id="L91">            return handler;</span>
+        }
+    }
+
+    /**
+     * @return ChannelHandler
+     */
+    @Deprecated
+    public ChannelHandler getHandler() {
+<span class="nc" id="L100">        return getDelegateHandler();</span>
+    }
+
+    /**
+     * Return the final handler (which may have been wrapped). This method should be distinguished with getChannelHandler() method
+     *
+     * @return ChannelHandler
+     */
+    public ChannelHandler getDelegateHandler() {
+<span class="nc" id="L109">        return handler;</span>
+    }
+
+    @Override
+    public boolean isClosed() {
+<span class="nc" id="L114">        return closed;</span>
+    }
+
+    public boolean isClosing() {
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        return closing &amp;&amp; !closed;</span>
+    }
+
+    @Override
+    public void connected(Channel ch) throws RemotingException {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L124">            return;</span>
+        }
+<span class="nc" id="L126">        handler.connected(ch);</span>
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public void disconnected(Channel ch) throws RemotingException {
+<span class="nc" id="L131">        handler.disconnected(ch);</span>
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    public void sent(Channel ch, Object msg) throws RemotingException {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L137">            return;</span>
+        }
+<span class="nc" id="L139">        handler.sent(ch, msg);</span>
+<span class="nc" id="L140">    }</span>
+
+    @Override
+    public void received(Channel ch, Object msg) throws RemotingException {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L145">            return;</span>
+        }
+<span class="nc" id="L147">        handler.received(ch, msg);</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public void caught(Channel ch, Throwable ex) throws RemotingException {
+<span class="nc" id="L152">        handler.caught(ch, ex);</span>
+<span class="nc" id="L153">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

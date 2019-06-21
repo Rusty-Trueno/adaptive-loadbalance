@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WrappedChannelHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.dispatcher</a> &gt; <span class="el_source">WrappedChannelHandler.java</span></div><h1>WrappedChannelHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.dispatcher;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.store.DataStore;
+import org.apache.dubbo.common.threadpool.ThreadPool;
+import org.apache.dubbo.common.utils.NamedThreadFactory;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.ChannelHandlerDelegate;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class WrappedChannelHandler implements ChannelHandlerDelegate {
+
+<span class="nc" id="L37">    protected static final Logger logger = LoggerFactory.getLogger(WrappedChannelHandler.class);</span>
+
+<span class="nc" id="L39">    protected static final ExecutorService SHARED_EXECUTOR = Executors.newCachedThreadPool(new NamedThreadFactory(&quot;DubboSharedHandler&quot;, true));</span>
+
+    protected final ExecutorService executor;
+
+    protected final ChannelHandler handler;
+
+    protected final URL url;
+
+<span class="nc" id="L47">    public WrappedChannelHandler(ChannelHandler handler, URL url) {</span>
+<span class="nc" id="L48">        this.handler = handler;</span>
+<span class="nc" id="L49">        this.url = url;</span>
+<span class="nc" id="L50">        executor = (ExecutorService) ExtensionLoader.getExtensionLoader(ThreadPool.class).getAdaptiveExtension().getExecutor(url);</span>
+
+<span class="nc" id="L52">        String componentKey = Constants.EXECUTOR_SERVICE_COMPONENT_KEY;</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (Constants.CONSUMER_SIDE.equalsIgnoreCase(url.getParameter(Constants.SIDE_KEY))) {</span>
+<span class="nc" id="L54">            componentKey = Constants.CONSUMER_SIDE;</span>
+        }
+<span class="nc" id="L56">        DataStore dataStore = ExtensionLoader.getExtensionLoader(DataStore.class).getDefaultExtension();</span>
+<span class="nc" id="L57">        dataStore.put(componentKey, Integer.toString(url.getPort()), executor);</span>
+<span class="nc" id="L58">    }</span>
+
+    public void close() {
+        try {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (executor != null) {</span>
+<span class="nc" id="L63">                executor.shutdown();</span>
+            }
+<span class="nc" id="L65">        } catch (Throwable t) {</span>
+<span class="nc" id="L66">            logger.warn(&quot;fail to destroy thread pool of server: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L67">        }</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public void connected(Channel channel) throws RemotingException {
+<span class="nc" id="L72">        handler.connected(channel);</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public void disconnected(Channel channel) throws RemotingException {
+<span class="nc" id="L77">        handler.disconnected(channel);</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void sent(Channel channel, Object message) throws RemotingException {
+<span class="nc" id="L82">        handler.sent(channel, message);</span>
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void received(Channel channel, Object message) throws RemotingException {
+<span class="nc" id="L87">        handler.received(channel, message);</span>
+<span class="nc" id="L88">    }</span>
+
+    @Override
+    public void caught(Channel channel, Throwable exception) throws RemotingException {
+<span class="nc" id="L92">        handler.caught(channel, exception);</span>
+<span class="nc" id="L93">    }</span>
+
+    public ExecutorService getExecutor() {
+<span class="nc" id="L96">        return executor;</span>
+    }
+
+    @Override
+    public ChannelHandler getHandler() {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (handler instanceof ChannelHandlerDelegate) {</span>
+<span class="nc" id="L102">            return ((ChannelHandlerDelegate) handler).getHandler();</span>
+        } else {
+<span class="nc" id="L104">            return handler;</span>
+        }
+    }
+
+    public URL getUrl() {
+<span class="nc" id="L109">        return url;</span>
+    }
+
+    public ExecutorService getExecutorService() {
+<span class="nc" id="L113">        ExecutorService cexecutor = executor;</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (cexecutor == null || cexecutor.isShutdown()) {</span>
+<span class="nc" id="L115">            cexecutor = SHARED_EXECUTOR;</span>
+        }
+<span class="nc" id="L117">        return cexecutor;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

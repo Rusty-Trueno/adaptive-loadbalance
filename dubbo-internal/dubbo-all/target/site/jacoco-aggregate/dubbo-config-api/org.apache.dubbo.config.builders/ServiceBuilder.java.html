@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.builders</a> &gt; <span class="el_source">ServiceBuilder.java</span></div><h1>ServiceBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.builders;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.dubbo.config.MethodConfig;
+import org.apache.dubbo.config.ProviderConfig;
+import org.apache.dubbo.config.ServiceConfig;
+
+/**
+ * This is a builder for build {@link ServiceConfig}.
+ *
+ * @since 2.7
+ */
+<span class="nc" id="L31">public class ServiceBuilder&lt;U&gt; extends AbstractServiceBuilder&lt;ServiceConfig, ServiceBuilder&lt;U&gt;&gt; {</span>
+    /**
+     * The interface name of the exported service
+     */
+    private String interfaceName;
+
+    /**
+     * The interface class of the exported service
+     */
+    private Class&lt;?&gt; interfaceClass;
+
+    /**
+     * The reference of the interface implementation
+     */
+    private U ref;
+
+    /**
+     * The service name
+     */
+    private String path;
+
+    /**
+     * The method configuration
+     */
+    private List&lt;MethodConfig&gt; methods;
+
+    /**
+     * The provider configuration
+     */
+    private ProviderConfig provider;
+
+    /**
+     * The providerIds
+     */
+    private String providerIds;
+    /**
+     * whether it is a GenericService
+     */
+    private String generic;
+
+    public ServiceBuilder&lt;U&gt; interfaceName(String interfaceName) {
+<span class="nc" id="L72">        this.interfaceName = interfaceName;</span>
+<span class="nc" id="L73">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; interfaceClass(Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L77">        this.interfaceClass = interfaceClass;</span>
+<span class="nc" id="L78">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; ref(U ref) {
+<span class="nc" id="L82">        this.ref = ref;</span>
+<span class="nc" id="L83">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; path(String path) {
+<span class="nc" id="L87">        this.path = path;</span>
+<span class="nc" id="L88">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; addMethod(MethodConfig method) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (this.methods == null) {</span>
+<span class="nc" id="L93">            this.methods = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L95">        this.methods.add(method);</span>
+<span class="nc" id="L96">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; addMethods(List&lt;? extends MethodConfig&gt; methods) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (this.methods == null) {</span>
+<span class="nc" id="L101">            this.methods = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L103">        this.methods.addAll(methods);</span>
+<span class="nc" id="L104">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; provider(ProviderConfig provider) {
+<span class="nc" id="L108">        this.provider = provider;</span>
+<span class="nc" id="L109">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; providerIds(String providerIds) {
+<span class="nc" id="L113">        this.providerIds = providerIds;</span>
+<span class="nc" id="L114">        return getThis();</span>
+    }
+
+    public ServiceBuilder&lt;U&gt; generic(String generic) {
+<span class="nc" id="L118">        this.generic = generic;</span>
+<span class="nc" id="L119">        return getThis();</span>
+    }
+
+    @Override
+    public ServiceBuilder&lt;U&gt; mock(String mock) {
+<span class="nc" id="L124">        throw new IllegalArgumentException(&quot;mock doesn't support on provider side&quot;);</span>
+    }
+
+    @Override
+    public ServiceBuilder&lt;U&gt; mock(Boolean mock) {
+<span class="nc" id="L129">        throw new IllegalArgumentException(&quot;mock doesn't support on provider side&quot;);</span>
+    }
+
+    public ServiceConfig&lt;U&gt; build() {
+<span class="nc" id="L133">        ServiceConfig&lt;U&gt; serviceConfig = new ServiceConfig&lt;&gt;();</span>
+<span class="nc" id="L134">        super.build(serviceConfig);</span>
+
+<span class="nc" id="L136">        serviceConfig.setInterface(interfaceName);</span>
+<span class="nc" id="L137">        serviceConfig.setInterface(interfaceClass);</span>
+<span class="nc" id="L138">        serviceConfig.setRef(ref);</span>
+<span class="nc" id="L139">        serviceConfig.setPath(path);</span>
+<span class="nc" id="L140">        serviceConfig.setMethods(methods);</span>
+<span class="nc" id="L141">        serviceConfig.setProvider(provider);</span>
+<span class="nc" id="L142">        serviceConfig.setProviderIds(providerIds);</span>
+<span class="nc" id="L143">        serviceConfig.setGeneric(generic);</span>
+
+<span class="nc" id="L145">        return serviceConfig;</span>
+    }
+
+    @Override
+    protected ServiceBuilder&lt;U&gt; getThis() {
+<span class="nc" id="L150">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

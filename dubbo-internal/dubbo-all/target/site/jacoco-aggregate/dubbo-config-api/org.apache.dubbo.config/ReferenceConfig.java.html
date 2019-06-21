@@ -1,0 +1,645 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">ReferenceConfig.java</span></div><h1>ReferenceConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.bytecode.Wrapper;
+import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.utils.ClassUtils;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConfigUtils;
+import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.annotation.Reference;
+import org.apache.dubbo.config.context.ConfigManager;
+import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.metadata.integration.MetadataReportService;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.Protocol;
+import org.apache.dubbo.rpc.ProxyFactory;
+import org.apache.dubbo.rpc.cluster.Cluster;
+import org.apache.dubbo.rpc.cluster.directory.StaticDirectory;
+import org.apache.dubbo.rpc.cluster.support.ClusterUtils;
+import org.apache.dubbo.rpc.cluster.support.RegistryAwareCluster;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+import org.apache.dubbo.rpc.model.ConsumerModel;
+import org.apache.dubbo.rpc.protocol.injvm.InjvmProtocol;
+import org.apache.dubbo.rpc.service.GenericService;
+import org.apache.dubbo.rpc.support.ProtocolUtils;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import static org.apache.dubbo.common.utils.NetUtils.isInvalidLocalHost;
+
+/**
+ * ReferenceConfig
+ *
+ * @export
+ */
+public class ReferenceConfig&lt;T&gt; extends AbstractReferenceConfig {
+
+    private static final long serialVersionUID = -5864351140409987595L;
+
+    /**
+     * The {@link Protocol} implementation with adaptive functionality,it will be different in different scenarios.
+     * A particular {@link Protocol} implementation is determined by the protocol attribute in the {@link URL}.
+     * For example:
+     *
+     * &lt;li&gt;when the url is registry://224.5.6.7:1234/org.apache.dubbo.registry.RegistryService?application=dubbo-sample,
+     * then the protocol is &lt;b&gt;RegistryProtocol&lt;/b&gt;&lt;/li&gt;
+     *
+     * &lt;li&gt;when the url is dubbo://224.5.6.7:1234/org.apache.dubbo.config.api.DemoService?application=dubbo-sample, then
+     * the protocol is &lt;b&gt;DubboProtocol&lt;/b&gt;&lt;/li&gt;
+     * &lt;p&gt;
+     * Actually，when the {@link ExtensionLoader} init the {@link Protocol} instants,it will automatically wraps two
+     * layers, and eventually will get a &lt;b&gt;ProtocolFilterWrapper&lt;/b&gt; or &lt;b&gt;ProtocolListenerWrapper&lt;/b&gt;
+     */
+<span class="nc" id="L83">    private static final Protocol REF_PROTOCOL = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();</span>
+
+    /**
+     * The {@link Cluster}'s implementation with adaptive functionality, and actually it will get a {@link Cluster}'s
+     * specific implementation who is wrapped with &lt;b&gt;MockClusterInvoker&lt;/b&gt;
+     */
+<span class="nc" id="L89">    private static final Cluster CLUSTER = ExtensionLoader.getExtensionLoader(Cluster.class).getAdaptiveExtension();</span>
+
+    /**
+     * A {@link ProxyFactory} implementation that will generate a reference service's proxy,the JavassistProxyFactory is
+     * its default implementation
+     */
+<span class="nc" id="L95">    private static final ProxyFactory PROXY_FACTORY = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();</span>
+
+    /**
+     * The url of the reference service
+     */
+<span class="nc" id="L100">    private final List&lt;URL&gt; urls = new ArrayList&lt;URL&gt;();</span>
+
+    /**
+     * The interface name of the reference service
+     */
+    private String interfaceName;
+
+    /**
+     * The interface class of the reference service
+     */
+    private Class&lt;?&gt; interfaceClass;
+
+    /**
+     * client type
+     */
+    private String client;
+
+    /**
+     * The url for peer-to-peer invocation
+     */
+    private String url;
+
+    /**
+     * The method configs
+     */
+    private List&lt;MethodConfig&gt; methods;
+
+    /**
+     * The consumer config (default)
+     */
+    private ConsumerConfig consumer;
+
+    /**
+     * Only the service provider of the specified protocol is invoked, and other protocols are ignored.
+     */
+    private String protocol;
+
+    /**
+     * The interface proxy reference
+     */
+    private transient volatile T ref;
+
+    /**
+     * The invoker of the reference service
+     */
+    private transient volatile Invoker&lt;?&gt; invoker;
+
+    /**
+     * The flag whether the ReferenceConfig has been initialized
+     */
+    private transient volatile boolean initialized;
+
+    /**
+     * whether this ReferenceConfig has been destroyed
+     */
+    private transient volatile boolean destroyed;
+
+<span class="nc" id="L157">    @SuppressWarnings(&quot;unused&quot;)</span>
+<span class="nc" id="L158">    private final Object finalizerGuardian = new Object() {</span>
+        @Override
+        protected void finalize() throws Throwable {
+<span class="nc" id="L161">            super.finalize();</span>
+
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (!ReferenceConfig.this.destroyed) {</span>
+<span class="nc" id="L164">                logger.warn(&quot;ReferenceConfig(&quot; + url + &quot;) is not DESTROYED when FINALIZE&quot;);</span>
+
+                /* don't destroy for now
+                try {
+                    ReferenceConfig.this.destroy();
+                } catch (Throwable t) {
+                        logger.warn(&quot;Unexpected err when destroy invoker of ReferenceConfig(&quot; + url + &quot;) in finalize method!&quot;, t);
+                }
+                */
+            }
+<span class="nc" id="L174">        }</span>
+    };
+
+<span class="nc" id="L177">    public ReferenceConfig() {</span>
+<span class="nc" id="L178">    }</span>
+
+<span class="nc" id="L180">    public ReferenceConfig(Reference reference) {</span>
+<span class="nc" id="L181">        appendAnnotation(Reference.class, reference);</span>
+<span class="nc" id="L182">        setMethods(MethodConfig.constructMethodConfig(reference.methods()));</span>
+<span class="nc" id="L183">    }</span>
+
+    public URL toUrl() {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        return urls.isEmpty() ? null : urls.iterator().next();</span>
+    }
+
+    public List&lt;URL&gt; toUrls() {
+<span class="nc" id="L190">        return urls;</span>
+    }
+
+    /**
+     * This method should be called right after the creation of this class's instance, before any property in other config modules is used.
+     * Check each config modules are created properly and override their properties if necessary.
+     */
+    public void checkAndUpdateSubConfigs() {
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (StringUtils.isEmpty(interfaceName)) {</span>
+<span class="nc" id="L199">            throw new IllegalStateException(&quot;&lt;dubbo:reference interface=\&quot;\&quot; /&gt; interface not allow null!&quot;);</span>
+        }
+<span class="nc" id="L201">        completeCompoundConfigs();</span>
+<span class="nc" id="L202">        startConfigCenter();</span>
+        // get consumer's global configuration
+<span class="nc" id="L204">        checkDefault();</span>
+<span class="nc" id="L205">        this.refresh();</span>
+<span class="nc bnc" id="L206" title="All 4 branches missed.">        if (getGeneric() == null &amp;&amp; getConsumer() != null) {</span>
+<span class="nc" id="L207">            setGeneric(getConsumer().getGeneric());</span>
+        }
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (ProtocolUtils.isGeneric(getGeneric())) {</span>
+<span class="nc" id="L210">            interfaceClass = GenericService.class;</span>
+        } else {
+            try {
+<span class="nc" id="L213">                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()</span>
+<span class="nc" id="L214">                        .getContextClassLoader());</span>
+<span class="nc" id="L215">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L216">                throw new IllegalStateException(e.getMessage(), e);</span>
+<span class="nc" id="L217">            }</span>
+<span class="nc" id="L218">            checkInterfaceAndMethods(interfaceClass, methods);</span>
+        }
+<span class="nc" id="L220">        resolveFile();</span>
+<span class="nc" id="L221">        checkApplication();</span>
+<span class="nc" id="L222">        checkMetadataReport();</span>
+<span class="nc" id="L223">    }</span>
+
+    public synchronized T get() {
+<span class="nc" id="L226">        checkAndUpdateSubConfigs();</span>
+
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (destroyed) {</span>
+<span class="nc" id="L229">            throw new IllegalStateException(&quot;The invoker of ReferenceConfig(&quot; + url + &quot;) has already destroyed!&quot;);</span>
+        }
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (ref == null) {</span>
+<span class="nc" id="L232">            init();</span>
+        }
+<span class="nc" id="L234">        return ref;</span>
+    }
+
+    public synchronized void destroy() {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (ref == null) {</span>
+<span class="nc" id="L239">            return;</span>
+        }
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (destroyed) {</span>
+<span class="nc" id="L242">            return;</span>
+        }
+<span class="nc" id="L244">        destroyed = true;</span>
+        try {
+<span class="nc" id="L246">            invoker.destroy();</span>
+<span class="nc" id="L247">        } catch (Throwable t) {</span>
+<span class="nc" id="L248">            logger.warn(&quot;Unexpected error occured when destroy invoker of ReferenceConfig(&quot; + url + &quot;).&quot;, t);</span>
+<span class="nc" id="L249">        }</span>
+<span class="nc" id="L250">        invoker = null;</span>
+<span class="nc" id="L251">        ref = null;</span>
+<span class="nc" id="L252">    }</span>
+
+    private void init() {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (initialized) {</span>
+<span class="nc" id="L256">            return;</span>
+        }
+<span class="nc" id="L258">        initialized = true;</span>
+<span class="nc" id="L259">        checkStubAndLocal(interfaceClass);</span>
+<span class="nc" id="L260">        checkMock(interfaceClass);</span>
+<span class="nc" id="L261">        Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+
+<span class="nc" id="L263">        map.put(Constants.SIDE_KEY, Constants.CONSUMER_SIDE);</span>
+
+<span class="nc" id="L265">        appendRuntimeParameters(map);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (!isGeneric()) {</span>
+<span class="nc" id="L267">            String revision = Version.getVersion(interfaceClass, version);</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">            if (revision != null &amp;&amp; revision.length() &gt; 0) {</span>
+<span class="nc" id="L269">                map.put(Constants.REVISION_KEY, revision);</span>
+            }
+
+<span class="nc" id="L272">            String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            if (methods.length == 0) {</span>
+<span class="nc" id="L274">                logger.warn(&quot;No method found in service interface &quot; + interfaceClass.getName());</span>
+<span class="nc" id="L275">                map.put(Constants.METHODS_KEY, Constants.ANY_VALUE);</span>
+            } else {
+<span class="nc" id="L277">                map.put(Constants.METHODS_KEY, StringUtils.join(new HashSet&lt;String&gt;(Arrays.asList(methods)), Constants.COMMA_SEPARATOR));</span>
+            }
+        }
+<span class="nc" id="L280">        map.put(Constants.INTERFACE_KEY, interfaceName);</span>
+<span class="nc" id="L281">        appendParameters(map, metrics);</span>
+<span class="nc" id="L282">        appendParameters(map, application);</span>
+<span class="nc" id="L283">        appendParameters(map, module);</span>
+        // remove 'default.' prefix for configs from ConsumerConfig
+        // appendParameters(map, consumer, Constants.DEFAULT_KEY);
+<span class="nc" id="L286">        appendParameters(map, consumer);</span>
+<span class="nc" id="L287">        appendParameters(map, this);</span>
+<span class="nc" id="L288">        Map&lt;String, Object&gt; attributes = null;</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(methods)) {</span>
+<span class="nc" id="L290">            attributes = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            for (MethodConfig methodConfig : methods) {</span>
+<span class="nc" id="L292">                appendParameters(map, methodConfig, methodConfig.getName());</span>
+<span class="nc" id="L293">                String retryKey = methodConfig.getName() + &quot;.retry&quot;;</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                if (map.containsKey(retryKey)) {</span>
+<span class="nc" id="L295">                    String retryValue = map.remove(retryKey);</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                    if (&quot;false&quot;.equals(retryValue)) {</span>
+<span class="nc" id="L297">                        map.put(methodConfig.getName() + &quot;.retries&quot;, &quot;0&quot;);</span>
+                    }
+                }
+<span class="nc" id="L300">                attributes.put(methodConfig.getName(), convertMethodConfig2AyncInfo(methodConfig));</span>
+<span class="nc" id="L301">            }</span>
+        }
+
+<span class="nc" id="L304">        String hostToRegistry = ConfigUtils.getSystemProperty(Constants.DUBBO_IP_TO_REGISTRY);</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (StringUtils.isEmpty(hostToRegistry)) {</span>
+<span class="nc" id="L306">            hostToRegistry = NetUtils.getLocalHost();</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        } else if (isInvalidLocalHost(hostToRegistry)) {</span>
+<span class="nc" id="L308">            throw new IllegalArgumentException(&quot;Specified invalid registry ip from property:&quot; + Constants.DUBBO_IP_TO_REGISTRY + &quot;, value:&quot; + hostToRegistry);</span>
+        }
+<span class="nc" id="L310">        map.put(Constants.REGISTER_IP_KEY, hostToRegistry);</span>
+
+<span class="nc" id="L312">        ref = createProxy(map);</span>
+
+<span class="nc" id="L314">        String serviceKey = URL.buildKey(interfaceName, group, version);</span>
+<span class="nc" id="L315">        ApplicationModel.initConsumerModel(serviceKey, buildConsumerModel(serviceKey, attributes));</span>
+<span class="nc" id="L316">    }</span>
+
+    private ConsumerModel buildConsumerModel(String serviceKey, Map&lt;String, Object&gt; attributes) {
+<span class="nc" id="L319">        Method[] methods = interfaceClass.getMethods();</span>
+<span class="nc" id="L320">        Class serviceInterface = interfaceClass;</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (interfaceClass == GenericService.class) {</span>
+            try {
+<span class="nc" id="L323">                serviceInterface = Class.forName(interfaceName);</span>
+<span class="nc" id="L324">                methods = serviceInterface.getMethods();</span>
+<span class="nc" id="L325">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L326">                methods = interfaceClass.getMethods();</span>
+<span class="nc" id="L327">            }</span>
+        }
+<span class="nc" id="L329">        return new ConsumerModel(serviceKey, serviceInterface, ref, methods, attributes);</span>
+    }
+
+    @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;, &quot;deprecation&quot;})
+    private T createProxy(Map&lt;String, String&gt; map) {
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (shouldJvmRefer(map)) {</span>
+<span class="nc" id="L335">            URL url = new URL(Constants.LOCAL_PROTOCOL, Constants.LOCALHOST_VALUE, 0, interfaceClass.getName()).addParameters(map);</span>
+<span class="nc" id="L336">            invoker = REF_PROTOCOL.refer(interfaceClass, url);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L338">                logger.info(&quot;Using injvm service &quot; + interfaceClass.getName());</span>
+            }
+<span class="nc" id="L340">        } else {</span>
+<span class="nc bnc" id="L341" title="All 4 branches missed.">            if (url != null &amp;&amp; url.length() &gt; 0) { // user specified URL, could be peer-to-peer address, or register center's address.</span>
+<span class="nc" id="L342">                String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);</span>
+<span class="nc bnc" id="L343" title="All 4 branches missed.">                if (us != null &amp;&amp; us.length &gt; 0) {</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                    for (String u : us) {</span>
+<span class="nc" id="L345">                        URL url = URL.valueOf(u);</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                        if (StringUtils.isEmpty(url.getPath())) {</span>
+<span class="nc" id="L347">                            url = url.setPath(interfaceName);</span>
+                        }
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                        if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L350">                            urls.add(url.addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map)));</span>
+                        } else {
+<span class="nc" id="L352">                            urls.add(ClusterUtils.mergeUrl(url, map));</span>
+                        }
+                    }
+                }
+<span class="nc" id="L356">            } else { // assemble URL from register center's configuration</span>
+<span class="nc" id="L357">                checkRegistry();</span>
+<span class="nc" id="L358">                List&lt;URL&gt; us = loadRegistries(false);</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                if (CollectionUtils.isNotEmpty(us)) {</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                    for (URL u : us) {</span>
+<span class="nc" id="L361">                        URL monitorUrl = loadMonitor(u);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                        if (monitorUrl != null) {</span>
+<span class="nc" id="L363">                            map.put(Constants.MONITOR_KEY, URL.encode(monitorUrl.toFullString()));</span>
+                        }
+<span class="nc" id="L365">                        urls.add(u.addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map)));</span>
+<span class="nc" id="L366">                    }</span>
+                }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                if (urls.isEmpty()) {</span>
+<span class="nc" id="L369">                    throw new IllegalStateException(&quot;No such any registry to reference &quot; + interfaceName + &quot; on the consumer &quot; + NetUtils.getLocalHost() + &quot; use dubbo version &quot; + Version.getVersion() + &quot;, please config &lt;dubbo:registry address=\&quot;...\&quot; /&gt; to your spring config.&quot;);</span>
+                }
+            }
+
+<span class="nc bnc" id="L373" title="All 2 branches missed.">            if (urls.size() == 1) {</span>
+<span class="nc" id="L374">                invoker = REF_PROTOCOL.refer(interfaceClass, urls.get(0));</span>
+            } else {
+<span class="nc" id="L376">                List&lt;Invoker&lt;?&gt;&gt; invokers = new ArrayList&lt;Invoker&lt;?&gt;&gt;();</span>
+<span class="nc" id="L377">                URL registryURL = null;</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">                for (URL url : urls) {</span>
+<span class="nc" id="L379">                    invokers.add(REF_PROTOCOL.refer(interfaceClass, url));</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">                    if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {</span>
+<span class="nc" id="L381">                        registryURL = url; // use last registry url</span>
+                    }
+<span class="nc" id="L383">                }</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                if (registryURL != null) { // registry url is available</span>
+                    // use RegistryAwareCluster only when register's CLUSTER is available
+<span class="nc" id="L386">                    URL u = registryURL.addParameter(Constants.CLUSTER_KEY, RegistryAwareCluster.NAME);</span>
+                    // The invoker wrap relation would be: RegistryAwareClusterInvoker(StaticDirectory) -&gt; FailoverClusterInvoker(RegistryDirectory, will execute route) -&gt; Invoker
+<span class="nc" id="L388">                    invoker = CLUSTER.join(new StaticDirectory(u, invokers));</span>
+<span class="nc" id="L389">                } else { // not a registry url, must be direct invoke.</span>
+<span class="nc" id="L390">                    invoker = CLUSTER.join(new StaticDirectory(invokers));</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L395" title="All 4 branches missed.">        if (shouldCheck() &amp;&amp; !invoker.isAvailable()) {</span>
+            // make it possible for consumer to retry later if provider is temporarily unavailable
+<span class="nc" id="L397">            initialized = false;</span>
+<span class="nc bnc" id="L398" title="All 4 branches missed.">            throw new IllegalStateException(&quot;Failed to check the status of the service &quot; + interfaceName + &quot;. No provider available for the service &quot; + (group == null ? &quot;&quot; : group + &quot;/&quot;) + interfaceName + (version == null ? &quot;&quot; : &quot;:&quot; + version) + &quot; from the url &quot; + invoker.getUrl() + &quot; to the consumer &quot; + NetUtils.getLocalHost() + &quot; use dubbo version &quot; + Version.getVersion());</span>
+        }
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L401">            logger.info(&quot;Refer dubbo service &quot; + interfaceClass.getName() + &quot; from url &quot; + invoker.getUrl());</span>
+        }
+        /**
+         * @since 2.7.0
+         * ServiceData Store
+         */
+<span class="nc" id="L407">        MetadataReportService metadataReportService = null;</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">        if ((metadataReportService = getMetadataReportService()) != null) {</span>
+<span class="nc" id="L409">            URL consumerURL = new URL(Constants.CONSUMER_PROTOCOL, map.remove(Constants.REGISTER_IP_KEY), 0, map.get(Constants.INTERFACE_KEY), map);</span>
+<span class="nc" id="L410">            metadataReportService.publishConsumer(consumerURL);</span>
+        }
+        // create service proxy
+<span class="nc" id="L413">        return (T) PROXY_FACTORY.getProxy(invoker);</span>
+    }
+
+    /**
+     * Figure out should refer the service in the same JVM from configurations. The default behavior is true
+     * 1. if injvm is specified, then use it
+     * 2. then if a url is specified, then assume it's a remote call
+     * 3. otherwise, check scope parameter
+     * 4. if scope is not specified but the target service is provided in the same JVM, then prefer to make the local
+     * call, which is the default behavior
+     */
+    protected boolean shouldJvmRefer(Map&lt;String, String&gt; map) {
+<span class="nc" id="L425">        URL tmpUrl = new URL(&quot;temp&quot;, &quot;localhost&quot;, 0, map);</span>
+        boolean isJvmRefer;
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (isInjvm() == null) {</span>
+            // if a url is specified, don't do local reference
+<span class="nc bnc" id="L429" title="All 4 branches missed.">            if (url != null &amp;&amp; url.length() &gt; 0) {</span>
+<span class="nc" id="L430">                isJvmRefer = false;</span>
+            } else {
+                // by default, reference local service if there is
+<span class="nc" id="L433">                isJvmRefer = InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl);</span>
+            }
+        } else {
+<span class="nc" id="L436">            isJvmRefer = isInjvm();</span>
+        }
+<span class="nc" id="L438">        return isJvmRefer;</span>
+    }
+
+    protected boolean shouldCheck() {
+<span class="nc" id="L442">        Boolean shouldCheck = isCheck();</span>
+<span class="nc bnc" id="L443" title="All 4 branches missed.">        if (shouldCheck == null &amp;&amp; getConsumer() != null) {</span>
+<span class="nc" id="L444">            shouldCheck = getConsumer().isCheck();</span>
+        }
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (shouldCheck == null) {</span>
+            // default true
+<span class="nc" id="L448">            shouldCheck = true;</span>
+        }
+<span class="nc" id="L450">        return shouldCheck;</span>
+    }
+
+    protected boolean shouldInit() {
+<span class="nc" id="L454">        Boolean shouldInit = isInit();</span>
+<span class="nc bnc" id="L455" title="All 4 branches missed.">        if (shouldInit == null &amp;&amp; getConsumer() != null) {</span>
+<span class="nc" id="L456">            shouldInit = getConsumer().isInit();</span>
+        }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (shouldInit == null) {</span>
+            // default is false
+<span class="nc" id="L460">            return false;</span>
+        }
+<span class="nc" id="L462">        return shouldInit;</span>
+    }
+
+    private void checkDefault() {
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        if (consumer != null) {</span>
+<span class="nc" id="L467">            return;</span>
+        }
+<span class="nc" id="L469">        setConsumer(ConfigManager.getInstance().getDefaultConsumer().orElseGet(() -&gt; {</span>
+<span class="nc" id="L470">            ConsumerConfig consumerConfig = new ConsumerConfig();</span>
+<span class="nc" id="L471">            consumerConfig.refresh();</span>
+<span class="nc" id="L472">            return consumerConfig;</span>
+        }));
+<span class="nc" id="L474">    }</span>
+
+    private void completeCompoundConfigs() {
+<span class="nc bnc" id="L477" title="All 2 branches missed.">        if (consumer != null) {</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">            if (application == null) {</span>
+<span class="nc" id="L479">                setApplication(consumer.getApplication());</span>
+            }
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            if (module == null) {</span>
+<span class="nc" id="L482">                setModule(consumer.getModule());</span>
+            }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L485">                setRegistries(consumer.getRegistries());</span>
+            }
+<span class="nc bnc" id="L487" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L488">                setMonitor(consumer.getMonitor());</span>
+            }
+        }
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        if (module != null) {</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L493">                setRegistries(module.getRegistries());</span>
+            }
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L496">                setMonitor(module.getMonitor());</span>
+            }
+        }
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        if (application != null) {</span>
+<span class="nc bnc" id="L500" title="All 2 branches missed.">            if (registries == null) {</span>
+<span class="nc" id="L501">                setRegistries(application.getRegistries());</span>
+            }
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            if (monitor == null) {</span>
+<span class="nc" id="L504">                setMonitor(application.getMonitor());</span>
+            }
+        }
+<span class="nc" id="L507">    }</span>
+
+    public Class&lt;?&gt; getInterfaceClass() {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (interfaceClass != null) {</span>
+<span class="nc" id="L511">            return interfaceClass;</span>
+        }
+<span class="nc bnc" id="L513" title="All 2 branches missed.">        if (isGeneric()</span>
+<span class="nc bnc" id="L514" title="All 4 branches missed.">                || (getConsumer() != null &amp;&amp; getConsumer().isGeneric())) {</span>
+<span class="nc" id="L515">            return GenericService.class;</span>
+        }
+        try {
+<span class="nc bnc" id="L518" title="All 4 branches missed.">            if (interfaceName != null &amp;&amp; interfaceName.length() &gt; 0) {</span>
+<span class="nc" id="L519">                this.interfaceClass = Class.forName(interfaceName, true, ClassUtils.getClassLoader());</span>
+            }
+<span class="nc" id="L521">        } catch (ClassNotFoundException t) {</span>
+<span class="nc" id="L522">            throw new IllegalStateException(t.getMessage(), t);</span>
+<span class="nc" id="L523">        }</span>
+<span class="nc" id="L524">        return interfaceClass;</span>
+    }
+
+    /**
+     * @param interfaceClass
+     * @see #setInterface(Class)
+     * @deprecated
+     */
+    @Deprecated
+    public void setInterfaceClass(Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L534">        setInterface(interfaceClass);</span>
+<span class="nc" id="L535">    }</span>
+
+    public String getInterface() {
+<span class="nc" id="L538">        return interfaceName;</span>
+    }
+
+    public void setInterface(String interfaceName) {
+<span class="nc" id="L542">        this.interfaceName = interfaceName;</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (StringUtils.isEmpty(id)) {</span>
+<span class="nc" id="L544">            id = interfaceName;</span>
+        }
+<span class="nc" id="L546">    }</span>
+
+    public void setInterface(Class&lt;?&gt; interfaceClass) {
+<span class="nc bnc" id="L549" title="All 4 branches missed.">        if (interfaceClass != null &amp;&amp; !interfaceClass.isInterface()) {</span>
+<span class="nc" id="L550">            throw new IllegalStateException(&quot;The interface class &quot; + interfaceClass + &quot; is not a interface!&quot;);</span>
+        }
+<span class="nc" id="L552">        this.interfaceClass = interfaceClass;</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">        setInterface(interfaceClass == null ? null : interfaceClass.getName());</span>
+<span class="nc" id="L554">    }</span>
+
+    public String getClient() {
+<span class="nc" id="L557">        return client;</span>
+    }
+
+    public void setClient(String client) {
+<span class="nc" id="L561">        checkName(Constants.CLIENT_KEY, client);</span>
+<span class="nc" id="L562">        this.client = client;</span>
+<span class="nc" id="L563">    }</span>
+
+    @Parameter(excluded = true)
+    public String getUrl() {
+<span class="nc" id="L567">        return url;</span>
+    }
+
+    public void setUrl(String url) {
+<span class="nc" id="L571">        this.url = url;</span>
+<span class="nc" id="L572">    }</span>
+
+    public List&lt;MethodConfig&gt; getMethods() {
+<span class="nc" id="L575">        return methods;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public void setMethods(List&lt;? extends MethodConfig&gt; methods) {
+<span class="nc" id="L580">        this.methods = (List&lt;MethodConfig&gt;) methods;</span>
+<span class="nc" id="L581">    }</span>
+
+    public ConsumerConfig getConsumer() {
+<span class="nc" id="L584">        return consumer;</span>
+    }
+
+    public void setConsumer(ConsumerConfig consumer) {
+<span class="nc" id="L588">        ConfigManager.getInstance().addConsumer(consumer);</span>
+<span class="nc" id="L589">        this.consumer = consumer;</span>
+<span class="nc" id="L590">    }</span>
+
+    public String getProtocol() {
+<span class="nc" id="L593">        return protocol;</span>
+    }
+
+    public void setProtocol(String protocol) {
+<span class="nc" id="L597">        this.protocol = protocol;</span>
+<span class="nc" id="L598">    }</span>
+
+    // just for test
+    Invoker&lt;?&gt; getInvoker() {
+<span class="nc" id="L602">        return invoker;</span>
+    }
+
+    @Override
+    @Parameter(excluded = true)
+    public String getPrefix() {
+<span class="nc" id="L608">        return Constants.DUBBO + &quot;.reference.&quot; + interfaceName;</span>
+    }
+
+    private void resolveFile() {
+<span class="nc" id="L612">        String resolve = System.getProperty(interfaceName);</span>
+<span class="nc" id="L613">        String resolveFile = null;</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">        if (StringUtils.isEmpty(resolve)) {</span>
+<span class="nc" id="L615">            resolveFile = System.getProperty(&quot;dubbo.resolve.file&quot;);</span>
+<span class="nc bnc" id="L616" title="All 2 branches missed.">            if (StringUtils.isEmpty(resolveFile)) {</span>
+<span class="nc" id="L617">                File userResolveFile = new File(new File(System.getProperty(&quot;user.home&quot;)), &quot;dubbo-resolve.properties&quot;);</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                if (userResolveFile.exists()) {</span>
+<span class="nc" id="L619">                    resolveFile = userResolveFile.getAbsolutePath();</span>
+                }
+            }
+<span class="nc bnc" id="L622" title="All 4 branches missed.">            if (resolveFile != null &amp;&amp; resolveFile.length() &gt; 0) {</span>
+<span class="nc" id="L623">                Properties properties = new Properties();</span>
+<span class="nc" id="L624">                try (FileInputStream fis = new FileInputStream(new File(resolveFile))) {</span>
+<span class="nc" id="L625">                    properties.load(fis);</span>
+<span class="nc" id="L626">                } catch (IOException e) {</span>
+<span class="nc" id="L627">                    throw new IllegalStateException(&quot;Failed to load &quot; + resolveFile + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L628">                }</span>
+
+<span class="nc" id="L630">                resolve = properties.getProperty(interfaceName);</span>
+            }
+        }
+<span class="nc bnc" id="L633" title="All 4 branches missed.">        if (resolve != null &amp;&amp; resolve.length() &gt; 0) {</span>
+<span class="nc" id="L634">            url = resolve;</span>
+<span class="nc bnc" id="L635" title="All 2 branches missed.">            if (logger.isWarnEnabled()) {</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                if (resolveFile != null) {</span>
+<span class="nc" id="L637">                    logger.warn(&quot;Using default dubbo resolve file &quot; + resolveFile + &quot; replace &quot; + interfaceName + &quot;&quot; + resolve + &quot; to p2p invoke remote service.&quot;);</span>
+                } else {
+<span class="nc" id="L639">                    logger.warn(&quot;Using -D&quot; + interfaceName + &quot;=&quot; + resolve + &quot; to p2p invoke remote service.&quot;);</span>
+                }
+            }
+        }
+<span class="nc" id="L643">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

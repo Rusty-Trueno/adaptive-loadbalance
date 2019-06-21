@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CtClassBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-container-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common.compiler.support</a> &gt; <span class="el_source">CtClassBuilder.java</span></div><h1>CtClassBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common.compiler.support;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javassist.CannotCompileException;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtField;
+import javassist.CtNewConstructor;
+import javassist.CtNewMethod;
+import javassist.LoaderClassPath;
+import javassist.NotFoundException;
+
+/**
+ * CtClassBuilder is builder for CtClass
+ * &lt;p&gt;
+ * contains all the information, including:
+ * &lt;p&gt;
+ * class name, imported packages, super class name, implemented interfaces, constructors, fields, methods.
+ */
+<span class="nc" id="L40">public class CtClassBuilder {</span>
+
+    private String className;
+
+<span class="nc" id="L44">    private String superClassName = &quot;java.lang.Object&quot;;</span>
+
+<span class="nc" id="L46">    private List&lt;String&gt; imports = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L48">    private Map&lt;String, String&gt; fullNames = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L50">    private List&lt;String&gt; ifaces = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L52">    private List&lt;String&gt; constructors = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L54">    private List&lt;String&gt; fields = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L56">    private List&lt;String&gt; methods = new ArrayList&lt;&gt;();</span>
+
+    public String getClassName() {
+<span class="nc" id="L59">        return className;</span>
+    }
+
+    public void setClassName(String className) {
+<span class="nc" id="L63">        this.className = className;</span>
+<span class="nc" id="L64">    }</span>
+
+    public String getSuperClassName() {
+<span class="nc" id="L67">        return superClassName;</span>
+    }
+
+    public void setSuperClassName(String superClassName) {
+<span class="nc" id="L71">        this.superClassName = getQualifiedClassName(superClassName);</span>
+<span class="nc" id="L72">    }</span>
+
+    public List&lt;String&gt; getImports() {
+<span class="nc" id="L75">        return imports;</span>
+    }
+
+    public void addImports(String pkg) {
+<span class="nc" id="L79">        int pi = pkg.lastIndexOf('.');</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (pi &gt; 0) {</span>
+<span class="nc" id="L81">            String pkgName = pkg.substring(0, pi);</span>
+<span class="nc" id="L82">            this.imports.add(pkgName);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (!pkg.endsWith(&quot;.*&quot;)) {</span>
+<span class="nc" id="L84">                fullNames.put(pkg.substring(pi + 1), pkg);</span>
+            }
+        }
+<span class="nc" id="L87">    }</span>
+
+    public List&lt;String&gt; getInterfaces() {
+<span class="nc" id="L90">        return ifaces;</span>
+    }
+
+    public void addInterface(String iface) {
+<span class="nc" id="L94">        this.ifaces.add(getQualifiedClassName(iface));</span>
+<span class="nc" id="L95">    }</span>
+
+    public List&lt;String&gt; getConstructors() {
+<span class="nc" id="L98">        return constructors;</span>
+    }
+
+    public void addConstructor(String constructor) {
+<span class="nc" id="L102">        this.constructors.add(constructor);</span>
+<span class="nc" id="L103">    }</span>
+
+    public List&lt;String&gt; getFields() {
+<span class="nc" id="L106">        return fields;</span>
+    }
+
+    public void addField(String field) {
+<span class="nc" id="L110">        this.fields.add(field);</span>
+<span class="nc" id="L111">    }</span>
+
+    public List&lt;String&gt; getMethods() {
+<span class="nc" id="L114">        return methods;</span>
+    }
+
+    public void addMethod(String method) {
+<span class="nc" id="L118">        this.methods.add(method);</span>
+<span class="nc" id="L119">    }</span>
+
+    /**
+     * get full qualified class name
+     * 
+     * @param className super class name, maybe qualified or not
+     */
+    protected String getQualifiedClassName(String className) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (className.contains(&quot;.&quot;)) {</span>
+<span class="nc" id="L128">            return className;</span>
+        }
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (fullNames.containsKey(className)) {</span>
+<span class="nc" id="L132">            return fullNames.get(className);</span>
+        }
+
+<span class="nc" id="L135">        return ClassUtils.forName(imports.toArray(new String[0]), className).getName();</span>
+    }
+
+    /**
+     * build CtClass object
+     */
+    public CtClass build(ClassLoader classLoader) throws NotFoundException, CannotCompileException {
+<span class="nc" id="L142">        ClassPool pool = new ClassPool(true);</span>
+<span class="nc" id="L143">        pool.appendClassPath(new LoaderClassPath(classLoader));</span>
+        
+        // create class
+<span class="nc" id="L146">        CtClass ctClass = pool.makeClass(className, pool.get(superClassName));</span>
+
+        // add imported packages
+<span class="nc" id="L149">        imports.stream().forEach(pool::importPackage);</span>
+
+        // add implemented interfaces
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        for (String iface : ifaces) {</span>
+<span class="nc" id="L153">            ctClass.addInterface(pool.get(iface));</span>
+<span class="nc" id="L154">        }</span>
+
+        // add constructors
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (String constructor : constructors) {</span>
+<span class="nc" id="L158">            ctClass.addConstructor(CtNewConstructor.make(constructor, ctClass));</span>
+<span class="nc" id="L159">        }</span>
+
+        // add fields
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (String field : fields) {</span>
+<span class="nc" id="L163">            ctClass.addField(CtField.make(field, ctClass));</span>
+<span class="nc" id="L164">        }</span>
+
+        // add methods
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        for (String method : methods) {</span>
+<span class="nc" id="L168">            ctClass.addMethod(CtNewMethod.make(method, ctClass));</span>
+<span class="nc" id="L169">        }</span>
+
+<span class="nc" id="L171">        return ctClass;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

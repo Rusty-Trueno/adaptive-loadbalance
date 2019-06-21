@@ -1,0 +1,19 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.SaveProperties,15,0,0,0,5,0,2,0,2,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport,746,0,64,0,141,0,50,0,18,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry.new Runnable() {...},61,0,6,0,11,0,5,0,2,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReportFactory,73,0,4,0,16,0,5,0,3,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.support,AbstractMetadataReport.MetadataReportRetry,73,0,4,0,17,0,5,0,3,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier,223,0,12,0,41,0,24,0,18,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.identifier,MetadataIdentifier.KeyTypeEnum,24,0,0,0,2,0,1,0,1,0
+dubbo-metadata-report-etcd/dubbo-metadata-report-api,org.apache.dubbo.metadata.integration,MetadataReportService,209,0,10,0,41,0,10,0,5,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.support,AbstractEtcdClient,291,0,30,0,70,0,32,0,17,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.option,OptionUtil,117,0,26,0,24,0,20,0,7,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.option,Constants,3,0,0,0,1,0,1,0,1,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd,AbstractRetryPolicy,27,0,4,0,12,0,4,0,2,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,JEtcdTransporter,8,0,0,0,2,0,2,0,2,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,RetryLoops,93,0,14,0,30,0,13,0,6,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,RetryNTimes,14,0,0,0,4,0,2,0,2,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,JEtcdClient.EtcdWatcher,500,0,61,0,113,0,48,0,17,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,JEtcdClient,190,0,8,0,49,0,22,0,18,0
+dubbo-metadata-report-etcd/dubbo-remoting-etcd3,org.apache.dubbo.remoting.etcd.jetcd,JEtcdClientWrapper,1330,0,102,0,317,0,103,0,52,0

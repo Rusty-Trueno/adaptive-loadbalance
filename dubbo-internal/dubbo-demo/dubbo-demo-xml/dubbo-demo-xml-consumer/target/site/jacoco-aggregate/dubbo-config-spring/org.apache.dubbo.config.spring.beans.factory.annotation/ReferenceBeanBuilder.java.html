@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceBeanBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">ReferenceBeanBuilder.java</span></div><h1>ReferenceBeanBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.config.ConsumerConfig;
+import org.apache.dubbo.config.MethodConfig;
+import org.apache.dubbo.config.annotation.Method;
+import org.apache.dubbo.config.annotation.Reference;
+import org.apache.dubbo.config.spring.ReferenceBean;
+
+import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.context.ApplicationContext;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.validation.DataBinder;
+
+import java.beans.PropertyEditorSupport;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.getOptionalBean;
+import static org.apache.dubbo.config.spring.util.ObjectUtils.of;
+import static org.springframework.util.StringUtils.commaDelimitedListToStringArray;
+
+/**
+ * {@link ReferenceBean} Builder
+ *
+ * @since 2.5.7
+ */
+class ReferenceBeanBuilder extends AbstractAnnotationConfigBeanBuilder&lt;Reference, ReferenceBean&gt; {
+
+    // Ignore those fields
+<span class="nc" id="L49">    static final String[] IGNORE_FIELD_NAMES = of(&quot;application&quot;, &quot;module&quot;, &quot;consumer&quot;, &quot;monitor&quot;, &quot;registry&quot;);</span>
+
+    private ReferenceBeanBuilder(Reference annotation, ClassLoader classLoader, ApplicationContext applicationContext) {
+<span class="nc" id="L52">        super(annotation, classLoader, applicationContext);</span>
+<span class="nc" id="L53">    }</span>
+
+    private void configureInterface(Reference reference, ReferenceBean referenceBean) {
+
+<span class="nc" id="L57">        Class&lt;?&gt; interfaceClass = reference.interfaceClass();</span>
+
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (void.class.equals(interfaceClass)) {</span>
+
+<span class="nc" id="L61">            interfaceClass = null;</span>
+
+<span class="nc" id="L63">            String interfaceClassName = reference.interfaceName();</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (StringUtils.hasText(interfaceClassName)) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                if (ClassUtils.isPresent(interfaceClassName, classLoader)) {</span>
+<span class="nc" id="L67">                    interfaceClass = ClassUtils.resolveClassName(interfaceClassName, classLoader);</span>
+                }
+            }
+
+        }
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (interfaceClass == null) {</span>
+<span class="nc" id="L74">            interfaceClass = this.interfaceClass;</span>
+        }
+
+<span class="nc" id="L77">        Assert.isTrue(interfaceClass.isInterface(),</span>
+                &quot;The class of field or method that was annotated @Reference is not an interface!&quot;);
+
+<span class="nc" id="L80">        referenceBean.setInterface(interfaceClass);</span>
+
+<span class="nc" id="L82">    }</span>
+
+
+    private void configureConsumerConfig(Reference reference, ReferenceBean&lt;?&gt; referenceBean) {
+
+<span class="nc" id="L87">        String consumerBeanName = reference.consumer();</span>
+
+<span class="nc" id="L89">        ConsumerConfig consumerConfig = getOptionalBean(applicationContext, consumerBeanName, ConsumerConfig.class);</span>
+
+<span class="nc" id="L91">        referenceBean.setConsumer(consumerConfig);</span>
+
+<span class="nc" id="L93">    }</span>
+
+    void configureMethodConfig(Reference reference, ReferenceBean&lt;?&gt; referenceBean){
+<span class="nc" id="L96">        Method[] methods = reference.methods();</span>
+<span class="nc" id="L97">        List&lt;MethodConfig&gt; methodConfigs = MethodConfig.constructMethodConfig(methods);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if(!methodConfigs.isEmpty()){</span>
+<span class="nc" id="L99">            referenceBean.setMethods(methodConfigs);</span>
+        }
+<span class="nc" id="L101">    }</span>
+
+    @Override
+    protected ReferenceBean doBuild() {
+<span class="nc" id="L105">        return new ReferenceBean&lt;Object&gt;();</span>
+    }
+
+    @Override
+    protected void preConfigureBean(Reference reference, ReferenceBean referenceBean) {
+<span class="nc" id="L110">        Assert.notNull(interfaceClass, &quot;The interface class must set first!&quot;);</span>
+<span class="nc" id="L111">        DataBinder dataBinder = new DataBinder(referenceBean);</span>
+        // Register CustomEditors for special fields
+<span class="nc" id="L113">        dataBinder.registerCustomEditor(String.class, &quot;filter&quot;, new StringTrimmerEditor(true));</span>
+<span class="nc" id="L114">        dataBinder.registerCustomEditor(String.class, &quot;listener&quot;, new StringTrimmerEditor(true));</span>
+<span class="nc" id="L115">        dataBinder.registerCustomEditor(Map.class, &quot;parameters&quot;, new PropertyEditorSupport() {</span>
+            @Override
+            public void setAsText(String text) throws java.lang.IllegalArgumentException {
+                // Trim all whitespace
+<span class="nc" id="L119">                String content = StringUtils.trimAllWhitespace(text);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (!StringUtils.hasText(content)) { // No content , ignore directly</span>
+<span class="nc" id="L121">                    return;</span>
+                }
+                // replace &quot;=&quot; to &quot;,&quot;
+<span class="nc" id="L124">                content = StringUtils.replace(content, &quot;=&quot;, &quot;,&quot;);</span>
+                // replace &quot;:&quot; to &quot;,&quot;
+<span class="nc" id="L126">                content = StringUtils.replace(content, &quot;:&quot;, &quot;,&quot;);</span>
+                // String[] to Map
+<span class="nc" id="L128">                Map&lt;String, String&gt; parameters = CollectionUtils.toStringMap(commaDelimitedListToStringArray(content));</span>
+<span class="nc" id="L129">                setValue(parameters);</span>
+<span class="nc" id="L130">            }</span>
+        });
+
+        // Bind annotation attributes
+<span class="nc" id="L134">        dataBinder.bind(new AnnotationPropertyValuesAdapter(reference, applicationContext.getEnvironment(), IGNORE_FIELD_NAMES));</span>
+
+<span class="nc" id="L136">    }</span>
+
+
+    @Override
+    protected String resolveModuleConfigBeanName(Reference annotation) {
+<span class="nc" id="L141">        return annotation.module();</span>
+    }
+
+    @Override
+    protected String resolveApplicationConfigBeanName(Reference annotation) {
+<span class="nc" id="L146">        return annotation.application();</span>
+    }
+
+    @Override
+    protected String[] resolveRegistryConfigBeanNames(Reference annotation) {
+<span class="nc" id="L151">        return annotation.registry();</span>
+    }
+
+    @Override
+    protected String resolveMonitorConfigBeanName(Reference annotation) {
+<span class="nc" id="L156">        return annotation.monitor();</span>
+    }
+
+    @Override
+    protected void postConfigureBean(Reference annotation, ReferenceBean bean) throws Exception {
+
+<span class="nc" id="L162">        bean.setApplicationContext(applicationContext);</span>
+
+<span class="nc" id="L164">        configureInterface(annotation, bean);</span>
+
+<span class="nc" id="L166">        configureConsumerConfig(annotation, bean);</span>
+
+<span class="nc" id="L168">        configureMethodConfig(annotation, bean);</span>
+
+<span class="nc" id="L170">        bean.afterPropertiesSet();</span>
+
+<span class="nc" id="L172">    }</span>
+
+    public static ReferenceBeanBuilder create(Reference annotation, ClassLoader classLoader,
+                                              ApplicationContext applicationContext) {
+<span class="nc" id="L176">        return new ReferenceBeanBuilder(annotation, classLoader, applicationContext);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

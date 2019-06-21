@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RmiRemoteInvocation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-rmi</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.rmi</a> &gt; <span class="el_source">RmiRemoteInvocation.java</span></div><h1>RmiRemoteInvocation.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.rmi;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.RpcContext;
+
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.remoting.support.RemoteInvocation;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class RmiRemoteInvocation extends RemoteInvocation {
+    private static final long serialVersionUID = 1L;
+    private static final String dubboAttachmentsAttrName = &quot;dubbo.attachments&quot;;
+
+    /**
+     * executed on consumer side
+     */
+    public RmiRemoteInvocation(MethodInvocation methodInvocation) {
+<span class="nc" id="L38">        super(methodInvocation);</span>
+<span class="nc" id="L39">        addAttribute(dubboAttachmentsAttrName, new HashMap&lt;&gt;(RpcContext.getContext().getAttachments()));</span>
+<span class="nc" id="L40">    }</span>
+
+    /**
+     * Need to restore context on provider side (Though context will be overridden by Invocation's attachment
+     * when ContextFilter gets executed, we will restore the attachment when Invocation is constructed, check more
+     * from {@link org.apache.dubbo.rpc.proxy.InvokerInvocationHandler}
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    public Object invoke(Object targetObject) throws NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException {
+<span class="nc" id="L51">        RpcContext context = RpcContext.getContext();</span>
+<span class="nc" id="L52">        context.setAttachments((Map&lt;String, String&gt;) getAttribute(dubboAttachmentsAttrName));</span>
+<span class="nc" id="L53">        String generic = (String) getAttribute(Constants.GENERIC_KEY);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(generic)) {</span>
+<span class="nc" id="L55">            context.setAttachment(Constants.GENERIC_KEY, generic);</span>
+        }
+        try {
+<span class="nc" id="L58">            return super.invoke(targetObject);</span>
+        } finally {
+<span class="nc" id="L60">            context.setAttachments(null);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

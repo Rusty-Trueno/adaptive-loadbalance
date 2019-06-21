@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JsonRpcProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-jsonrpc</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.jsonrpc</a> &gt; <span class="el_source">JsonRpcProtocol.java</span></div><h1>JsonRpcProtocol.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.jsonrpc;
+
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.http.HttpBinder;
+import org.apache.dubbo.remoting.http.HttpHandler;
+import org.apache.dubbo.remoting.http.HttpServer;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.protocol.AbstractProxyProtocol;
+
+import com.googlecode.jsonrpc4j.HttpException;
+import com.googlecode.jsonrpc4j.JsonRpcClientException;
+import com.googlecode.jsonrpc4j.JsonRpcServer;
+import com.googlecode.jsonrpc4j.spring.JsonProxyFactoryBean;
+import org.springframework.remoting.RemoteAccessException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class JsonRpcProtocol extends AbstractProxyProtocol {
+
+    public static final String ACCESS_CONTROL_ALLOW_ORIGIN_HEADER = &quot;Access-Control-Allow-Origin&quot;;
+    public static final String ACCESS_CONTROL_ALLOW_METHODS_HEADER = &quot;Access-Control-Allow-Methods&quot;;
+    public static final String ACCESS_CONTROL_ALLOW_HEADERS_HEADER = &quot;Access-Control-Allow-Headers&quot;;
+
+<span class="nc" id="L48">    private final Map&lt;String, HttpServer&gt; serverMap = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L50">    private final Map&lt;String, JsonRpcServer&gt; skeletonMap = new ConcurrentHashMap&lt;&gt;();</span>
+
+    private HttpBinder httpBinder;
+
+    public JsonRpcProtocol() {
+<span class="nc" id="L55">        super(HttpException.class, JsonRpcClientException.class);</span>
+<span class="nc" id="L56">    }</span>
+
+    public void setHttpBinder(HttpBinder httpBinder) {
+<span class="nc" id="L59">        this.httpBinder = httpBinder;</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public int getDefaultPort() {
+<span class="nc" id="L64">        return 80;</span>
+    }
+
+    private class InternalHandler implements HttpHandler {
+
+        private boolean cors;
+
+<span class="nc" id="L71">        public InternalHandler(boolean cors) {</span>
+<span class="nc" id="L72">            this.cors = cors;</span>
+<span class="nc" id="L73">        }</span>
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException {
+<span class="nc" id="L78">            String uri = request.getRequestURI();</span>
+<span class="nc" id="L79">            JsonRpcServer skeleton = skeletonMap.get(uri);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (cors) {</span>
+<span class="nc" id="L81">                response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER, &quot;*&quot;);</span>
+<span class="nc" id="L82">                response.setHeader(ACCESS_CONTROL_ALLOW_METHODS_HEADER, &quot;POST&quot;);</span>
+<span class="nc" id="L83">                response.setHeader(ACCESS_CONTROL_ALLOW_HEADERS_HEADER, &quot;*&quot;);</span>
+            }
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (request.getMethod().equalsIgnoreCase(&quot;OPTIONS&quot;)) {</span>
+<span class="nc" id="L86">                response.setStatus(200);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            } else if (request.getMethod().equalsIgnoreCase(&quot;POST&quot;)) {</span>
+
+<span class="nc" id="L89">                RpcContext.getContext().setRemoteAddress(request.getRemoteAddr(), request.getRemotePort());</span>
+                try {
+<span class="nc" id="L91">                    skeleton.handle(request.getInputStream(), response.getOutputStream());</span>
+<span class="nc" id="L92">                } catch (Throwable e) {</span>
+<span class="nc" id="L93">                    throw new ServletException(e);</span>
+<span class="nc" id="L94">                }</span>
+            } else {
+<span class="nc" id="L96">                response.setStatus(500);</span>
+            }
+<span class="nc" id="L98">        }</span>
+
+    }
+
+    @Override
+    protected &lt;T&gt; Runnable doExport(T impl, Class&lt;T&gt; type, URL url) throws RpcException {
+<span class="nc" id="L104">        String addr = url.getIp() + &quot;:&quot; + url.getPort();</span>
+<span class="nc" id="L105">        HttpServer server = serverMap.get(addr);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (server == null) {</span>
+<span class="nc" id="L107">            server = httpBinder.bind(url, new InternalHandler(url.getParameter(&quot;cors&quot;, false)));</span>
+<span class="nc" id="L108">            serverMap.put(addr, server);</span>
+        }
+<span class="nc" id="L110">        final String path = url.getAbsolutePath();</span>
+<span class="nc" id="L111">        JsonRpcServer skeleton = new JsonRpcServer(impl, type);</span>
+<span class="nc" id="L112">        skeletonMap.put(path, skeleton);</span>
+<span class="nc" id="L113">        return () -&gt; skeletonMap.remove(path);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    protected &lt;T&gt; T doRefer(final Class&lt;T&gt; serviceType, URL url) throws RpcException {
+<span class="nc" id="L119">        JsonProxyFactoryBean jsonProxyFactoryBean = new JsonProxyFactoryBean();</span>
+<span class="nc" id="L120">        jsonProxyFactoryBean.setServiceUrl(url.setProtocol(&quot;http&quot;).toIdentityString());</span>
+<span class="nc" id="L121">        jsonProxyFactoryBean.setServiceInterface(serviceType);</span>
+
+<span class="nc" id="L123">        jsonProxyFactoryBean.afterPropertiesSet();</span>
+<span class="nc" id="L124">        return (T) jsonProxyFactoryBean.getObject();</span>
+    }
+
+    @Override
+    protected int getErrorCode(Throwable e) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (e instanceof RemoteAccessException) {</span>
+<span class="nc" id="L130">            e = e.getCause();</span>
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (e != null) {</span>
+<span class="nc" id="L133">            Class&lt;?&gt; cls = e.getClass();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            if (SocketTimeoutException.class.equals(cls)) {</span>
+<span class="nc" id="L135">                return RpcException.TIMEOUT_EXCEPTION;</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            } else if (IOException.class.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L137">                return RpcException.NETWORK_EXCEPTION;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            } else if (ClassNotFoundException.class.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L139">                return RpcException.SERIALIZATION_EXCEPTION;</span>
+            }
+        }
+<span class="nc" id="L142">        return super.getErrorCode(e);</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L147">        super.destroy();</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        for (String key : new ArrayList&lt;&gt;(serverMap.keySet())) {</span>
+<span class="nc" id="L149">            HttpServer server = serverMap.remove(key);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (server != null) {</span>
+                try {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                    if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L153">                        logger.info(&quot;Close jsonrpc server &quot; + server.getUrl());</span>
+                    }
+<span class="nc" id="L155">                    server.close();</span>
+<span class="nc" id="L156">                } catch (Throwable t) {</span>
+<span class="nc" id="L157">                    logger.warn(t.getMessage(), t);</span>
+<span class="nc" id="L158">                }</span>
+            }
+<span class="nc" id="L160">        }</span>
+<span class="nc" id="L161">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

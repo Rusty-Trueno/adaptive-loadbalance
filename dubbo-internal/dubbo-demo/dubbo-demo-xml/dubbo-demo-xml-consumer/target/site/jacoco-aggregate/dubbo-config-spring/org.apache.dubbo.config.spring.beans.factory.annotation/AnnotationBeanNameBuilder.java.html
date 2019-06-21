@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnnotationBeanNameBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-xml-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.beans.factory.annotation</a> &gt; <span class="el_source">AnnotationBeanNameBuilder.java</span></div><h1>AnnotationBeanNameBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.beans.factory.annotation;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.config.annotation.Reference;
+import org.apache.dubbo.config.annotation.Service;
+import org.apache.dubbo.registry.Registry;
+
+import org.springframework.core.env.Environment;
+
+import static org.apache.dubbo.common.Constants.CONSUMERS_CATEGORY;
+import static org.apache.dubbo.common.Constants.DEFAULT_PROTOCOL;
+import static org.apache.dubbo.common.Constants.PROVIDERS_CATEGORY;
+import static org.apache.dubbo.config.spring.util.AnnotationUtils.resolveInterfaceName;
+import static org.springframework.util.StringUtils.arrayToCommaDelimitedString;
+import static org.springframework.util.StringUtils.hasText;
+
+/**
+ * The Bean Name Builder for the annotations {@link Service} and {@link Reference}
+ * &lt;p&gt;
+ * The naming rule is consistent with the the implementation {@link Registry} that is based on the service-name aware
+ * infrastructure, e.g Spring Cloud, Cloud Native and so on.
+ * &lt;p&gt;
+ * The pattern of bean name : ${category}:${protocol}:${serviceInterface}:${version}:${group}.
+ * &lt;p&gt;
+ * ${version} and ${group} are optional.
+ *
+ * @since 2.6.6
+ */
+class AnnotationBeanNameBuilder {
+
+    private static final String SEPARATOR = &quot;:&quot;;
+
+    // Required properties
+
+    private final String category;
+
+    private final String protocol;
+
+    private final String interfaceClassName;
+
+    // Optional properties
+
+    private String version;
+
+    private String group;
+
+    private Environment environment;
+
+<span class="nc" id="L65">    private AnnotationBeanNameBuilder(String category, String protocol, String interfaceClassName) {</span>
+<span class="nc" id="L66">        this.category = category;</span>
+<span class="nc" id="L67">        this.protocol = protocol;</span>
+<span class="nc" id="L68">        this.interfaceClassName = interfaceClassName;</span>
+<span class="nc" id="L69">    }</span>
+
+    private AnnotationBeanNameBuilder(Service service, Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L72">        this(PROVIDERS_CATEGORY, resolveProtocol(service.protocol()), resolveInterfaceName(service, interfaceClass));</span>
+<span class="nc" id="L73">        this.group(service.group());</span>
+<span class="nc" id="L74">        this.version(service.version());</span>
+<span class="nc" id="L75">    }</span>
+
+    private AnnotationBeanNameBuilder(Reference reference, Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L78">        this(CONSUMERS_CATEGORY, resolveProtocol(reference.protocol()), resolveInterfaceName(reference, interfaceClass));</span>
+<span class="nc" id="L79">        this.group(reference.group());</span>
+<span class="nc" id="L80">        this.version(reference.version());</span>
+<span class="nc" id="L81">    }</span>
+
+    public static AnnotationBeanNameBuilder create(Service service, Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L84">        return new AnnotationBeanNameBuilder(service, interfaceClass);</span>
+    }
+
+    public static AnnotationBeanNameBuilder create(Reference reference, Class&lt;?&gt; interfaceClass) {
+<span class="nc" id="L88">        return new AnnotationBeanNameBuilder(reference, interfaceClass);</span>
+    }
+
+    private static void append(StringBuilder builder, String value) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (hasText(value)) {</span>
+<span class="nc" id="L93">            builder.append(SEPARATOR).append(value);</span>
+        }
+<span class="nc" id="L95">    }</span>
+
+    public AnnotationBeanNameBuilder group(String group) {
+<span class="nc" id="L98">        this.group = group;</span>
+<span class="nc" id="L99">        return this;</span>
+    }
+
+    public AnnotationBeanNameBuilder version(String version) {
+<span class="nc" id="L103">        this.version = version;</span>
+<span class="nc" id="L104">        return this;</span>
+    }
+
+    public AnnotationBeanNameBuilder environment(Environment environment) {
+<span class="nc" id="L108">        this.environment = environment;</span>
+<span class="nc" id="L109">        return this;</span>
+    }
+
+    /**
+     * Resolve the protocol
+     *
+     * @param protocols one or more protocols
+     * @return if &lt;code&gt;protocols&lt;/code&gt; == &lt;code&gt;null&lt;/code&gt;, it will return
+     * {@link Constants#DEFAULT_PROTOCOL &quot;dubbo&quot;} as the default protocol
+     * @see Constants#DEFAULT_PROTOCOL
+     */
+    private static String resolveProtocol(String... protocols) {
+<span class="nc" id="L121">        String protocol = arrayToCommaDelimitedString(protocols);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        return hasText(protocol) ? protocol : DEFAULT_PROTOCOL;</span>
+    }
+
+    /**
+     * Build bean name while resolve the placeholders if possible.
+     *
+     * @return pattern : ${category}:${protocol}:${serviceInterface}:${version}:${group}
+     */
+    public String build() {
+        // Append the required properties
+<span class="nc" id="L132">        StringBuilder beanNameBuilder = new StringBuilder(category);</span>
+<span class="nc" id="L133">        append(beanNameBuilder, protocol);</span>
+<span class="nc" id="L134">        append(beanNameBuilder, interfaceClassName);</span>
+        // Append the optional properties
+<span class="nc" id="L136">        append(beanNameBuilder, version);</span>
+<span class="nc" id="L137">        append(beanNameBuilder, group);</span>
+<span class="nc" id="L138">        String beanName = beanNameBuilder.toString();</span>
+        // Resolve placeholders
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        return environment != null ? environment.resolvePlaceholders(beanName) : beanName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

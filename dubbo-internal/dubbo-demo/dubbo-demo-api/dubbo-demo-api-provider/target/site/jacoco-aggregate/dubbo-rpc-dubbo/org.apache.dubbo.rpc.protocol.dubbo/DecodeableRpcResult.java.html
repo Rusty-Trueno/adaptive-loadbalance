@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DecodeableRpcResult.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-dubbo</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.protocol.dubbo</a> &gt; <span class="el_source">DecodeableRpcResult.java</span></div><h1>DecodeableRpcResult.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.protocol.dubbo;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.serialize.Cleanable;
+import org.apache.dubbo.common.serialize.ObjectInput;
+import org.apache.dubbo.common.utils.ArrayUtils;
+import org.apache.dubbo.common.utils.Assert;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.Codec;
+import org.apache.dubbo.remoting.Decodeable;
+import org.apache.dubbo.remoting.exchange.Response;
+import org.apache.dubbo.remoting.transport.CodecSupport;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.RpcResult;
+import org.apache.dubbo.rpc.support.RpcUtils;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Type;
+import java.util.Map;
+
+public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable {
+
+<span class="nc" id="L43">    private static final Logger log = LoggerFactory.getLogger(DecodeableRpcResult.class);</span>
+
+    private Channel channel;
+
+    private byte serializationType;
+
+    private InputStream inputStream;
+
+    private Response response;
+
+    private Invocation invocation;
+
+    private volatile boolean hasDecoded;
+
+<span class="nc" id="L57">    public DecodeableRpcResult(Channel channel, Response response, InputStream is, Invocation invocation, byte id) {</span>
+<span class="nc" id="L58">        Assert.notNull(channel, &quot;channel == null&quot;);</span>
+<span class="nc" id="L59">        Assert.notNull(response, &quot;response == null&quot;);</span>
+<span class="nc" id="L60">        Assert.notNull(is, &quot;inputStream == null&quot;);</span>
+<span class="nc" id="L61">        this.channel = channel;</span>
+<span class="nc" id="L62">        this.response = response;</span>
+<span class="nc" id="L63">        this.inputStream = is;</span>
+<span class="nc" id="L64">        this.invocation = invocation;</span>
+<span class="nc" id="L65">        this.serializationType = id;</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public void encode(Channel channel, OutputStream output, Object message) throws IOException {
+<span class="nc" id="L70">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public Object decode(Channel channel, InputStream input) throws IOException {
+<span class="nc" id="L75">        ObjectInput in = CodecSupport.getSerialization(channel.getUrl(), serializationType)</span>
+<span class="nc" id="L76">                .deserialize(channel.getUrl(), input);</span>
+
+<span class="nc" id="L78">        byte flag = in.readByte();</span>
+<span class="nc bnc" id="L79" title="All 7 branches missed.">        switch (flag) {</span>
+            case DubboCodec.RESPONSE_NULL_VALUE:
+<span class="nc" id="L81">                break;</span>
+            case DubboCodec.RESPONSE_VALUE:
+<span class="nc" id="L83">                handleValue(in);</span>
+<span class="nc" id="L84">                break;</span>
+            case DubboCodec.RESPONSE_WITH_EXCEPTION:
+<span class="nc" id="L86">                handleException(in);</span>
+<span class="nc" id="L87">                break;</span>
+            case DubboCodec.RESPONSE_NULL_VALUE_WITH_ATTACHMENTS:
+<span class="nc" id="L89">                handleAttachment(in);</span>
+<span class="nc" id="L90">                break;</span>
+            case DubboCodec.RESPONSE_VALUE_WITH_ATTACHMENTS:
+<span class="nc" id="L92">                handleValue(in);</span>
+<span class="nc" id="L93">                handleAttachment(in);</span>
+<span class="nc" id="L94">                break;</span>
+            case DubboCodec.RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS:
+<span class="nc" id="L96">                handleException(in);</span>
+<span class="nc" id="L97">                handleAttachment(in);</span>
+<span class="nc" id="L98">                break;</span>
+            default:
+<span class="nc" id="L100">                throw new IOException(&quot;Unknown result flag, expect '0' '1' '2', get &quot; + flag);</span>
+        }
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (in instanceof Cleanable) {</span>
+<span class="nc" id="L103">            ((Cleanable) in).cleanup();</span>
+        }
+<span class="nc" id="L105">        return this;</span>
+    }
+
+    @Override
+    public void decode() throws Exception {
+<span class="nc bnc" id="L110" title="All 6 branches missed.">        if (!hasDecoded &amp;&amp; channel != null &amp;&amp; inputStream != null) {</span>
+            try {
+<span class="nc" id="L112">                decode(channel, inputStream);</span>
+<span class="nc" id="L113">            } catch (Throwable e) {</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (log.isWarnEnabled()) {</span>
+<span class="nc" id="L115">                    log.warn(&quot;Decode rpc result failed: &quot; + e.getMessage(), e);</span>
+                }
+<span class="nc" id="L117">                response.setStatus(Response.CLIENT_ERROR);</span>
+<span class="nc" id="L118">                response.setErrorMessage(StringUtils.toString(e));</span>
+            } finally {
+<span class="nc" id="L120">                hasDecoded = true;</span>
+            }
+        }
+<span class="nc" id="L123">    }</span>
+
+    private void handleValue(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L127">            Type[] returnTypes = RpcUtils.getReturnTypes(invocation);</span>
+<span class="nc" id="L128">            Object value = null;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (ArrayUtils.isEmpty(returnTypes)) {</span>
+<span class="nc" id="L130">                value = in.readObject();</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            } else if (returnTypes.length == 1) {</span>
+<span class="nc" id="L132">                value = in.readObject((Class&lt;?&gt;) returnTypes[0]);</span>
+            } else {
+<span class="nc" id="L134">                value = in.readObject((Class&lt;?&gt;) returnTypes[0], returnTypes[1]);</span>
+            }
+<span class="nc" id="L136">            setValue(value);</span>
+<span class="nc" id="L137">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L138">            rethrow(e);</span>
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">    }</span>
+
+    private void handleException(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L144">            Object obj = in.readObject();</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (!(obj instanceof Throwable)) {</span>
+<span class="nc" id="L146">                throw new IOException(&quot;Response data error, expect Throwable, but get &quot; + obj);</span>
+            }
+<span class="nc" id="L148">            setException((Throwable) obj);</span>
+<span class="nc" id="L149">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L150">            rethrow(e);</span>
+<span class="nc" id="L151">        }</span>
+<span class="nc" id="L152">    }</span>
+
+    private void handleAttachment(ObjectInput in) throws IOException {
+        try {
+<span class="nc" id="L156">            setAttachments((Map&lt;String, String&gt;) in.readObject(Map.class));</span>
+<span class="nc" id="L157">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L158">            rethrow(e);</span>
+<span class="nc" id="L159">        }</span>
+<span class="nc" id="L160">    }</span>
+
+    private void rethrow(Exception e) throws IOException {
+<span class="nc" id="L163">        throw new IOException(StringUtils.toString(&quot;Read response data failed.&quot;, e));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

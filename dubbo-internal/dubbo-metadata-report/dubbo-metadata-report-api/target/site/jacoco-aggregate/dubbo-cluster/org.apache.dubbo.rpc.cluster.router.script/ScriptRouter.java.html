@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScriptRouter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-report-api</a> &gt; <a href="../index.html" class="el_bundle">dubbo-cluster</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.cluster.router.script</a> &gt; <span class="el_source">ScriptRouter.java</span></div><h1>ScriptRouter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.cluster.router.script;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.rpc.Invocation;
+import org.apache.dubbo.rpc.Invoker;
+import org.apache.dubbo.rpc.RpcContext;
+import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.cluster.router.AbstractRouter;
+
+import javax.script.Bindings;
+import javax.script.Compilable;
+import javax.script.CompiledScript;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+/**
+ * ScriptRouter
+ */
+public class ScriptRouter extends AbstractRouter {
+    public static final String NAME = &quot;SCRIPT_ROUTER&quot;;
+    private static final int SCRIPT_ROUTER_DEFAULT_PRIORITY = 0;
+<span class="nc" id="L49">    private static final Logger logger = LoggerFactory.getLogger(ScriptRouter.class);</span>
+
+<span class="nc" id="L51">    private static final Map&lt;String, ScriptEngine&gt; engines = new ConcurrentHashMap&lt;&gt;();</span>
+
+    private final ScriptEngine engine;
+
+    private final String rule;
+
+    private CompiledScript function;
+
+<span class="nc" id="L59">    public ScriptRouter(URL url) {</span>
+<span class="nc" id="L60">        this.url = url;</span>
+<span class="nc" id="L61">        this.priority = url.getParameter(Constants.PRIORITY_KEY, SCRIPT_ROUTER_DEFAULT_PRIORITY);</span>
+
+<span class="nc" id="L63">        engine = getEngine(url);</span>
+<span class="nc" id="L64">        rule = getRule(url);</span>
+        try {
+<span class="nc" id="L66">            Compilable compilable = (Compilable) engine;</span>
+<span class="nc" id="L67">            function = compilable.compile(rule);</span>
+<span class="nc" id="L68">        } catch (ScriptException e) {</span>
+<span class="nc" id="L69">            logger.error(&quot;route error, rule has been ignored. rule: &quot; + rule +</span>
+<span class="nc" id="L70">                    &quot;, url: &quot; + RpcContext.getContext().getUrl(), e);</span>
+<span class="nc" id="L71">        }</span>
+
+
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * get rule from url parameters.
+     */
+    private String getRule(URL url) {
+<span class="nc" id="L80">        String vRule = url.getParameterAndDecoded(Constants.RULE_KEY);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (StringUtils.isEmpty(vRule)) {</span>
+<span class="nc" id="L82">            throw new IllegalStateException(&quot;route rule can not be empty.&quot;);</span>
+        }
+<span class="nc" id="L84">        return vRule;</span>
+    }
+
+    /**
+     * create ScriptEngine instance by type from url parameters, then cache it
+     */
+    private ScriptEngine getEngine(URL url) {
+<span class="nc" id="L91">        String type = url.getParameter(Constants.TYPE_KEY, Constants.DEFAULT_SCRIPT_TYPE_KEY);</span>
+
+<span class="nc" id="L93">        return engines.computeIfAbsent(type, t -&gt; {</span>
+<span class="nc" id="L94">            ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByName(type);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (scriptEngine == null) {</span>
+<span class="nc" id="L96">                throw new IllegalStateException(&quot;unsupported route engine type: &quot; + type);</span>
+            }
+<span class="nc" id="L98">            return scriptEngine;</span>
+        });
+    }
+
+    @Override
+    public &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; route(List&lt;Invoker&lt;T&gt;&gt; invokers, URL url, Invocation invocation) throws RpcException {
+        try {
+<span class="nc" id="L105">            Bindings bindings = createBindings(invokers, invocation);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (function == null) {</span>
+<span class="nc" id="L107">                return invokers;</span>
+            }
+<span class="nc" id="L109">            return getRoutedInvokers(function.eval(bindings));</span>
+<span class="nc" id="L110">        } catch (ScriptException e) {</span>
+<span class="nc" id="L111">            logger.error(&quot;route error, rule has been ignored. rule: &quot; + rule + &quot;, method:&quot; +</span>
+<span class="nc" id="L112">                    invocation.getMethodName() + &quot;, url: &quot; + RpcContext.getContext().getUrl(), e);</span>
+<span class="nc" id="L113">            return invokers;</span>
+        }
+    }
+
+    /**
+     * get routed invokers from result of script rule evaluation
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected &lt;T&gt; List&lt;Invoker&lt;T&gt;&gt; getRoutedInvokers(Object obj) {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (obj instanceof Invoker[]) {</span>
+<span class="nc" id="L123">            return Arrays.asList((Invoker&lt;T&gt;[]) obj);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        } else if (obj instanceof Object[]) {</span>
+<span class="nc" id="L125">            return Arrays.stream((Object[]) obj).map(item -&gt; (Invoker&lt;T&gt;) item).collect(Collectors.toList());</span>
+        } else {
+<span class="nc" id="L127">            return (List&lt;Invoker&lt;T&gt;&gt;) obj;</span>
+        }
+    }
+
+    /**
+     * create bindings for script engine
+     */
+    private &lt;T&gt; Bindings createBindings(List&lt;Invoker&lt;T&gt;&gt; invokers, Invocation invocation) {
+<span class="nc" id="L135">        Bindings bindings = engine.createBindings();</span>
+        // create a new List of invokers
+<span class="nc" id="L137">        bindings.put(&quot;invokers&quot;, new ArrayList&lt;&gt;(invokers));</span>
+<span class="nc" id="L138">        bindings.put(&quot;invocation&quot;, invocation);</span>
+<span class="nc" id="L139">        bindings.put(&quot;context&quot;, RpcContext.getContext());</span>
+<span class="nc" id="L140">        return bindings;</span>
+    }
+
+    @Override
+    public boolean isRuntime() {
+<span class="nc" id="L145">        return this.url.getParameter(Constants.RUNTIME_KEY, false);</span>
+    }
+
+    @Override
+    public boolean isForce() {
+<span class="nc" id="L150">        return url.getParameter(Constants.FORCE_KEY, false);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

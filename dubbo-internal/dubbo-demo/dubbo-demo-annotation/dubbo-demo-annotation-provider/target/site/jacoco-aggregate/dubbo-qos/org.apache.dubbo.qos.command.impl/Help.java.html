@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Help.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-qos</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.qos.command.impl</a> &gt; <span class="el_source">Help.java</span></div><h1>Help.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.qos.command.impl;
+
+import org.apache.dubbo.qos.command.BaseCommand;
+import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.command.annotation.Cmd;
+import org.apache.dubbo.qos.command.util.CommandHelper;
+import org.apache.dubbo.qos.textui.TTable;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+@Cmd(name = &quot;help&quot;, summary = &quot;help command&quot;, example = {
+        &quot;help&quot;,
+        &quot;help online&quot;
+})
+<span class="nc" id="L33">public class Help implements BaseCommand {</span>
+    @Override
+    public String execute(CommandContext commandContext, String[] args) {
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (args != null &amp;&amp; args.length &gt; 0) {</span>
+<span class="nc" id="L37">            return commandHelp(args[0]);</span>
+        } else {
+<span class="nc" id="L39">            return mainHelp();</span>
+        }
+
+    }
+
+
+    private String commandHelp(String commandName) {
+
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (!CommandHelper.hasCommand(commandName)) {</span>
+<span class="nc" id="L48">            return &quot;no such command:&quot; + commandName;</span>
+        }
+
+<span class="nc" id="L51">        Class&lt;?&gt; clazz = CommandHelper.getCommandClass(commandName);</span>
+
+<span class="nc" id="L53">        final Cmd cmd = clazz.getAnnotation(Cmd.class);</span>
+<span class="nc" id="L54">        final TTable tTable = new TTable(new TTable.ColumnDefine[]{</span>
+                new TTable.ColumnDefine(TTable.Align.RIGHT),
+                new TTable.ColumnDefine(80, false, TTable.Align.LEFT)
+        });
+
+<span class="nc" id="L59">        tTable.addRow(&quot;COMMAND NAME&quot;, commandName);</span>
+
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (null != cmd.example()) {</span>
+<span class="nc" id="L62">            tTable.addRow(&quot;EXAMPLE&quot;, drawExample(cmd));</span>
+        }
+
+<span class="nc" id="L65">        return tTable.padding(1).rendering();</span>
+    }
+
+    private String drawExample(Cmd cmd) {
+<span class="nc" id="L69">        final StringBuilder drawExampleStringBuilder = new StringBuilder();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (String example : cmd.example()) {</span>
+<span class="nc" id="L71">            drawExampleStringBuilder.append(example).append(&quot;\n&quot;);</span>
+        }
+<span class="nc" id="L73">        return drawExampleStringBuilder.toString();</span>
+    }
+
+    /*
+     * output main help
+     */
+    private String mainHelp() {
+
+<span class="nc" id="L81">        final TTable tTable = new TTable(new TTable.ColumnDefine[]{</span>
+                new TTable.ColumnDefine(TTable.Align.RIGHT),
+                new TTable.ColumnDefine(80, false, TTable.Align.LEFT)
+        });
+
+<span class="nc" id="L86">        final List&lt;Class&lt;?&gt;&gt; classes = CommandHelper.getAllCommandClass();</span>
+
+<span class="nc" id="L88">        Collections.sort(classes, new Comparator&lt;Class&lt;?&gt;&gt;() {</span>
+
+            @Override
+            public int compare(Class&lt;?&gt; o1, Class&lt;?&gt; o2) {
+<span class="nc" id="L92">                final Integer o1s = o1.getAnnotation(Cmd.class).sort();</span>
+<span class="nc" id="L93">                final Integer o2s = o2.getAnnotation(Cmd.class).sort();</span>
+<span class="nc" id="L94">                return o1s.compareTo(o2s);</span>
+            }
+
+        });
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        for (Class&lt;?&gt; clazz : classes) {</span>
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (clazz.isAnnotationPresent(Cmd.class)) {</span>
+<span class="nc" id="L101">                final Cmd cmd = clazz.getAnnotation(Cmd.class);</span>
+<span class="nc" id="L102">                tTable.addRow(cmd.name(), cmd.summary());</span>
+            }
+
+<span class="nc" id="L105">        }</span>
+
+<span class="nc" id="L107">        return tTable.padding(1).rendering();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

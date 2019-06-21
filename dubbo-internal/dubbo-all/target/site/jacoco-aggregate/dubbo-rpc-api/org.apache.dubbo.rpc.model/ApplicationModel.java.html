@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationModel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-rpc-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.rpc.model</a> &gt; <span class="el_source">ApplicationModel.java</span></div><h1>ApplicationModel.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.rpc.model;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+
+import java.util.Collection;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * Represent a application which is using Dubbo and store basic metadata info for using
+ * during the processing of RPC invoking.
+ *
+ * ApplicationModel includes many ProviderModel which is about published services
+ * and many Consumer Model which is about subscribed services.
+ *
+ * adjust project structure in order to fully utilize the methods introduced here.
+ */
+<span class="nc" id="L35">public class ApplicationModel {</span>
+
+<span class="nc" id="L37">    protected static final Logger LOGGER = LoggerFactory.getLogger(ApplicationModel.class);</span>
+
+    /**
+     * full qualified class name -&gt; provided service
+     */
+<span class="nc" id="L42">    private static final ConcurrentMap&lt;String, ProviderModel&gt; PROVIDED_SERVICES = new ConcurrentHashMap&lt;&gt;();</span>
+    /**
+     * full qualified class name -&gt; subscribe service
+     */
+<span class="nc" id="L46">    private static final ConcurrentMap&lt;String, ConsumerModel&gt; CONSUMED_SERVICES = new ConcurrentHashMap&lt;&gt;();</span>
+
+    private static String application;
+
+    public static Collection&lt;ConsumerModel&gt; allConsumerModels() {
+<span class="nc" id="L51">        return CONSUMED_SERVICES.values();</span>
+    }
+
+    public static Collection&lt;ProviderModel&gt; allProviderModels() {
+<span class="nc" id="L55">        return PROVIDED_SERVICES.values();</span>
+    }
+
+    public static ProviderModel getProviderModel(String serviceName) {
+<span class="nc" id="L59">        return PROVIDED_SERVICES.get(serviceName);</span>
+    }
+
+    public static ConsumerModel getConsumerModel(String serviceName) {
+<span class="nc" id="L63">        return CONSUMED_SERVICES.get(serviceName);</span>
+    }
+
+    public static void initConsumerModel(String serviceName, ConsumerModel consumerModel) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (CONSUMED_SERVICES.putIfAbsent(serviceName, consumerModel) != null) {</span>
+<span class="nc" id="L68">            LOGGER.warn(&quot;Already register the same consumer:&quot; + serviceName);</span>
+        }
+<span class="nc" id="L70">    }</span>
+
+    public static void initProviderModel(String serviceName, ProviderModel providerModel) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (PROVIDED_SERVICES.putIfAbsent(serviceName, providerModel) != null) {</span>
+<span class="nc" id="L74">            LOGGER.warn(&quot;Already register the same:&quot; + serviceName);</span>
+        }
+<span class="nc" id="L76">    }</span>
+
+    public static String getApplication() {
+<span class="nc" id="L79">        return application;</span>
+    }
+
+    public static void setApplication(String application) {
+<span class="nc" id="L83">        ApplicationModel.application = application;</span>
+<span class="nc" id="L84">    }</span>
+
+    /**
+     * For unit test
+     */
+    public static void reset() {
+<span class="nc" id="L90">        PROVIDED_SERVICES.clear();</span>
+<span class="nc" id="L91">        CONSUMED_SERVICES.clear();</span>
+<span class="nc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

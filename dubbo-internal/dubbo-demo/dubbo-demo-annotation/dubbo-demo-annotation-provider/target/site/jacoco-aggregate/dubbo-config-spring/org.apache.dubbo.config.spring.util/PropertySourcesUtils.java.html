@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PropertySourcesUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-annotation-provider</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-spring</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.spring.util</a> &gt; <span class="el_source">PropertySourcesUtils.java</span></div><h1>PropertySourcesUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.spring.util;
+
+import org.springframework.core.env.AbstractEnvironment;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.EnumerablePropertySource;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.PropertySources;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Properties;
+
+
+/**
+ * {@link PropertySources} Utilities
+ * &lt;p&gt;
+ * The source code is cloned from https://github.com/alibaba/spring-context-support/blob/1.0.2/src/main/java/com/alibaba/spring/util/PropertySourcesUtils.java
+ *
+ * @since 2.6.6
+ */
+<span class="nc" id="L39">public abstract class PropertySourcesUtils {</span>
+
+    /**
+     * Get Sub {@link Properties}
+     *
+     * @param propertySources {@link PropertySource} Iterable
+     * @param prefix          the prefix of property name
+     * @return Map
+     * @see Properties
+     */
+    public static Map&lt;String, Object&gt; getSubProperties(Iterable&lt;PropertySource&lt;?&gt;&gt; propertySources, String prefix) {
+
+        // Non-Extension AbstractEnvironment
+<span class="nc" id="L52">        AbstractEnvironment environment = new AbstractEnvironment() {</span>
+        };
+
+<span class="nc" id="L55">        MutablePropertySources mutablePropertySources = environment.getPropertySources();</span>
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (PropertySource&lt;?&gt; source : propertySources) {</span>
+<span class="nc" id="L58">            mutablePropertySources.addLast(source);</span>
+<span class="nc" id="L59">        }</span>
+
+<span class="nc" id="L61">        return getSubProperties(environment, prefix);</span>
+
+    }
+
+    /**
+     * Get Sub {@link Properties}
+     *
+     * @param environment {@link ConfigurableEnvironment}
+     * @param prefix      the prefix of property name
+     * @return Map
+     * @see Properties
+     */
+    public static Map&lt;String, Object&gt; getSubProperties(ConfigurableEnvironment environment, String prefix) {
+
+<span class="nc" id="L75">        Map&lt;String, Object&gt; subProperties = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L77">        MutablePropertySources propertySources = environment.getPropertySources();</span>
+
+<span class="nc" id="L79">        String normalizedPrefix = normalizePrefix(prefix);</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (PropertySource&lt;?&gt; source : propertySources) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (source instanceof EnumerablePropertySource) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                for (String name : ((EnumerablePropertySource&lt;?&gt;) source).getPropertyNames()) {</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">                    if (!subProperties.containsKey(name) &amp;&amp; name.startsWith(normalizedPrefix)) {</span>
+<span class="nc" id="L85">                        String subName = name.substring(normalizedPrefix.length());</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                        if (!subProperties.containsKey(subName)) { // take first one</span>
+<span class="nc" id="L87">                            Object value = source.getProperty(name);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                            if (value instanceof String) {</span>
+                                // Resolve placeholder
+<span class="nc" id="L90">                                value = environment.resolvePlaceholders((String) value);</span>
+                            }
+<span class="nc" id="L92">                            subProperties.put(subName, value);</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L97">        }</span>
+
+<span class="nc" id="L99">        return Collections.unmodifiableMap(subProperties);</span>
+
+    }
+
+    /**
+     * Normalize the prefix
+     *
+     * @param prefix the prefix
+     * @return the prefix
+     */
+    public static String normalizePrefix(String prefix) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        return prefix.endsWith(&quot;.&quot;) ? prefix : prefix + &quot;.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

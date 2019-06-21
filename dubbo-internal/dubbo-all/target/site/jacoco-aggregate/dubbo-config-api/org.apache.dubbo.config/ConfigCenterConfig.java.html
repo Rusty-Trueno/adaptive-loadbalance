@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConfigCenterConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">ConfigCenterConfig.java</span></div><h1>ConfigCenterConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.config.Environment;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.config.support.Parameter;
+
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * ConfigCenterConfig
+ */
+public class ConfigCenterConfig extends AbstractConfig {
+<span class="nc" id="L33">    private AtomicBoolean inited = new AtomicBoolean(false);</span>
+
+    private String protocol;
+    private String address;
+    private String cluster;
+<span class="nc" id="L38">    private String namespace = &quot;dubbo&quot;;</span>
+<span class="nc" id="L39">    private String group = &quot;dubbo&quot;;</span>
+    private String username;
+    private String password;
+<span class="nc" id="L42">    private Long timeout = 3000L;</span>
+<span class="nc" id="L43">    private Boolean highestPriority = true;</span>
+<span class="nc" id="L44">    private Boolean check = true;</span>
+
+    private String appName;
+<span class="nc" id="L47">    private String configFile = &quot;dubbo.properties&quot;;</span>
+    private String appConfigFile;
+
+    // customized parameters
+    private Map&lt;String, String&gt; parameters;
+
+<span class="nc" id="L53">    public ConfigCenterConfig() {</span>
+<span class="nc" id="L54">    }</span>
+
+    public URL toUrl() {
+<span class="nc" id="L57">        Map&lt;String, String&gt; map = this.getMetaData();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (StringUtils.isEmpty(address)) {</span>
+<span class="nc" id="L59">            address = Constants.ANYHOST_VALUE;</span>
+        }
+<span class="nc" id="L61">        map.put(Constants.PATH_KEY, ConfigCenterConfig.class.getSimpleName());</span>
+        // use 'zookeeper' as the default configcenter.
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (StringUtils.isEmpty(map.get(Constants.PROTOCOL_KEY))) {</span>
+<span class="nc" id="L64">            map.put(Constants.PROTOCOL_KEY, Constants.ZOOKEEPER_PROTOCOL);</span>
+        }
+<span class="nc" id="L66">        return UrlUtils.parseURL(address, map);</span>
+    }
+
+    public boolean checkOrUpdateInited() {
+<span class="nc" id="L70">        return inited.compareAndSet(false, true);</span>
+    }
+
+    public void setExternalConfig(Map&lt;String, String&gt; externalConfiguration) {
+<span class="nc" id="L74">        Environment.getInstance().setExternalConfigMap(externalConfiguration);</span>
+<span class="nc" id="L75">    }</span>
+
+    public void setAppExternalConfig(Map&lt;String, String&gt; appExternalConfiguration) {
+<span class="nc" id="L78">        Environment.getInstance().setAppExternalConfigMap(appExternalConfiguration);</span>
+<span class="nc" id="L79">    }</span>
+
+    public String getProtocol() {
+<span class="nc" id="L82">        return protocol;</span>
+    }
+
+    public void setProtocol(String protocol) {
+<span class="nc" id="L86">        this.protocol = protocol;</span>
+<span class="nc" id="L87">    }</span>
+
+    @Parameter(excluded = true)
+    public String getAddress() {
+<span class="nc" id="L91">        return address;</span>
+    }
+
+    public void setAddress(String address) {
+<span class="nc" id="L95">        this.address = address;</span>
+<span class="nc" id="L96">    }</span>
+
+    @Parameter(key = Constants.CONFIG_CLUSTER_KEY, useKeyAsProperty = false)
+    public String getCluster() {
+<span class="nc" id="L100">        return cluster;</span>
+    }
+
+    public void setCluster(String cluster) {
+<span class="nc" id="L104">        this.cluster = cluster;</span>
+<span class="nc" id="L105">    }</span>
+
+    @Parameter(key = Constants.CONFIG_NAMESPACE_KEY, useKeyAsProperty = false)
+    public String getNamespace() {
+<span class="nc" id="L109">        return namespace;</span>
+    }
+
+    public void setNamespace(String namespace) {
+<span class="nc" id="L113">        this.namespace = namespace;</span>
+<span class="nc" id="L114">    }</span>
+
+    @Parameter(key = Constants.CONFIG_GROUP_KEY, useKeyAsProperty = false)
+    public String getGroup() {
+<span class="nc" id="L118">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L122">        this.group = group;</span>
+<span class="nc" id="L123">    }</span>
+
+    @Parameter(key = Constants.CONFIG_CHECK_KEY, useKeyAsProperty = false)
+    public Boolean isCheck() {
+<span class="nc" id="L127">        return check;</span>
+    }
+
+    public void setCheck(Boolean check) {
+<span class="nc" id="L131">        this.check = check;</span>
+<span class="nc" id="L132">    }</span>
+
+    @Parameter(key = Constants.CONFIG_ENABLE_KEY, useKeyAsProperty = false)
+    public Boolean isHighestPriority() {
+<span class="nc" id="L136">        return highestPriority;</span>
+    }
+
+    public void setHighestPriority(Boolean highestPriority) {
+<span class="nc" id="L140">        this.highestPriority = highestPriority;</span>
+<span class="nc" id="L141">    }</span>
+
+    public String getUsername() {
+<span class="nc" id="L144">        return username;</span>
+    }
+
+    public void setUsername(String username) {
+<span class="nc" id="L148">        this.username = username;</span>
+<span class="nc" id="L149">    }</span>
+
+    public String getPassword() {
+<span class="nc" id="L152">        return password;</span>
+    }
+
+    public void setPassword(String password) {
+<span class="nc" id="L156">        this.password = password;</span>
+<span class="nc" id="L157">    }</span>
+
+    @Parameter(key = Constants.CONFIG_TIMEOUT_KEY, useKeyAsProperty = false)
+    public Long getTimeout() {
+<span class="nc" id="L161">        return timeout;</span>
+    }
+
+    public void setTimeout(Long timeout) {
+<span class="nc" id="L165">        this.timeout = timeout;</span>
+<span class="nc" id="L166">    }</span>
+
+    @Parameter(key = Constants.CONFIG_CONFIGFILE_KEY, useKeyAsProperty = false)
+    public String getConfigFile() {
+<span class="nc" id="L170">        return configFile;</span>
+    }
+
+    public void setConfigFile(String configFile) {
+<span class="nc" id="L174">        this.configFile = configFile;</span>
+<span class="nc" id="L175">    }</span>
+
+    @Parameter(excluded = true)
+    public String getAppConfigFile() {
+<span class="nc" id="L179">        return appConfigFile;</span>
+    }
+
+    public void setAppConfigFile(String appConfigFile) {
+<span class="nc" id="L183">        this.appConfigFile = appConfigFile;</span>
+<span class="nc" id="L184">    }</span>
+
+    @Parameter(key = Constants.CONFIG_APPNAME_KEY, useKeyAsProperty = false)
+    public String getAppName() {
+<span class="nc" id="L188">        return appName;</span>
+    }
+
+    public void setAppName(String appName) {
+<span class="nc" id="L192">        this.appName = appName;</span>
+<span class="nc" id="L193">    }</span>
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L196">        return parameters;</span>
+    }
+
+    public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L200">        checkParameterName(parameters);</span>
+<span class="nc" id="L201">        this.parameters = parameters;</span>
+<span class="nc" id="L202">    }</span>
+
+    @Override
+    @Parameter(excluded = true)
+    public boolean isValid() {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (StringUtils.isEmpty(address)) {</span>
+<span class="nc" id="L208">            return false;</span>
+        }
+
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        return address.contains(&quot;://&quot;) || StringUtils.isNotEmpty(protocol);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

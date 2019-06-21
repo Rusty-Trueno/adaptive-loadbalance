@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DynamicConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-configcenter-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.configcenter</a> &gt; <span class="el_source">DynamicConfiguration.java</span></div><h1>DynamicConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.configcenter;
+
+import org.apache.dubbo.common.config.Configuration;
+import org.apache.dubbo.common.config.Environment;
+
+import java.util.Optional;
+
+import static org.apache.dubbo.common.extension.ExtensionLoader.getExtensionLoader;
+
+/**
+ * Dynamic configuration
+ */
+public interface DynamicConfiguration extends Configuration {
+    String DEFAULT_GROUP = &quot;dubbo&quot;;
+
+    /**
+     * {@link #addListener(String, String, ConfigurationListener)}
+     *
+     * @param key      the key to represent a configuration
+     * @param listener configuration listener
+     */
+    default void addListener(String key, ConfigurationListener listener) {
+<span class="nc" id="L39">        addListener(key, DEFAULT_GROUP, listener);</span>
+<span class="nc" id="L40">    }</span>
+
+
+    /**
+     * {@link #removeListener(String, String, ConfigurationListener)}
+     *
+     * @param key      the key to represent a configuration
+     * @param listener configuration listener
+     */
+    default void removeListener(String key, ConfigurationListener listener) {
+<span class="nc" id="L50">        removeListener(key, DEFAULT_GROUP, listener);</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Register a configuration listener for a specified key
+     * The listener only works for service governance purpose, so the target group would always be the value user
+     * specifies at startup or 'dubbo' by default. This method will only register listener, which means it will not
+     * trigger a notification that contains the current value.
+     *
+     * @param key      the key to represent a configuration
+     * @param group    the group where the key belongs to
+     * @param listener configuration listener
+     */
+    void addListener(String key, String group, ConfigurationListener listener);
+
+    /**
+     * Stops one listener from listening to value changes in the specified key.
+     *
+     * @param key      the key to represent a configuration
+     * @param group    the group where the key belongs to
+     * @param listener configuration listener
+     */
+    void removeListener(String key, String group, ConfigurationListener listener);
+
+    /**
+     * Get the configuration mapped to the given key
+     *
+     * @param key the key to represent a configuration
+     * @return target configuration mapped to the given key
+     */
+    default String getConfig(String key) {
+<span class="nc" id="L81">        return getConfig(key, null, 0L);</span>
+    }
+
+    /**
+     * Get the configuration mapped to the given key and the given group
+     *
+     * @param key   the key to represent a configuration
+     * @param group the group where the key belongs to
+     * @return target configuration mapped to the given key and the given group
+     */
+    default String getConfig(String key, String group) {
+<span class="nc" id="L92">        return getConfig(key, group, 0L);</span>
+    }
+
+    /**
+     * Get the configuration mapped to the given key and the given group. If the
+     * configuration fails to fetch after timeout exceeds, IllegalStateException will be thrown.
+     *
+     * @param key     the key to represent a configuration
+     * @param group   the group where the key belongs to
+     * @param timeout timeout value for fetching the target config
+     * @return target configuration mapped to the given key and the given group, IllegalStateException will be thrown
+     * if timeout exceeds.
+     */
+    String getConfig(String key, String group, long timeout) throws IllegalStateException;
+
+    /**
+     * Find DynamicConfiguration instance
+     *
+     * @return DynamicConfiguration instance
+     */
+    static DynamicConfiguration getDynamicConfiguration() {
+<span class="nc" id="L113">        Optional&lt;Configuration&gt; optional = Environment.getInstance().getDynamicConfiguration();</span>
+<span class="nc" id="L114">        return (DynamicConfiguration) optional.orElseGet(() -&gt; getExtensionLoader(DynamicConfigurationFactory.class)</span>
+<span class="nc" id="L115">                .getDefaultExtension()</span>
+<span class="nc" id="L116">                .getDynamicConfiguration(null));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

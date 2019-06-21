@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RegistryConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config</a> &gt; <span class="el_source">RegistryConfig.java</span></div><h1>RegistryConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.support.Parameter;
+
+import java.util.Map;
+
+/**
+ * RegistryConfig
+ *
+ * @export
+ */
+public class RegistryConfig extends AbstractConfig {
+
+    public static final String NO_AVAILABLE = &quot;N/A&quot;;
+    private static final long serialVersionUID = 5508512956753757169L;
+
+    /**
+     * Register center address
+     */
+    private String address;
+
+    /**
+     * Username to login register center
+     */
+    private String username;
+
+    /**
+     * Password to login register center
+     */
+    private String password;
+
+    /**
+     * Default port for register center
+     */
+    private Integer port;
+
+    /**
+     * Protocol for register center
+     */
+    private String protocol;
+
+    /**
+     * Network transmission type
+     */
+    private String transporter;
+
+    private String server;
+
+    private String client;
+
+    private String cluster;
+
+    /**
+     * The group the services registry in
+     */
+    private String group;
+
+    private String version;
+
+    /**
+     * Request timeout in milliseconds for register center
+     */
+    private Integer timeout;
+
+    /**
+     * Session timeout in milliseconds for register center
+     */
+    private Integer session;
+
+    /**
+     * File for saving register center dynamic list
+     */
+    private String file;
+
+    /**
+     * Wait time before stop
+     */
+    private Integer wait;
+
+    /**
+     * Whether to check if register center is available when boot up
+     */
+    private Boolean check;
+
+    /**
+     * Whether to allow dynamic service to register on the register center
+     */
+    private Boolean dynamic;
+
+    /**
+     * Whether to export service on the register center
+     */
+    private Boolean register;
+
+    /**
+     * Whether allow to subscribe service on the register center
+     */
+    private Boolean subscribe;
+
+    /**
+     * The customized parameters
+     */
+    private Map&lt;String, String&gt; parameters;
+
+    /**
+     * Whether it's default
+     */
+    private Boolean isDefault;
+
+    /**
+     * Simple the registry. both useful for provider and consumer
+     *
+     * @since 2.7.0
+     */
+    private Boolean simplified;
+    /**
+     * After simplify the registry, should add some paramter individually. just for provider.
+     * &lt;p&gt;
+     * such as: extra-keys = A,b,c,d
+     *
+     * @since 2.7.0
+     */
+    private String extraKeys;
+
+<span class="nc" id="L143">    public RegistryConfig() {</span>
+<span class="nc" id="L144">    }</span>
+
+<span class="nc" id="L146">    public RegistryConfig(String address) {</span>
+<span class="nc" id="L147">        setAddress(address);</span>
+<span class="nc" id="L148">    }</span>
+
+<span class="nc" id="L150">    public RegistryConfig(String address, String protocol) {</span>
+<span class="nc" id="L151">        setAddress(address);</span>
+<span class="nc" id="L152">        setProtocol(protocol);</span>
+<span class="nc" id="L153">    }</span>
+
+    public String getProtocol() {
+<span class="nc" id="L156">        return protocol;</span>
+    }
+
+    public void setProtocol(String protocol) {
+<span class="nc" id="L160">        checkName(Constants.PROTOCOL_KEY, protocol);</span>
+<span class="nc" id="L161">        this.protocol = protocol;</span>
+<span class="nc" id="L162">        this.updateIdIfAbsent(protocol);</span>
+<span class="nc" id="L163">    }</span>
+
+    @Parameter(excluded = true)
+    public String getAddress() {
+<span class="nc" id="L167">        return address;</span>
+    }
+
+    public void setAddress(String address) {
+<span class="nc" id="L171">        this.address = address;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (address != null) {</span>
+<span class="nc" id="L173">            int i = address.indexOf(&quot;://&quot;);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L175">                this.updateIdIfAbsent(address.substring(0, i));</span>
+            }
+        }
+<span class="nc" id="L178">    }</span>
+
+    public Integer getPort() {
+<span class="nc" id="L181">        return port;</span>
+    }
+
+    public void setPort(Integer port) {
+<span class="nc" id="L185">        this.port = port;</span>
+<span class="nc" id="L186">    }</span>
+
+    public String getUsername() {
+<span class="nc" id="L189">        return username;</span>
+    }
+
+    public void setUsername(String username) {
+<span class="nc" id="L193">        checkName(Constants.USERNAME_KEY, username);</span>
+<span class="nc" id="L194">        this.username = username;</span>
+<span class="nc" id="L195">    }</span>
+
+    public String getPassword() {
+<span class="nc" id="L198">        return password;</span>
+    }
+
+    public void setPassword(String password) {
+<span class="nc" id="L202">        checkLength(Constants.PASSWORD_KEY, password);</span>
+<span class="nc" id="L203">        this.password = password;</span>
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * @return wait
+     * @see org.apache.dubbo.config.ProviderConfig#getWait()
+     * @deprecated
+     */
+    @Deprecated
+    public Integer getWait() {
+<span class="nc" id="L213">        return wait;</span>
+    }
+
+    /**
+     * @param wait
+     * @see org.apache.dubbo.config.ProviderConfig#setWait(Integer)
+     * @deprecated
+     */
+    @Deprecated
+    public void setWait(Integer wait) {
+<span class="nc" id="L223">        this.wait = wait;</span>
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        if (wait != null &amp;&amp; wait &gt; 0) {</span>
+<span class="nc" id="L225">            System.setProperty(Constants.SHUTDOWN_WAIT_KEY, String.valueOf(wait));</span>
+        }
+<span class="nc" id="L227">    }</span>
+
+    public Boolean isCheck() {
+<span class="nc" id="L230">        return check;</span>
+    }
+
+    public void setCheck(Boolean check) {
+<span class="nc" id="L234">        this.check = check;</span>
+<span class="nc" id="L235">    }</span>
+
+    public String getFile() {
+<span class="nc" id="L238">        return file;</span>
+    }
+
+    public void setFile(String file) {
+<span class="nc" id="L242">        checkPathLength(Constants.FILE_KEY, file);</span>
+<span class="nc" id="L243">        this.file = file;</span>
+<span class="nc" id="L244">    }</span>
+
+    /**
+     * @return transport
+     * @see #getTransporter()
+     * @deprecated
+     */
+    @Deprecated
+    @Parameter(excluded = true)
+    public String getTransport() {
+<span class="nc" id="L254">        return getTransporter();</span>
+    }
+
+    /**
+     * @param transport
+     * @see #setTransporter(String)
+     * @deprecated
+     */
+    @Deprecated
+    public void setTransport(String transport) {
+<span class="nc" id="L264">        setTransporter(transport);</span>
+<span class="nc" id="L265">    }</span>
+
+    public String getTransporter() {
+<span class="nc" id="L268">        return transporter;</span>
+    }
+
+    public void setTransporter(String transporter) {
+<span class="nc" id="L272">        checkName(Constants.TRANSPORTER_KEY, transporter);</span>
+        /*if(transporter != null &amp;&amp; transporter.length() &gt; 0 &amp;&amp; ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(transporter)){
+            throw new IllegalStateException(&quot;No such transporter type : &quot; + transporter);
+        }*/
+<span class="nc" id="L276">        this.transporter = transporter;</span>
+<span class="nc" id="L277">    }</span>
+
+    public String getServer() {
+<span class="nc" id="L280">        return server;</span>
+    }
+
+    public void setServer(String server) {
+<span class="nc" id="L284">        checkName(Constants.SERVER_KEY, server);</span>
+        /*if(server != null &amp;&amp; server.length() &gt; 0 &amp;&amp; ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(server)){
+            throw new IllegalStateException(&quot;No such server type : &quot; + server);
+        }*/
+<span class="nc" id="L288">        this.server = server;</span>
+<span class="nc" id="L289">    }</span>
+
+    public String getClient() {
+<span class="nc" id="L292">        return client;</span>
+    }
+
+    public void setClient(String client) {
+<span class="nc" id="L296">        checkName(Constants.CLIENT_KEY, client);</span>
+        /*if(client != null &amp;&amp; client.length() &gt; 0 &amp;&amp; ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(client)){
+            throw new IllegalStateException(&quot;No such client type : &quot; + client);
+        }*/
+<span class="nc" id="L300">        this.client = client;</span>
+<span class="nc" id="L301">    }</span>
+
+    public Integer getTimeout() {
+<span class="nc" id="L304">        return timeout;</span>
+    }
+
+    public void setTimeout(Integer timeout) {
+<span class="nc" id="L308">        this.timeout = timeout;</span>
+<span class="nc" id="L309">    }</span>
+
+    public Integer getSession() {
+<span class="nc" id="L312">        return session;</span>
+    }
+
+    public void setSession(Integer session) {
+<span class="nc" id="L316">        this.session = session;</span>
+<span class="nc" id="L317">    }</span>
+
+    public Boolean isDynamic() {
+<span class="nc" id="L320">        return dynamic;</span>
+    }
+
+    public void setDynamic(Boolean dynamic) {
+<span class="nc" id="L324">        this.dynamic = dynamic;</span>
+<span class="nc" id="L325">    }</span>
+
+    public Boolean isRegister() {
+<span class="nc" id="L328">        return register;</span>
+    }
+
+    public void setRegister(Boolean register) {
+<span class="nc" id="L332">        this.register = register;</span>
+<span class="nc" id="L333">    }</span>
+
+    public Boolean isSubscribe() {
+<span class="nc" id="L336">        return subscribe;</span>
+    }
+
+    public void setSubscribe(Boolean subscribe) {
+<span class="nc" id="L340">        this.subscribe = subscribe;</span>
+<span class="nc" id="L341">    }</span>
+
+    public String getCluster() {
+<span class="nc" id="L344">        return cluster;</span>
+    }
+
+    public void setCluster(String cluster) {
+<span class="nc" id="L348">        this.cluster = cluster;</span>
+<span class="nc" id="L349">    }</span>
+
+    public String getGroup() {
+<span class="nc" id="L352">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L356">        this.group = group;</span>
+<span class="nc" id="L357">    }</span>
+
+    public String getVersion() {
+<span class="nc" id="L360">        return version;</span>
+    }
+
+    public void setVersion(String version) {
+<span class="nc" id="L364">        this.version = version;</span>
+<span class="nc" id="L365">    }</span>
+
+    public Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L368">        return parameters;</span>
+    }
+
+    public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L372">        checkParameterName(parameters);</span>
+<span class="nc" id="L373">        this.parameters = parameters;</span>
+<span class="nc" id="L374">    }</span>
+
+    public Boolean isDefault() {
+<span class="nc" id="L377">        return isDefault;</span>
+    }
+
+    public void setDefault(Boolean isDefault) {
+<span class="nc" id="L381">        this.isDefault = isDefault;</span>
+<span class="nc" id="L382">    }</span>
+
+    public Boolean getSimplified() {
+<span class="nc" id="L385">        return simplified;</span>
+    }
+
+    public void setSimplified(Boolean simplified) {
+<span class="nc" id="L389">        this.simplified = simplified;</span>
+<span class="nc" id="L390">    }</span>
+
+    @Parameter(key = Constants.EXTRA_KEYS_KEY)
+    public String getExtraKeys() {
+<span class="nc" id="L394">        return extraKeys;</span>
+    }
+
+    public void setExtraKeys(String extraKeys) {
+<span class="nc" id="L398">        this.extraKeys = extraKeys;</span>
+<span class="nc" id="L399">    }</span>
+
+    @Parameter(excluded = true)
+    public boolean isZookeeperProtocol() {
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (!isValid()) {</span>
+<span class="nc" id="L404">            return false;</span>
+        }
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        return Constants.ZOOKEEPER_PROTOCOL.equals(getProtocol())</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                || getAddress().startsWith(Constants.ZOOKEEPER_PROTOCOL);</span>
+    }
+
+    @Override
+    public void refresh() {
+<span class="nc" id="L412">        super.refresh();</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(this.getId())) {</span>
+<span class="nc" id="L414">            this.setPrefix(Constants.REGISTRIES_SUFFIX);</span>
+<span class="nc" id="L415">            super.refresh();</span>
+        }
+<span class="nc" id="L417">    }</span>
+
+    @Override
+    @Parameter(excluded = true)
+    public boolean isValid() {
+        // empty protocol will default to 'dubbo'
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        return !StringUtils.isEmpty(address);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

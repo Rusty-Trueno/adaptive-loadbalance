@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MinaCodecAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-mina</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.mina</a> &gt; <span class="el_source">MinaCodecAdapter.java</span></div><h1>MinaCodecAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.mina;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Channel;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.ChannelBuffer;
+import org.apache.dubbo.remoting.buffer.ChannelBuffers;
+import org.apache.dubbo.remoting.buffer.DynamicChannelBuffer;
+
+import org.apache.mina.common.ByteBuffer;
+import org.apache.mina.common.IoSession;
+import org.apache.mina.filter.codec.ProtocolCodecFactory;
+import org.apache.mina.filter.codec.ProtocolDecoder;
+import org.apache.mina.filter.codec.ProtocolDecoderOutput;
+import org.apache.mina.filter.codec.ProtocolEncoder;
+import org.apache.mina.filter.codec.ProtocolEncoderOutput;
+
+/**
+ * MinaCodecAdapter.
+ */
+final class MinaCodecAdapter implements ProtocolCodecFactory {
+
+<span class="nc" id="L41">    private final ProtocolEncoder encoder = new InternalEncoder();</span>
+
+<span class="nc" id="L43">    private final ProtocolDecoder decoder = new InternalDecoder();</span>
+
+    private final Codec2 codec;
+
+    private final URL url;
+
+    private final ChannelHandler handler;
+
+    private final int bufferSize;
+
+<span class="nc" id="L53">    public MinaCodecAdapter(Codec2 codec, URL url, ChannelHandler handler) {</span>
+<span class="nc" id="L54">        this.codec = codec;</span>
+<span class="nc" id="L55">        this.url = url;</span>
+<span class="nc" id="L56">        this.handler = handler;</span>
+<span class="nc" id="L57">        int b = url.getPositiveParameter(Constants.BUFFER_KEY, Constants.DEFAULT_BUFFER_SIZE);</span>
+<span class="nc bnc" id="L58" title="All 4 branches missed.">        this.bufferSize = b &gt;= Constants.MIN_BUFFER_SIZE &amp;&amp; b &lt;= Constants.MAX_BUFFER_SIZE ? b : Constants.DEFAULT_BUFFER_SIZE;</span>
+<span class="nc" id="L59">    }</span>
+
+    @Override
+    public ProtocolEncoder getEncoder() {
+<span class="nc" id="L63">        return encoder;</span>
+    }
+
+    @Override
+    public ProtocolDecoder getDecoder() {
+<span class="nc" id="L68">        return decoder;</span>
+    }
+
+<span class="nc" id="L71">    private class InternalEncoder implements ProtocolEncoder {</span>
+
+        @Override
+        public void dispose(IoSession session) throws Exception {
+<span class="nc" id="L75">        }</span>
+
+        @Override
+        public void encode(IoSession session, Object msg, ProtocolEncoderOutput out) throws Exception {
+<span class="nc" id="L79">            ChannelBuffer buffer = ChannelBuffers.dynamicBuffer(1024);</span>
+<span class="nc" id="L80">            MinaChannel channel = MinaChannel.getOrAddChannel(session, url, handler);</span>
+            try {
+<span class="nc" id="L82">                codec.encode(channel, buffer, msg);</span>
+            } finally {
+<span class="nc" id="L84">                MinaChannel.removeChannelIfDisconnected(session);</span>
+            }
+<span class="nc" id="L86">            out.write(ByteBuffer.wrap(buffer.toByteBuffer()));</span>
+<span class="nc" id="L87">            out.flush();</span>
+<span class="nc" id="L88">        }</span>
+    }
+
+<span class="nc" id="L91">    private class InternalDecoder implements ProtocolDecoder {</span>
+
+<span class="nc" id="L93">        private ChannelBuffer buffer = ChannelBuffers.EMPTY_BUFFER;</span>
+
+        @Override
+        public void decode(IoSession session, ByteBuffer in, ProtocolDecoderOutput out) throws Exception {
+<span class="nc" id="L97">            int readable = in.limit();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (readable &lt;= 0) {</span>
+<span class="nc" id="L99">                return;</span>
+            }
+
+            ChannelBuffer frame;
+
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (buffer.readable()) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                if (buffer instanceof DynamicChannelBuffer) {</span>
+<span class="nc" id="L106">                    buffer.writeBytes(in.buf());</span>
+<span class="nc" id="L107">                    frame = buffer;</span>
+                } else {
+<span class="nc" id="L109">                    int size = buffer.readableBytes() + in.remaining();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                    frame = ChannelBuffers.dynamicBuffer(size &gt; bufferSize ? size : bufferSize);</span>
+<span class="nc" id="L111">                    frame.writeBytes(buffer, buffer.readableBytes());</span>
+<span class="nc" id="L112">                    frame.writeBytes(in.buf());</span>
+<span class="nc" id="L113">                }</span>
+            } else {
+<span class="nc" id="L115">                frame = ChannelBuffers.wrappedBuffer(in.buf());</span>
+            }
+
+<span class="nc" id="L118">            Channel channel = MinaChannel.getOrAddChannel(session, url, handler);</span>
+            Object msg;
+            int savedReadIndex;
+
+            try {
+                do {
+<span class="nc" id="L124">                    savedReadIndex = frame.readerIndex();</span>
+                    try {
+<span class="nc" id="L126">                        msg = codec.decode(channel, frame);</span>
+<span class="nc" id="L127">                    } catch (Exception e) {</span>
+<span class="nc" id="L128">                        buffer = ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L129">                        throw e;</span>
+<span class="nc" id="L130">                    }</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                    if (msg == Codec2.DecodeResult.NEED_MORE_INPUT) {</span>
+<span class="nc" id="L132">                        frame.readerIndex(savedReadIndex);</span>
+<span class="nc" id="L133">                        break;</span>
+                    } else {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                        if (savedReadIndex == frame.readerIndex()) {</span>
+<span class="nc" id="L136">                            buffer = ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L137">                            throw new Exception(&quot;Decode without read data.&quot;);</span>
+                        }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                        if (msg != null) {</span>
+<span class="nc" id="L140">                            out.write(msg);</span>
+                        }
+                    }
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                } while (frame.readable());</span>
+            } finally {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (frame.readable()) {</span>
+<span class="nc" id="L146">                    frame.discardReadBytes();</span>
+<span class="nc" id="L147">                    buffer = frame;</span>
+                } else {
+<span class="nc" id="L149">                    buffer = ChannelBuffers.EMPTY_BUFFER;</span>
+                }
+<span class="nc" id="L151">                MinaChannel.removeChannelIfDisconnected(session);</span>
+            }
+<span class="nc" id="L153">        }</span>
+
+        @Override
+        public void dispose(IoSession session) throws Exception {
+<span class="nc" id="L157">        }</span>
+
+        @Override
+        public void finishDecode(IoSession session, ProtocolDecoderOutput out) throws Exception {
+<span class="nc" id="L161">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

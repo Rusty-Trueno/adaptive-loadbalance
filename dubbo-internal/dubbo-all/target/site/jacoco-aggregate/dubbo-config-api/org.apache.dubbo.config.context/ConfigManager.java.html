@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConfigManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-config-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.config.context</a> &gt; <span class="el_source">ConfigManager.java</span></div><h1>ConfigManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.config.context;
+
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.config.AbstractConfig;
+import org.apache.dubbo.config.ApplicationConfig;
+import org.apache.dubbo.config.ConfigCenterConfig;
+import org.apache.dubbo.config.ConsumerConfig;
+import org.apache.dubbo.config.ModuleConfig;
+import org.apache.dubbo.config.MonitorConfig;
+import org.apache.dubbo.config.ProtocolConfig;
+import org.apache.dubbo.config.ProviderConfig;
+import org.apache.dubbo.config.RegistryConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static org.apache.dubbo.common.Constants.DEFAULT_KEY;
+
+/**
+ * TODO
+ * Experimental API, should only being used internally at present.
+ * &lt;p&gt;
+ * Maybe we can consider open to end user in the following version by providing a fluent style builder.
+ *
+ * &lt;pre&gt;{@code
+ *  public void class DubboBuilder() {
+ *
+ *      public static DubboBuilder create() {
+ *          return new DubboBuilder();
+ *      }
+ *
+ *      public DubboBuilder application(ApplicationConfig application) {
+ *          ConfigManager.getInstance().addApplication(application);
+ *          return this;
+ *      }
+ *
+ *      ...
+ *
+ *      public void build() {
+ *          // export all ServiceConfigs
+ *          // refer all ReferenceConfigs
+ *      }
+ *  }
+ *  }
+ * &lt;/pre&gt;
+ * &lt;/p&gt;
+ * TODO
+ * The properties defined here are duplicate with that in ReferenceConfig/ServiceConfig,
+ * the properties here are currently only used for duplication check but are still not being used in the export/refer process yet.
+ * Maybe we can remove the property definition in ReferenceConfig/ServiceConfig and only keep the setXxxConfig() as an entrance.
+ * All workflow internally can rely on ConfigManager.
+ */
+public class ConfigManager {
+<span class="nc" id="L75">    private static final Logger logger = LoggerFactory.getLogger(ConfigManager.class);</span>
+<span class="nc" id="L76">    private static final ConfigManager CONFIG_MANAGER = new ConfigManager();</span>
+
+    private ApplicationConfig application;
+    private MonitorConfig monitor;
+    private ModuleConfig module;
+    private ConfigCenterConfig configCenter;
+
+<span class="nc" id="L83">    private Map&lt;String, ProtocolConfig&gt; protocols = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L84">    private Map&lt;String, RegistryConfig&gt; registries = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L85">    private Map&lt;String, ProviderConfig&gt; providers = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L86">    private Map&lt;String, ConsumerConfig&gt; consumers = new ConcurrentHashMap&lt;&gt;();</span>
+
+    public static ConfigManager getInstance() {
+<span class="nc" id="L89">        return CONFIG_MANAGER;</span>
+    }
+
+<span class="nc" id="L92">    private ConfigManager() {</span>
+
+<span class="nc" id="L94">    }</span>
+
+    public Optional&lt;ApplicationConfig&gt; getApplication() {
+<span class="nc" id="L97">        return Optional.ofNullable(application);</span>
+    }
+
+    public void setApplication(ApplicationConfig application) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (application != null) {</span>
+<span class="nc" id="L102">            checkDuplicate(this.application, application);</span>
+<span class="nc" id="L103">            this.application = application;</span>
+        }
+<span class="nc" id="L105">    }</span>
+
+    public Optional&lt;MonitorConfig&gt; getMonitor() {
+<span class="nc" id="L108">        return Optional.ofNullable(monitor);</span>
+    }
+
+    public void setMonitor(MonitorConfig monitor) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (monitor != null) {</span>
+<span class="nc" id="L113">            checkDuplicate(this.monitor, monitor);</span>
+<span class="nc" id="L114">            this.monitor = monitor;</span>
+        }
+<span class="nc" id="L116">    }</span>
+
+    public Optional&lt;ModuleConfig&gt; getModule() {
+<span class="nc" id="L119">        return Optional.ofNullable(module);</span>
+    }
+
+    public void setModule(ModuleConfig module) {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (module != null) {</span>
+<span class="nc" id="L124">            checkDuplicate(this.module, module);</span>
+<span class="nc" id="L125">            this.module = module;</span>
+        }
+<span class="nc" id="L127">    }</span>
+
+    public Optional&lt;ConfigCenterConfig&gt; getConfigCenter() {
+<span class="nc" id="L130">        return Optional.ofNullable(configCenter);</span>
+    }
+
+    public void setConfigCenter(ConfigCenterConfig configCenter) {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (configCenter != null) {</span>
+<span class="nc" id="L135">            checkDuplicate(this.configCenter, configCenter);</span>
+<span class="nc" id="L136">            this.configCenter = configCenter;</span>
+        }
+<span class="nc" id="L138">    }</span>
+
+    public Optional&lt;ProviderConfig&gt; getProvider(String id) {
+<span class="nc" id="L141">        return Optional.ofNullable(providers.get(id));</span>
+    }
+
+    public Optional&lt;ProviderConfig&gt; getDefaultProvider() {
+<span class="nc" id="L145">        return Optional.ofNullable(providers.get(DEFAULT_KEY));</span>
+    }
+
+    public void addProvider(ProviderConfig providerConfig) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (providerConfig == null) {</span>
+<span class="nc" id="L150">            return;</span>
+        }
+
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        String key = StringUtils.isNotEmpty(providerConfig.getId())</span>
+<span class="nc" id="L154">                ? providerConfig.getId()</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">                : (providerConfig.isDefault() == null || providerConfig.isDefault()) ? DEFAULT_KEY : null;</span>
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L158">            throw new IllegalStateException(&quot;A ProviderConfig should either has an id or it's the default one, &quot; + providerConfig);</span>
+        }
+
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (providers.containsKey(key) &amp;&amp; !providerConfig.equals(providers.get(key))) {</span>
+<span class="nc" id="L162">            logger.warn(&quot;Duplicate ProviderConfig found, there already has one default ProviderConfig or more than two ProviderConfigs have the same id, &quot; +</span>
+                                                    &quot;you can try to give each ProviderConfig a different id. &quot; + providerConfig);
+        } else {
+<span class="nc" id="L165">            providers.put(key, providerConfig);</span>
+        }
+<span class="nc" id="L167">    }</span>
+
+    public Optional&lt;ConsumerConfig&gt; getConsumer(String id) {
+<span class="nc" id="L170">        return Optional.ofNullable(consumers.get(id));</span>
+    }
+
+    public Optional&lt;ConsumerConfig&gt; getDefaultConsumer() {
+<span class="nc" id="L174">        return Optional.ofNullable(consumers.get(DEFAULT_KEY));</span>
+    }
+
+    public void addConsumer(ConsumerConfig consumerConfig) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (consumerConfig == null) {</span>
+<span class="nc" id="L179">            return;</span>
+        }
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        String key = StringUtils.isNotEmpty(consumerConfig.getId())</span>
+<span class="nc" id="L183">                ? consumerConfig.getId()</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">                : (consumerConfig.isDefault() == null || consumerConfig.isDefault()) ? DEFAULT_KEY : null;</span>
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L187">            throw new IllegalStateException(&quot;A ConsumerConfig should either has an id or it's the default one, &quot; + consumerConfig);</span>
+        }
+
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (consumers.containsKey(key) &amp;&amp; !consumerConfig.equals(consumers.get(key))) {</span>
+<span class="nc" id="L191">            logger.warn(&quot;Duplicate ConsumerConfig found, there already has one default ConsumerConfig or more than two ConsumerConfigs have the same id, &quot; +</span>
+                                                    &quot;you can try to give each ConsumerConfig a different id. &quot; + consumerConfig);
+        } else {
+<span class="nc" id="L194">            consumers.put(key, consumerConfig);</span>
+        }
+<span class="nc" id="L196">    }</span>
+
+    public Optional&lt;ProtocolConfig&gt; getProtocol(String id) {
+<span class="nc" id="L199">        return Optional.ofNullable(protocols.get(id));</span>
+    }
+
+    public Optional&lt;List&lt;ProtocolConfig&gt;&gt; getDefaultProtocols() {
+<span class="nc" id="L203">        List&lt;ProtocolConfig&gt; defaults = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L204">        protocols.forEach((k, v) -&gt; {</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (DEFAULT_KEY.equalsIgnoreCase(k)) {</span>
+<span class="nc" id="L206">                defaults.add(v);</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">            } else if (v.isDefault() == null || v.isDefault()) {</span>
+<span class="nc" id="L208">                defaults.add(v);</span>
+            }
+<span class="nc" id="L210">        });</span>
+<span class="nc" id="L211">        return Optional.of(defaults);</span>
+    }
+
+    public void addProtocols(List&lt;ProtocolConfig&gt; protocolConfigs) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (protocolConfigs != null) {</span>
+<span class="nc" id="L216">            protocolConfigs.forEach(this::addProtocol);</span>
+        }
+<span class="nc" id="L218">    }</span>
+
+    public void addProtocol(ProtocolConfig protocolConfig) {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (protocolConfig == null) {</span>
+<span class="nc" id="L222">            return;</span>
+        }
+
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        String key = StringUtils.isNotEmpty(protocolConfig.getId())</span>
+<span class="nc" id="L226">                ? protocolConfig.getId()</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">                : (protocolConfig.isDefault() == null || protocolConfig.isDefault()) ? DEFAULT_KEY : null;</span>
+
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L230">            throw new IllegalStateException(&quot;A ProtocolConfig should either has an id or it's the default one, &quot; + protocolConfig);</span>
+        }
+
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        if (protocols.containsKey(key) &amp;&amp; !protocolConfig.equals(protocols.get(key))) {</span>
+<span class="nc" id="L234">            logger.warn(&quot;Duplicate ProtocolConfig found, there already has one default ProtocolConfig or more than two ProtocolConfigs have the same id, &quot; +</span>
+                                                    &quot;you can try to give each ProtocolConfig a different id. &quot; + protocolConfig);
+        } else {
+<span class="nc" id="L237">            protocols.put(key, protocolConfig);</span>
+        }
+<span class="nc" id="L239">    }</span>
+
+    public Optional&lt;RegistryConfig&gt; getRegistry(String id) {
+<span class="nc" id="L242">        return Optional.ofNullable(registries.get(id));</span>
+    }
+
+    public Optional&lt;List&lt;RegistryConfig&gt;&gt; getDefaultRegistries() {
+<span class="nc" id="L246">        List&lt;RegistryConfig&gt; defaults = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L247">        registries.forEach((k, v) -&gt; {</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            if (DEFAULT_KEY.equalsIgnoreCase(k)) {</span>
+<span class="nc" id="L249">                defaults.add(v);</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">            } else if (v.isDefault() == null || v.isDefault()) {</span>
+<span class="nc" id="L251">                defaults.add(v);</span>
+            }
+<span class="nc" id="L253">        });</span>
+<span class="nc" id="L254">        return Optional.of(defaults);</span>
+    }
+
+    public void addRegistries(List&lt;RegistryConfig&gt; registryConfigs) {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (registryConfigs != null) {</span>
+<span class="nc" id="L259">            registryConfigs.forEach(this::addRegistry);</span>
+        }
+<span class="nc" id="L261">    }</span>
+
+    public void addRegistry(RegistryConfig registryConfig) {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (registryConfig == null) {</span>
+<span class="nc" id="L265">            return;</span>
+        }
+
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        String key = StringUtils.isNotEmpty(registryConfig.getId())</span>
+<span class="nc" id="L269">                ? registryConfig.getId()</span>
+<span class="nc bnc" id="L270" title="All 4 branches missed.">                : (registryConfig.isDefault() == null || registryConfig.isDefault()) ? DEFAULT_KEY : null;</span>
+
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L273">            throw new IllegalStateException(&quot;A RegistryConfig should either has an id or it's the default one, &quot; + registryConfig);</span>
+        }
+
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        if (registries.containsKey(key) &amp;&amp; !registryConfig.equals(registries.get(key))) {</span>
+<span class="nc" id="L277">            logger.warn(&quot;Duplicate RegistryConfig found, there already has one default RegistryConfig or more than two RegistryConfigs have the same id, &quot; +</span>
+                                                    &quot;you can try to give each RegistryConfig a different id. &quot; + registryConfig);
+        } else {
+<span class="nc" id="L280">            registries.put(key, registryConfig);</span>
+        }
+<span class="nc" id="L282">    }</span>
+
+    public Map&lt;String, ProtocolConfig&gt; getProtocols() {
+<span class="nc" id="L285">        return protocols;</span>
+    }
+
+    public Map&lt;String, RegistryConfig&gt; getRegistries() {
+<span class="nc" id="L289">        return registries;</span>
+    }
+
+    public Map&lt;String, ProviderConfig&gt; getProviders() {
+<span class="nc" id="L293">        return providers;</span>
+    }
+
+    public Map&lt;String, ConsumerConfig&gt; getConsumers() {
+<span class="nc" id="L297">        return consumers;</span>
+    }
+
+    public void refreshAll() {
+        // refresh all configs here,
+<span class="nc" id="L302">        getApplication().ifPresent(ApplicationConfig::refresh);</span>
+<span class="nc" id="L303">        getMonitor().ifPresent(MonitorConfig::refresh);</span>
+<span class="nc" id="L304">        getModule().ifPresent(ModuleConfig::refresh);</span>
+
+<span class="nc" id="L306">        getProtocols().values().forEach(ProtocolConfig::refresh);</span>
+<span class="nc" id="L307">        getRegistries().values().forEach(RegistryConfig::refresh);</span>
+<span class="nc" id="L308">        getProviders().values().forEach(ProviderConfig::refresh);</span>
+<span class="nc" id="L309">        getConsumers().values().forEach(ConsumerConfig::refresh);</span>
+<span class="nc" id="L310">    }</span>
+
+    private void checkDuplicate(AbstractConfig oldOne, AbstractConfig newOne) {
+<span class="nc bnc" id="L313" title="All 4 branches missed.">        if (oldOne != null &amp;&amp; !oldOne.equals(newOne)) {</span>
+<span class="nc" id="L314">            String configName = oldOne.getClass().getSimpleName();</span>
+<span class="nc" id="L315">            throw new IllegalStateException(&quot;Duplicate Config found for &quot; + configName + &quot;, you should use only one unique &quot; + configName + &quot; for one application.&quot;);</span>
+        }
+<span class="nc" id="L317">    }</span>
+
+    // For test purpose
+    public void clear() {
+<span class="nc" id="L321">        this.application = null;</span>
+<span class="nc" id="L322">        this.configCenter = null;</span>
+<span class="nc" id="L323">        this.monitor = null;</span>
+<span class="nc" id="L324">        this.module = null;</span>
+<span class="nc" id="L325">        this.registries.clear();</span>
+<span class="nc" id="L326">        this.protocols.clear();</span>
+<span class="nc" id="L327">        this.providers.clear();</span>
+<span class="nc" id="L328">        this.consumers.clear();</span>
+<span class="nc" id="L329">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,3 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+dubbo-container-logback/dubbo-container-api,org.apache.dubbo.container,Main.new Thread() {...},49,0,2,0,12,0,3,0,2,0
+dubbo-container-logback/dubbo-container-api,org.apache.dubbo.container,Main,140,0,8,0,29,0,7,0,3,0

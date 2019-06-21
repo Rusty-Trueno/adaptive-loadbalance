@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ZookeeperRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-registry-zookeeper</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.registry.zookeeper</a> &gt; <span class="el_source">ZookeeperRegistry.java</span></div><h1>ZookeeperRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.registry.zookeeper;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.common.utils.UrlUtils;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.support.FailbackRegistry;
+import org.apache.dubbo.remoting.zookeeper.ChildListener;
+import org.apache.dubbo.remoting.zookeeper.StateListener;
+import org.apache.dubbo.remoting.zookeeper.ZookeeperClient;
+import org.apache.dubbo.remoting.zookeeper.ZookeeperTransporter;
+import org.apache.dubbo.rpc.RpcException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * ZookeeperRegistry
+ *
+ */
+public class ZookeeperRegistry extends FailbackRegistry {
+
+<span class="nc" id="L47">    private final static Logger logger = LoggerFactory.getLogger(ZookeeperRegistry.class);</span>
+
+    private final static int DEFAULT_ZOOKEEPER_PORT = 2181;
+
+    private final static String DEFAULT_ROOT = &quot;dubbo&quot;;
+
+    private final String root;
+
+<span class="nc" id="L55">    private final Set&lt;String&gt; anyServices = new ConcurrentHashSet&lt;&gt;();</span>
+
+<span class="nc" id="L57">    private final ConcurrentMap&lt;URL, ConcurrentMap&lt;NotifyListener, ChildListener&gt;&gt; zkListeners = new ConcurrentHashMap&lt;&gt;();</span>
+
+    private final ZookeeperClient zkClient;
+
+    public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
+<span class="nc" id="L62">        super(url);</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (url.isAnyHost()) {</span>
+<span class="nc" id="L64">            throw new IllegalStateException(&quot;registry address == null&quot;);</span>
+        }
+<span class="nc" id="L66">        String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (!group.startsWith(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L68">            group = Constants.PATH_SEPARATOR + group;</span>
+        }
+<span class="nc" id="L70">        this.root = group;</span>
+<span class="nc" id="L71">        zkClient = zookeeperTransporter.connect(url);</span>
+<span class="nc" id="L72">        zkClient.addStateListener(state -&gt; {</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (state == StateListener.RECONNECTED) {</span>
+                try {
+<span class="nc" id="L75">                    recover();</span>
+<span class="nc" id="L76">                } catch (Exception e) {</span>
+<span class="nc" id="L77">                    logger.error(e.getMessage(), e);</span>
+<span class="nc" id="L78">                }</span>
+            }
+<span class="nc" id="L80">        });</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public boolean isAvailable() {
+<span class="nc" id="L85">        return zkClient.isConnected();</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="nc" id="L90">        super.destroy();</span>
+        try {
+<span class="nc" id="L92">            zkClient.close();</span>
+<span class="nc" id="L93">        } catch (Exception e) {</span>
+<span class="nc" id="L94">            logger.warn(&quot;Failed to close zookeeper client &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L95">        }</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void doRegister(URL url) {
+        try {
+<span class="nc" id="L101">            zkClient.create(toUrlPath(url), url.getParameter(Constants.DYNAMIC_KEY, true));</span>
+<span class="nc" id="L102">        } catch (Throwable e) {</span>
+<span class="nc" id="L103">            throw new RpcException(&quot;Failed to register &quot; + url + &quot; to zookeeper &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L104">        }</span>
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void doUnregister(URL url) {
+        try {
+<span class="nc" id="L110">            zkClient.delete(toUrlPath(url));</span>
+<span class="nc" id="L111">        } catch (Throwable e) {</span>
+<span class="nc" id="L112">            throw new RpcException(&quot;Failed to unregister &quot; + url + &quot; to zookeeper &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L113">        }</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public void doSubscribe(final URL url, final NotifyListener listener) {
+        try {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L120">                String root = toRootPath();</span>
+<span class="nc" id="L121">                ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners = zkListeners.get(url);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                if (listeners == null) {</span>
+<span class="nc" id="L123">                    zkListeners.putIfAbsent(url, new ConcurrentHashMap&lt;&gt;());</span>
+<span class="nc" id="L124">                    listeners = zkListeners.get(url);</span>
+                }
+<span class="nc" id="L126">                ChildListener zkListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                if (zkListener == null) {</span>
+<span class="nc" id="L128">                    listeners.putIfAbsent(listener, (parentPath, currentChilds) -&gt; {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                        for (String child : currentChilds) {</span>
+<span class="nc" id="L130">                            child = URL.decode(child);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                            if (!anyServices.contains(child)) {</span>
+<span class="nc" id="L132">                                anyServices.add(child);</span>
+<span class="nc" id="L133">                                subscribe(url.setPath(child).addParameters(Constants.INTERFACE_KEY, child,</span>
+<span class="nc" id="L134">                                        Constants.CHECK_KEY, String.valueOf(false)), listener);</span>
+                            }
+<span class="nc" id="L136">                        }</span>
+<span class="nc" id="L137">                    });</span>
+<span class="nc" id="L138">                    zkListener = listeners.get(listener);</span>
+                }
+<span class="nc" id="L140">                zkClient.create(root, false);</span>
+<span class="nc" id="L141">                List&lt;String&gt; services = zkClient.addChildListener(root, zkListener);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (CollectionUtils.isNotEmpty(services)) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                    for (String service : services) {</span>
+<span class="nc" id="L144">                        service = URL.decode(service);</span>
+<span class="nc" id="L145">                        anyServices.add(service);</span>
+<span class="nc" id="L146">                        subscribe(url.setPath(service).addParameters(Constants.INTERFACE_KEY, service,</span>
+<span class="nc" id="L147">                                Constants.CHECK_KEY, String.valueOf(false)), listener);</span>
+<span class="nc" id="L148">                    }</span>
+                }
+<span class="nc" id="L150">            } else {</span>
+<span class="nc" id="L151">                List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                for (String path : toCategoriesPath(url)) {</span>
+<span class="nc" id="L153">                    ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners = zkListeners.get(url);</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    if (listeners == null) {</span>
+<span class="nc" id="L155">                        zkListeners.putIfAbsent(url, new ConcurrentHashMap&lt;&gt;());</span>
+<span class="nc" id="L156">                        listeners = zkListeners.get(url);</span>
+                    }
+<span class="nc" id="L158">                    ChildListener zkListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    if (zkListener == null) {</span>
+<span class="nc" id="L160">                        listeners.putIfAbsent(listener, (parentPath, currentChilds) -&gt; ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds)));</span>
+<span class="nc" id="L161">                        zkListener = listeners.get(listener);</span>
+                    }
+<span class="nc" id="L163">                    zkClient.create(path, false);</span>
+<span class="nc" id="L164">                    List&lt;String&gt; children = zkClient.addChildListener(path, zkListener);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                    if (children != null) {</span>
+<span class="nc" id="L166">                        urls.addAll(toUrlsWithEmpty(url, path, children));</span>
+                    }
+                }
+<span class="nc" id="L169">                notify(url, listener, urls);</span>
+            }
+<span class="nc" id="L171">        } catch (Throwable e) {</span>
+<span class="nc" id="L172">            throw new RpcException(&quot;Failed to subscribe &quot; + url + &quot; to zookeeper &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L173">        }</span>
+<span class="nc" id="L174">    }</span>
+
+    @Override
+    public void doUnsubscribe(URL url, NotifyListener listener) {
+<span class="nc" id="L178">        ConcurrentMap&lt;NotifyListener, ChildListener&gt; listeners = zkListeners.get(url);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (listeners != null) {</span>
+<span class="nc" id="L180">            ChildListener zkListener = listeners.get(listener);</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (zkListener != null) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {</span>
+<span class="nc" id="L183">                    String root = toRootPath();</span>
+<span class="nc" id="L184">                    zkClient.removeChildListener(root, zkListener);</span>
+<span class="nc" id="L185">                } else {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    for (String path : toCategoriesPath(url)) {</span>
+<span class="nc" id="L187">                        zkClient.removeChildListener(path, zkListener);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L192">    }</span>
+
+    @Override
+    public List&lt;URL&gt; lookup(URL url) {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L197">            throw new IllegalArgumentException(&quot;lookup url == null&quot;);</span>
+        }
+        try {
+<span class="nc" id="L200">            List&lt;String&gt; providers = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            for (String path : toCategoriesPath(url)) {</span>
+<span class="nc" id="L202">                List&lt;String&gt; children = zkClient.getChildren(path);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                if (children != null) {</span>
+<span class="nc" id="L204">                    providers.addAll(children);</span>
+                }
+            }
+<span class="nc" id="L207">            return toUrlsWithoutEmpty(url, providers);</span>
+<span class="nc" id="L208">        } catch (Throwable e) {</span>
+<span class="nc" id="L209">            throw new RpcException(&quot;Failed to lookup &quot; + url + &quot; from zookeeper &quot; + getUrl() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    private String toRootDir() {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (root.equals(Constants.PATH_SEPARATOR)) {</span>
+<span class="nc" id="L215">            return root;</span>
+        }
+<span class="nc" id="L217">        return root + Constants.PATH_SEPARATOR;</span>
+    }
+
+    private String toRootPath() {
+<span class="nc" id="L221">        return root;</span>
+    }
+
+    private String toServicePath(URL url) {
+<span class="nc" id="L225">        String name = url.getServiceInterface();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(name)) {</span>
+<span class="nc" id="L227">            return toRootPath();</span>
+        }
+<span class="nc" id="L229">        return toRootDir() + URL.encode(name);</span>
+    }
+
+    private String[] toCategoriesPath(URL url) {
+        String[] categories;
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (Constants.ANY_VALUE.equals(url.getParameter(Constants.CATEGORY_KEY))) {</span>
+<span class="nc" id="L235">            categories = new String[]{Constants.PROVIDERS_CATEGORY, Constants.CONSUMERS_CATEGORY,</span>
+                    Constants.ROUTERS_CATEGORY, Constants.CONFIGURATORS_CATEGORY};
+        } else {
+<span class="nc" id="L238">            categories = url.getParameter(Constants.CATEGORY_KEY, new String[]{Constants.DEFAULT_CATEGORY});</span>
+        }
+<span class="nc" id="L240">        String[] paths = new String[categories.length];</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        for (int i = 0; i &lt; categories.length; i++) {</span>
+<span class="nc" id="L242">            paths[i] = toServicePath(url) + Constants.PATH_SEPARATOR + categories[i];</span>
+        }
+<span class="nc" id="L244">        return paths;</span>
+    }
+
+    private String toCategoryPath(URL url) {
+<span class="nc" id="L248">        return toServicePath(url) + Constants.PATH_SEPARATOR + url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);</span>
+    }
+
+    private String toUrlPath(URL url) {
+<span class="nc" id="L252">        return toCategoryPath(url) + Constants.PATH_SEPARATOR + URL.encode(url.toFullString());</span>
+    }
+
+    private List&lt;URL&gt; toUrlsWithoutEmpty(URL consumer, List&lt;String&gt; providers) {
+<span class="nc" id="L256">        List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (CollectionUtils.isNotEmpty(providers)) {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            for (String provider : providers) {</span>
+<span class="nc" id="L259">                provider = URL.decode(provider);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if (provider.contains(Constants.PROTOCOL_SEPARATOR)) {</span>
+<span class="nc" id="L261">                    URL url = URL.valueOf(provider);</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                    if (UrlUtils.isMatch(consumer, url)) {</span>
+<span class="nc" id="L263">                        urls.add(url);</span>
+                    }
+                }
+<span class="nc" id="L266">            }</span>
+        }
+<span class="nc" id="L268">        return urls;</span>
+    }
+
+    private List&lt;URL&gt; toUrlsWithEmpty(URL consumer, String path, List&lt;String&gt; providers) {
+<span class="nc" id="L272">        List&lt;URL&gt; urls = toUrlsWithoutEmpty(consumer, providers);</span>
+<span class="nc bnc" id="L273" title="All 4 branches missed.">        if (urls == null || urls.isEmpty()) {</span>
+<span class="nc" id="L274">            int i = path.lastIndexOf(Constants.PATH_SEPARATOR);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            String category = i &lt; 0 ? path : path.substring(i + 1);</span>
+<span class="nc" id="L276">            URL empty = URLBuilder.from(consumer)</span>
+<span class="nc" id="L277">                    .setProtocol(Constants.EMPTY_PROTOCOL)</span>
+<span class="nc" id="L278">                    .addParameter(Constants.CATEGORY_KEY, category)</span>
+<span class="nc" id="L279">                    .build();</span>
+<span class="nc" id="L280">            urls.add(empty);</span>
+        }
+<span class="nc" id="L282">        return urls;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

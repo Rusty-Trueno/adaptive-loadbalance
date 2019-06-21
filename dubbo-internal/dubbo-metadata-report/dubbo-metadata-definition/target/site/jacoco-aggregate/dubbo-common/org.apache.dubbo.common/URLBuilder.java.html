@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>URLBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-metadata-definition</a> &gt; <a href="../index.html" class="el_bundle">dubbo-common</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.common</a> &gt; <span class="el_source">URLBuilder.java</span></div><h1>URLBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.common;
+
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.StringUtils;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+public final class URLBuilder {
+    private String protocol;
+
+    private String username;
+
+    private String password;
+
+    // by default, host to registry
+    private String host;
+
+    // by default, port to registry
+    private int port;
+
+    private String path;
+
+    private Map&lt;String, String&gt; parameters;
+
+<span class="nc" id="L44">    public URLBuilder() {</span>
+<span class="nc" id="L45">        protocol = null;</span>
+<span class="nc" id="L46">        username = null;</span>
+<span class="nc" id="L47">        password = null;</span>
+<span class="nc" id="L48">        host = null;</span>
+<span class="nc" id="L49">        port = 0;</span>
+<span class="nc" id="L50">        path = null;</span>
+<span class="nc" id="L51">        parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L52">    }</span>
+
+    public URLBuilder(String protocol, String host, int port) {
+<span class="nc" id="L55">        this(protocol, null, null, host, port, null, null);</span>
+<span class="nc" id="L56">    }</span>
+
+    public URLBuilder(String protocol, String host, int port, String[] pairs) {
+<span class="nc" id="L59">        this(protocol, null, null, host, port, null, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L60">    }</span>
+
+    public URLBuilder(String protocol, String host, int port, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L63">        this(protocol, null, null, host, port, null, parameters);</span>
+<span class="nc" id="L64">    }</span>
+
+    public URLBuilder(String protocol, String host, int port, String path) {
+<span class="nc" id="L67">        this(protocol, null, null, host, port, path, null);</span>
+<span class="nc" id="L68">    }</span>
+
+    public URLBuilder(String protocol, String host, int port, String path, String... pairs) {
+<span class="nc" id="L71">        this(protocol, null, null, host, port, path, CollectionUtils.toStringMap(pairs));</span>
+<span class="nc" id="L72">    }</span>
+
+    public URLBuilder(String protocol, String host, int port, String path, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L75">        this(protocol, null, null, host, port, path, parameters);</span>
+<span class="nc" id="L76">    }</span>
+
+<span class="nc" id="L78">    public URLBuilder(String protocol, String username, String password, String host, int port, String path, Map&lt;String, String&gt; parameters) {</span>
+<span class="nc" id="L79">        this.protocol = protocol;</span>
+<span class="nc" id="L80">        this.username = username;</span>
+<span class="nc" id="L81">        this.password = password;</span>
+<span class="nc" id="L82">        this.host = host;</span>
+<span class="nc" id="L83">        this.port = port;</span>
+<span class="nc" id="L84">        this.path = path;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        this.parameters = parameters != null ? parameters : new HashMap&lt;&gt;();</span>
+<span class="nc" id="L86">    }</span>
+
+    public static URLBuilder from(URL url) {
+<span class="nc" id="L89">        String protocol = url.getProtocol();</span>
+<span class="nc" id="L90">        String username = url.getUsername();</span>
+<span class="nc" id="L91">        String password = url.getPassword();</span>
+<span class="nc" id="L92">        String host = url.getHost();</span>
+<span class="nc" id="L93">        int port = url.getPort();</span>
+<span class="nc" id="L94">        String path = url.getPath();</span>
+<span class="nc" id="L95">        Map&lt;String, String&gt; parameters = new HashMap&lt;&gt;(url.getParameters());</span>
+<span class="nc" id="L96">        return new URLBuilder(</span>
+                protocol,
+                username,
+                password,
+                host,
+                port,
+                path,
+                parameters);
+    }
+
+    public URL build() {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (StringUtils.isEmpty(username) &amp;&amp; StringUtils.isNotEmpty(password)) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;Invalid url, password without username!&quot;);</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        port = port &lt; 0 ? 0 : port;</span>
+        // trim the leading &quot;/&quot;
+<span class="nc" id="L112">        int firstNonSlash = 0;</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (path != null) {</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            while (firstNonSlash &lt; path.length() &amp;&amp; path.charAt(firstNonSlash) == '/') {</span>
+<span class="nc" id="L115">                firstNonSlash++;</span>
+            }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (firstNonSlash &gt;= path.length()) {</span>
+<span class="nc" id="L118">                path = &quot;&quot;;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            } else if (firstNonSlash &gt; 0) {</span>
+<span class="nc" id="L120">                path = path.substring(firstNonSlash);</span>
+            }
+        }
+<span class="nc" id="L123">        return new URL(protocol, username, password, host, port, path, parameters);</span>
+    }
+
+
+    public URLBuilder setProtocol(String protocol) {
+<span class="nc" id="L128">        this.protocol = protocol;</span>
+<span class="nc" id="L129">        return this;</span>
+    }
+
+    public URLBuilder setUsername(String username) {
+<span class="nc" id="L133">        this.username = username;</span>
+<span class="nc" id="L134">        return this;</span>
+    }
+
+    public URLBuilder setPassword(String password) {
+<span class="nc" id="L138">        this.password = password;</span>
+<span class="nc" id="L139">        return this;</span>
+    }
+
+    public URLBuilder setHost(String host) {
+<span class="nc" id="L143">        this.host = host;</span>
+<span class="nc" id="L144">        return this;</span>
+    }
+
+    public URLBuilder setPort(int port) {
+<span class="nc" id="L148">        this.port = port;</span>
+<span class="nc" id="L149">        return this;</span>
+    }
+
+    public URLBuilder setAddress(String address) {
+<span class="nc" id="L153">        int i = address.lastIndexOf(':');</span>
+        String host;
+<span class="nc" id="L155">        int port = this.port;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L157">            host = address.substring(0, i);</span>
+<span class="nc" id="L158">            port = Integer.parseInt(address.substring(i + 1));</span>
+        } else {
+<span class="nc" id="L160">            host = address;</span>
+        }
+<span class="nc" id="L162">        this.host = host;</span>
+<span class="nc" id="L163">        this.port = port;</span>
+<span class="nc" id="L164">        return this;</span>
+    }
+
+    public URLBuilder setPath(String path) {
+<span class="nc" id="L168">        this.path = path;</span>
+<span class="nc" id="L169">        return this;</span>
+    }
+
+    public URLBuilder addParameterAndEncoded(String key, String value) {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L174">            return this;</span>
+        }
+<span class="nc" id="L176">        return addParameter(key, URL.encode(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, boolean value) {
+<span class="nc" id="L180">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, char value) {
+<span class="nc" id="L184">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, byte value) {
+<span class="nc" id="L188">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, short value) {
+<span class="nc" id="L192">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, int value) {
+<span class="nc" id="L196">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, long value) {
+<span class="nc" id="L200">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, float value) {
+<span class="nc" id="L204">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, double value) {
+<span class="nc" id="L208">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, Enum&lt;?&gt; value) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L213">            return this;</span>
+        }
+<span class="nc" id="L215">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, Number value) {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L220">            return this;</span>
+        }
+<span class="nc" id="L222">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, CharSequence value) {
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L227">            return this;</span>
+        }
+<span class="nc" id="L229">        return addParameter(key, String.valueOf(value));</span>
+    }
+
+    public URLBuilder addParameter(String key, String value) {
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L234">            return this;</span>
+        }
+        // if value doesn't change, return immediately
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (value.equals(parameters.get(key))) { // value != null</span>
+<span class="nc" id="L238">            return this;</span>
+        }
+
+<span class="nc" id="L241">        parameters.put(key, value);</span>
+<span class="nc" id="L242">        return this;</span>
+    }
+
+    public URLBuilder addParameterIfAbsent(String key, String value) {
+<span class="nc bnc" id="L246" title="All 4 branches missed.">        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L247">            return this;</span>
+        }
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (hasParameter(key)) {</span>
+<span class="nc" id="L250">            return this;</span>
+        }
+<span class="nc" id="L252">        parameters.put(key, value);</span>
+<span class="nc" id="L253">        return this;</span>
+    }
+
+    public URLBuilder addParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L258">            return this;</span>
+        }
+
+<span class="nc" id="L261">        boolean hasAndEqual = true;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : parameters.entrySet()) {</span>
+<span class="nc" id="L263">            String oldValue = this.parameters.get(entry.getKey());</span>
+<span class="nc" id="L264">            String newValue = entry.getValue();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if (!Objects.equals(oldValue, newValue)) {</span>
+<span class="nc" id="L266">                hasAndEqual = false;</span>
+<span class="nc" id="L267">                break;</span>
+            }
+<span class="nc" id="L269">        }</span>
+        // return immediately if there's no change
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (hasAndEqual) {</span>
+<span class="nc" id="L272">            return this;</span>
+        }
+
+<span class="nc" id="L275">        this.parameters.putAll(parameters);</span>
+<span class="nc" id="L276">        return this;</span>
+    }
+
+    public URLBuilder addParametersIfAbsent(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        if (CollectionUtils.isEmptyMap(parameters)) {</span>
+<span class="nc" id="L281">            return this;</span>
+        }
+<span class="nc" id="L283">        this.parameters.putAll(parameters);</span>
+<span class="nc" id="L284">        return this;</span>
+    }
+
+    public URLBuilder addParameters(String... pairs) {
+<span class="nc bnc" id="L288" title="All 4 branches missed.">        if (pairs == null || pairs.length == 0) {</span>
+<span class="nc" id="L289">            return this;</span>
+        }
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (pairs.length % 2 != 0) {</span>
+<span class="nc" id="L292">            throw new IllegalArgumentException(&quot;Map pairs can not be odd number.&quot;);</span>
+        }
+<span class="nc" id="L294">        Map&lt;String, String&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L295">        int len = pairs.length / 2;</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L297">            map.put(pairs[2 * i], pairs[2 * i + 1]);</span>
+        }
+<span class="nc" id="L299">        return addParameters(map);</span>
+    }
+
+    public URLBuilder addParameterString(String query) {
+<span class="nc bnc" id="L303" title="All 2 branches missed.">        if (StringUtils.isEmpty(query)) {</span>
+<span class="nc" id="L304">            return this;</span>
+        }
+<span class="nc" id="L306">        return addParameters(StringUtils.parseQueryString(query));</span>
+    }
+
+    public URLBuilder removeParameter(String key) {
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (StringUtils.isEmpty(key)) {</span>
+<span class="nc" id="L311">            return this;</span>
+        }
+<span class="nc" id="L313">        return removeParameters(key);</span>
+    }
+
+    public URLBuilder removeParameters(Collection&lt;String&gt; keys) {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (CollectionUtils.isEmpty(keys)) {</span>
+<span class="nc" id="L318">            return this;</span>
+        }
+<span class="nc" id="L320">        return removeParameters(keys.toArray(new String[0]));</span>
+    }
+
+    public URLBuilder removeParameters(String... keys) {
+<span class="nc bnc" id="L324" title="All 4 branches missed.">        if (keys == null || keys.length == 0) {</span>
+<span class="nc" id="L325">            return this;</span>
+        }
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        for (String key : keys) {</span>
+<span class="nc" id="L328">            parameters.remove(key);</span>
+        }
+<span class="nc" id="L330">        return this;</span>
+    }
+
+    public URLBuilder clearParameters() {
+<span class="nc" id="L334">        parameters.clear();</span>
+<span class="nc" id="L335">        return this;</span>
+    }
+
+    public boolean hasParameter(String key) {
+<span class="nc" id="L339">        String value = getParameter(key);</span>
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        return value != null &amp;&amp; value.length() &gt; 0;</span>
+    }
+
+    public String getParameter(String key) {
+<span class="nc" id="L344">        String value = parameters.get(key);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (StringUtils.isEmpty(value)) {</span>
+<span class="nc" id="L346">            value = parameters.get(Constants.DEFAULT_KEY_PREFIX + key);</span>
+        }
+<span class="nc" id="L348">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

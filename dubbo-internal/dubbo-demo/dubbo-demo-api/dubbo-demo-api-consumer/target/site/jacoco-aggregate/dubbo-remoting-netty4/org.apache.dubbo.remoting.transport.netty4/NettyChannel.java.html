@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyChannel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-demo-api-consumer</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty4</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty4</a> &gt; <span class="el_source">NettyChannel.java</span></div><h1>NettyChannel.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty4;
+
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.RemotingException;
+import org.apache.dubbo.remoting.transport.AbstractChannel;
+
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * NettyChannel.
+ */
+final class NettyChannel extends AbstractChannel {
+
+<span class="nc" id="L39">    private static final Logger logger = LoggerFactory.getLogger(NettyChannel.class);</span>
+
+<span class="nc" id="L41">    private static final ConcurrentMap&lt;Channel, NettyChannel&gt; CHANNEL_MAP = new ConcurrentHashMap&lt;Channel, NettyChannel&gt;();</span>
+
+    private final Channel channel;
+
+<span class="nc" id="L45">    private final Map&lt;String, Object&gt; attributes = new ConcurrentHashMap&lt;String, Object&gt;();</span>
+
+    private NettyChannel(Channel channel, URL url, ChannelHandler handler) {
+<span class="nc" id="L48">        super(url, handler);</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (channel == null) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;netty channel == null;&quot;);</span>
+        }
+<span class="nc" id="L52">        this.channel = channel;</span>
+<span class="nc" id="L53">    }</span>
+
+    static NettyChannel getOrAddChannel(Channel ch, URL url, ChannelHandler handler) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (ch == null) {</span>
+<span class="nc" id="L57">            return null;</span>
+        }
+<span class="nc" id="L59">        NettyChannel ret = CHANNEL_MAP.get(ch);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (ret == null) {</span>
+<span class="nc" id="L61">            NettyChannel nettyChannel = new NettyChannel(ch, url, handler);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (ch.isActive()) {</span>
+<span class="nc" id="L63">                ret = CHANNEL_MAP.putIfAbsent(ch, nettyChannel);</span>
+            }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (ret == null) {</span>
+<span class="nc" id="L66">                ret = nettyChannel;</span>
+            }
+<span class="nc" id="L68">            NettyChannelManager.addChannel(ret);</span>
+        }
+<span class="nc" id="L70">        return ret;</span>
+    }
+
+    static void removeChannelIfDisconnected(Channel ch) {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (ch != null &amp;&amp; !ch.isActive()) {</span>
+<span class="nc" id="L75">            NettyChannel removedChannel = CHANNEL_MAP.remove(ch);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (removedChannel != null) {</span>
+<span class="nc" id="L77">                NettyChannelManager.removeChannel(removedChannel);</span>
+            }
+        }
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+<span class="nc" id="L84">        return (InetSocketAddress) channel.localAddress();</span>
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+<span class="nc" id="L89">        return (InetSocketAddress) channel.remoteAddress();</span>
+    }
+
+    @Override
+    public boolean isConnected() {
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        return !isClosed() &amp;&amp; channel.isActive();</span>
+    }
+
+    @Override
+    public void send(Object message, boolean sent) throws RemotingException {
+<span class="nc" id="L99">        super.send(message, sent);</span>
+
+<span class="nc" id="L101">        boolean success = true;</span>
+<span class="nc" id="L102">        int timeout = 0;</span>
+        try {
+<span class="nc" id="L104">            ChannelFuture future = channel.writeAndFlush(message);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (sent) {</span>
+<span class="nc" id="L106">                timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);</span>
+<span class="nc" id="L107">                success = future.await(timeout);</span>
+            }
+<span class="nc" id="L109">            Throwable cause = future.cause();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (cause != null) {</span>
+<span class="nc" id="L111">                throw cause;</span>
+            }
+<span class="nc" id="L113">        } catch (Throwable e) {</span>
+<span class="nc" id="L114">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress() + &quot;, cause: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L115">        }</span>
+
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (!success) {</span>
+<span class="nc" id="L118">            throw new RemotingException(this, &quot;Failed to send message &quot; + message + &quot; to &quot; + getRemoteAddress()</span>
+                    + &quot;in timeout(&quot; + timeout + &quot;ms) limit&quot;);
+        }
+<span class="nc" id="L121">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L126">            super.close();</span>
+<span class="nc" id="L127">        } catch (Exception e) {</span>
+<span class="nc" id="L128">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L129">        }</span>
+        try {
+<span class="nc" id="L131">            removeChannelIfDisconnected(channel);</span>
+<span class="nc" id="L132">        } catch (Exception e) {</span>
+<span class="nc" id="L133">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L134">        }</span>
+        try {
+<span class="nc" id="L136">            attributes.clear();</span>
+<span class="nc" id="L137">        } catch (Exception e) {</span>
+<span class="nc" id="L138">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L139">        }</span>
+        try {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (logger.isInfoEnabled()) {</span>
+<span class="nc" id="L142">                logger.info(&quot;Close netty channel &quot; + channel);</span>
+            }
+<span class="nc" id="L144">            channel.close();</span>
+<span class="nc" id="L145">        } catch (Exception e) {</span>
+<span class="nc" id="L146">            logger.warn(e.getMessage(), e);</span>
+<span class="nc" id="L147">        }</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public boolean hasAttribute(String key) {
+<span class="nc" id="L152">        return attributes.containsKey(key);</span>
+    }
+
+    @Override
+    public Object getAttribute(String key) {
+<span class="nc" id="L157">        return attributes.get(key);</span>
+    }
+
+    @Override
+    public void setAttribute(String key, Object value) {
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (value == null) { // The null value unallowed in the ConcurrentHashMap.</span>
+<span class="nc" id="L163">            attributes.remove(key);</span>
+        } else {
+<span class="nc" id="L165">            attributes.put(key, value);</span>
+        }
+<span class="nc" id="L167">    }</span>
+
+    @Override
+    public void removeAttribute(String key) {
+<span class="nc" id="L171">        attributes.remove(key);</span>
+<span class="nc" id="L172">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L176">        final int prime = 31;</span>
+<span class="nc" id="L177">        int result = 1;</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        result = prime * result + ((channel == null) ? 0 : channel.hashCode());</span>
+<span class="nc" id="L179">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L185">            return true;</span>
+        }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L188">            return false;</span>
+        }
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L191">            return false;</span>
+        }
+<span class="nc" id="L193">        NettyChannel other = (NettyChannel) obj;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (channel == null) {</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            if (other.channel != null) {</span>
+<span class="nc" id="L196">                return false;</span>
+            }
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        } else if (!channel.equals(other.channel)) {</span>
+<span class="nc" id="L199">            return false;</span>
+        }
+<span class="nc" id="L201">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L206">        return &quot;NettyChannel [channel=&quot; + channel + &quot;]&quot;;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

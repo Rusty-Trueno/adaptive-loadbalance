@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ByteBufferBackedChannelBuffer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-api</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.buffer</a> &gt; <span class="el_source">ByteBufferBackedChannelBuffer.java</span></div><h1>ByteBufferBackedChannelBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.dubbo.remoting.buffer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+
+public class ByteBufferBackedChannelBuffer extends AbstractChannelBuffer {
+
+    private final ByteBuffer buffer;
+
+    private final int capacity;
+
+<span class="nc" id="L31">    public ByteBufferBackedChannelBuffer(ByteBuffer buffer) {</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (buffer == null) {</span>
+<span class="nc" id="L33">            throw new NullPointerException(&quot;buffer&quot;);</span>
+        }
+
+<span class="nc" id="L36">        this.buffer = buffer.slice();</span>
+<span class="nc" id="L37">        capacity = buffer.remaining();</span>
+<span class="nc" id="L38">        writerIndex(capacity);</span>
+<span class="nc" id="L39">    }</span>
+
+<span class="nc" id="L41">    public ByteBufferBackedChannelBuffer(ByteBufferBackedChannelBuffer buffer) {</span>
+<span class="nc" id="L42">        this.buffer = buffer.buffer;</span>
+<span class="nc" id="L43">        capacity = buffer.capacity;</span>
+<span class="nc" id="L44">        setIndex(buffer.readerIndex(), buffer.writerIndex());</span>
+<span class="nc" id="L45">    }</span>
+
+    @Override
+    public ChannelBufferFactory factory() {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (buffer.isDirect()) {</span>
+<span class="nc" id="L50">            return DirectChannelBufferFactory.getInstance();</span>
+        } else {
+<span class="nc" id="L52">            return HeapChannelBufferFactory.getInstance();</span>
+        }
+    }
+
+
+    @Override
+    public int capacity() {
+<span class="nc" id="L59">        return capacity;</span>
+    }
+
+
+    @Override
+    public ChannelBuffer copy(int index, int length) {
+        ByteBuffer src;
+        try {
+<span class="nc" id="L67">            src = (ByteBuffer) buffer.duplicate().position(index).limit(index + length);</span>
+<span class="nc" id="L68">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L69">            throw new IndexOutOfBoundsException();</span>
+<span class="nc" id="L70">        }</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        ByteBuffer dst = buffer.isDirect()</span>
+<span class="nc" id="L73">                ? ByteBuffer.allocateDirect(length)</span>
+<span class="nc" id="L74">                : ByteBuffer.allocate(length);</span>
+<span class="nc" id="L75">        dst.put(src);</span>
+<span class="nc" id="L76">        dst.clear();</span>
+<span class="nc" id="L77">        return new ByteBufferBackedChannelBuffer(dst);</span>
+    }
+
+
+    @Override
+    public byte getByte(int index) {
+<span class="nc" id="L83">        return buffer.get(index);</span>
+    }
+
+
+    @Override
+    public void getBytes(int index, byte[] dst, int dstIndex, int length) {
+<span class="nc" id="L89">        ByteBuffer data = buffer.duplicate();</span>
+        try {
+<span class="nc" id="L91">            data.limit(index + length).position(index);</span>
+<span class="nc" id="L92">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L93">            throw new IndexOutOfBoundsException();</span>
+<span class="nc" id="L94">        }</span>
+<span class="nc" id="L95">        data.get(dst, dstIndex, length);</span>
+<span class="nc" id="L96">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ByteBuffer dst) {
+<span class="nc" id="L101">        ByteBuffer data = buffer.duplicate();</span>
+<span class="nc" id="L102">        int bytesToCopy = Math.min(capacity() - index, dst.remaining());</span>
+        try {
+<span class="nc" id="L104">            data.limit(index + bytesToCopy).position(index);</span>
+<span class="nc" id="L105">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L106">            throw new IndexOutOfBoundsException();</span>
+<span class="nc" id="L107">        }</span>
+<span class="nc" id="L108">        dst.put(data);</span>
+<span class="nc" id="L109">    }</span>
+
+
+    @Override
+    public void getBytes(int index, ChannelBuffer dst, int dstIndex, int length) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (dst instanceof ByteBufferBackedChannelBuffer) {</span>
+<span class="nc" id="L115">            ByteBufferBackedChannelBuffer bbdst = (ByteBufferBackedChannelBuffer) dst;</span>
+<span class="nc" id="L116">            ByteBuffer data = bbdst.buffer.duplicate();</span>
+
+<span class="nc" id="L118">            data.limit(dstIndex + length).position(dstIndex);</span>
+<span class="nc" id="L119">            getBytes(index, data);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        } else if (buffer.hasArray()) {</span>
+<span class="nc" id="L121">            dst.setBytes(dstIndex, buffer.array(), index + buffer.arrayOffset(), length);</span>
+        } else {
+<span class="nc" id="L123">            dst.setBytes(dstIndex, this, index, length);</span>
+        }
+<span class="nc" id="L125">    }</span>
+
+
+    @Override
+    public void getBytes(int index, OutputStream out, int length) throws IOException {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (length == 0) {</span>
+<span class="nc" id="L131">            return;</span>
+        }
+
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (buffer.hasArray()) {</span>
+<span class="nc" id="L135">            out.write(</span>
+<span class="nc" id="L136">                    buffer.array(),</span>
+<span class="nc" id="L137">                    index + buffer.arrayOffset(),</span>
+                    length);
+        } else {
+<span class="nc" id="L140">            byte[] tmp = new byte[length];</span>
+<span class="nc" id="L141">            ((ByteBuffer) buffer.duplicate().position(index)).get(tmp);</span>
+<span class="nc" id="L142">            out.write(tmp);</span>
+        }
+<span class="nc" id="L144">    }</span>
+
+
+    @Override
+    public boolean isDirect() {
+<span class="nc" id="L149">        return buffer.isDirect();</span>
+    }
+
+
+    @Override
+    public void setByte(int index, int value) {
+<span class="nc" id="L155">        buffer.put(index, (byte) value);</span>
+<span class="nc" id="L156">    }</span>
+
+
+    @Override
+    public void setBytes(int index, byte[] src, int srcIndex, int length) {
+<span class="nc" id="L161">        ByteBuffer data = buffer.duplicate();</span>
+<span class="nc" id="L162">        data.limit(index + length).position(index);</span>
+<span class="nc" id="L163">        data.put(src, srcIndex, length);</span>
+<span class="nc" id="L164">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ByteBuffer src) {
+<span class="nc" id="L169">        ByteBuffer data = buffer.duplicate();</span>
+<span class="nc" id="L170">        data.limit(index + src.remaining()).position(index);</span>
+<span class="nc" id="L171">        data.put(src);</span>
+<span class="nc" id="L172">    }</span>
+
+
+    @Override
+    public void setBytes(int index, ChannelBuffer src, int srcIndex, int length) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (src instanceof ByteBufferBackedChannelBuffer) {</span>
+<span class="nc" id="L178">            ByteBufferBackedChannelBuffer bbsrc = (ByteBufferBackedChannelBuffer) src;</span>
+<span class="nc" id="L179">            ByteBuffer data = bbsrc.buffer.duplicate();</span>
+
+<span class="nc" id="L181">            data.limit(srcIndex + length).position(srcIndex);</span>
+<span class="nc" id="L182">            setBytes(index, data);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        } else if (buffer.hasArray()) {</span>
+<span class="nc" id="L184">            src.getBytes(srcIndex, buffer.array(), index + buffer.arrayOffset(), length);</span>
+        } else {
+<span class="nc" id="L186">            src.getBytes(srcIndex, this, index, length);</span>
+        }
+<span class="nc" id="L188">    }</span>
+
+
+    @Override
+    public ByteBuffer toByteBuffer(int index, int length) {
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        if (index == 0 &amp;&amp; length == capacity()) {</span>
+<span class="nc" id="L194">            return buffer.duplicate();</span>
+        } else {
+<span class="nc" id="L196">            return ((ByteBuffer) buffer.duplicate().position(</span>
+<span class="nc" id="L197">                    index).limit(index + length)).slice();</span>
+        }
+    }
+
+
+    @Override
+    public int setBytes(int index, InputStream in, int length) throws IOException {
+<span class="nc" id="L204">        int readBytes = 0;</span>
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (buffer.hasArray()) {</span>
+<span class="nc" id="L207">            index += buffer.arrayOffset();</span>
+            do {
+<span class="nc" id="L209">                int localReadBytes = in.read(buffer.array(), index, length);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (localReadBytes &lt; 0) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                    if (readBytes == 0) {</span>
+<span class="nc" id="L212">                        return -1;</span>
+                    } else {
+                        break;
+                    }
+                }
+<span class="nc" id="L217">                readBytes += localReadBytes;</span>
+<span class="nc" id="L218">                index += localReadBytes;</span>
+<span class="nc" id="L219">                length -= localReadBytes;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            } while (length &gt; 0);</span>
+        } else {
+<span class="nc" id="L222">            byte[] tmp = new byte[length];</span>
+<span class="nc" id="L223">            int i = 0;</span>
+            do {
+<span class="nc" id="L225">                int localReadBytes = in.read(tmp, i, tmp.length - i);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                if (localReadBytes &lt; 0) {</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                    if (readBytes == 0) {</span>
+<span class="nc" id="L228">                        return -1;</span>
+                    } else {
+                        break;
+                    }
+                }
+<span class="nc" id="L233">                readBytes += localReadBytes;</span>
+<span class="nc" id="L234">                i += readBytes;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            } while (i &lt; tmp.length);</span>
+<span class="nc" id="L236">            ((ByteBuffer) buffer.duplicate().position(index)).put(tmp);</span>
+        }
+
+<span class="nc" id="L239">        return readBytes;</span>
+    }
+
+
+    @Override
+    public byte[] array() {
+<span class="nc" id="L245">        return buffer.array();</span>
+    }
+
+
+    @Override
+    public boolean hasArray() {
+<span class="nc" id="L251">        return buffer.hasArray();</span>
+    }
+
+
+    @Override
+    public int arrayOffset() {
+<span class="nc" id="L257">        return buffer.arrayOffset();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

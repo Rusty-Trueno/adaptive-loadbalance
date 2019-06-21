@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NettyCodecAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">dubbo-all</a> &gt; <a href="../index.html" class="el_bundle">dubbo-remoting-netty</a> &gt; <a href="index.source.html" class="el_package">org.apache.dubbo.remoting.transport.netty</a> &gt; <span class="el_source">NettyCodecAdapter.java</span></div><h1>NettyCodecAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.dubbo.remoting.transport.netty;
+
+import org.apache.dubbo.common.Constants;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.remoting.Codec2;
+import org.apache.dubbo.remoting.buffer.DynamicChannelBuffer;
+
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelHandler;
+import org.jboss.netty.channel.ChannelHandler.Sharable;
+import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.ExceptionEvent;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
+import org.jboss.netty.handler.codec.oneone.OneToOneEncoder;
+
+import java.io.IOException;
+
+/**
+ * NettyCodecAdapter.
+ */
+final class NettyCodecAdapter {
+
+<span class="nc" id="L43">    private final ChannelHandler encoder = new InternalEncoder();</span>
+
+<span class="nc" id="L45">    private final ChannelHandler decoder = new InternalDecoder();</span>
+
+    private final Codec2 codec;
+
+    private final URL url;
+
+    private final int bufferSize;
+
+    private final org.apache.dubbo.remoting.ChannelHandler handler;
+
+<span class="nc" id="L55">    public NettyCodecAdapter(Codec2 codec, URL url, org.apache.dubbo.remoting.ChannelHandler handler) {</span>
+<span class="nc" id="L56">        this.codec = codec;</span>
+<span class="nc" id="L57">        this.url = url;</span>
+<span class="nc" id="L58">        this.handler = handler;</span>
+<span class="nc" id="L59">        int b = url.getPositiveParameter(Constants.BUFFER_KEY, Constants.DEFAULT_BUFFER_SIZE);</span>
+<span class="nc bnc" id="L60" title="All 4 branches missed.">        this.bufferSize = b &gt;= Constants.MIN_BUFFER_SIZE &amp;&amp; b &lt;= Constants.MAX_BUFFER_SIZE ? b : Constants.DEFAULT_BUFFER_SIZE;</span>
+<span class="nc" id="L61">    }</span>
+
+    public ChannelHandler getEncoder() {
+<span class="nc" id="L64">        return encoder;</span>
+    }
+
+    public ChannelHandler getDecoder() {
+<span class="nc" id="L68">        return decoder;</span>
+    }
+
+    @Sharable
+<span class="nc" id="L72">    private class InternalEncoder extends OneToOneEncoder {</span>
+
+        @Override
+        protected Object encode(ChannelHandlerContext ctx, Channel ch, Object msg) throws Exception {
+<span class="nc" id="L76">            org.apache.dubbo.remoting.buffer.ChannelBuffer buffer =</span>
+<span class="nc" id="L77">                    org.apache.dubbo.remoting.buffer.ChannelBuffers.dynamicBuffer(1024);</span>
+<span class="nc" id="L78">            NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);</span>
+            try {
+<span class="nc" id="L80">                codec.encode(channel, buffer, msg);</span>
+            } finally {
+<span class="nc" id="L82">                NettyChannel.removeChannelIfDisconnected(ch);</span>
+            }
+<span class="nc" id="L84">            return ChannelBuffers.wrappedBuffer(buffer.toByteBuffer());</span>
+        }
+    }
+
+<span class="nc" id="L88">    private class InternalDecoder extends SimpleChannelUpstreamHandler {</span>
+
+<span class="nc" id="L90">        private org.apache.dubbo.remoting.buffer.ChannelBuffer buffer =</span>
+                org.apache.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;
+
+        @Override
+        public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throws Exception {
+<span class="nc" id="L95">            Object o = event.getMessage();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (!(o instanceof ChannelBuffer)) {</span>
+<span class="nc" id="L97">                ctx.sendUpstream(event);</span>
+<span class="nc" id="L98">                return;</span>
+            }
+
+<span class="nc" id="L101">            ChannelBuffer input = (ChannelBuffer) o;</span>
+<span class="nc" id="L102">            int readable = input.readableBytes();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (readable &lt;= 0) {</span>
+<span class="nc" id="L104">                return;</span>
+            }
+
+            org.apache.dubbo.remoting.buffer.ChannelBuffer message;
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (buffer.readable()) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (buffer instanceof DynamicChannelBuffer) {</span>
+<span class="nc" id="L110">                    buffer.writeBytes(input.toByteBuffer());</span>
+<span class="nc" id="L111">                    message = buffer;</span>
+                } else {
+<span class="nc" id="L113">                    int size = buffer.readableBytes() + input.readableBytes();</span>
+<span class="nc" id="L114">                    message = org.apache.dubbo.remoting.buffer.ChannelBuffers.dynamicBuffer(</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                            size &gt; bufferSize ? size : bufferSize);</span>
+<span class="nc" id="L116">                    message.writeBytes(buffer, buffer.readableBytes());</span>
+<span class="nc" id="L117">                    message.writeBytes(input.toByteBuffer());</span>
+<span class="nc" id="L118">                }</span>
+            } else {
+<span class="nc" id="L120">                message = org.apache.dubbo.remoting.buffer.ChannelBuffers.wrappedBuffer(</span>
+<span class="nc" id="L121">                        input.toByteBuffer());</span>
+            }
+
+<span class="nc" id="L124">            NettyChannel channel = NettyChannel.getOrAddChannel(ctx.getChannel(), url, handler);</span>
+            Object msg;
+            int saveReaderIndex;
+
+            try {
+                // decode object.
+                do {
+<span class="nc" id="L131">                    saveReaderIndex = message.readerIndex();</span>
+                    try {
+<span class="nc" id="L133">                        msg = codec.decode(channel, message);</span>
+<span class="nc" id="L134">                    } catch (IOException e) {</span>
+<span class="nc" id="L135">                        buffer = org.apache.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L136">                        throw e;</span>
+<span class="nc" id="L137">                    }</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                    if (msg == Codec2.DecodeResult.NEED_MORE_INPUT) {</span>
+<span class="nc" id="L139">                        message.readerIndex(saveReaderIndex);</span>
+<span class="nc" id="L140">                        break;</span>
+                    } else {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                        if (saveReaderIndex == message.readerIndex()) {</span>
+<span class="nc" id="L143">                            buffer = org.apache.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;</span>
+<span class="nc" id="L144">                            throw new IOException(&quot;Decode without read data.&quot;);</span>
+                        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                        if (msg != null) {</span>
+<span class="nc" id="L147">                            Channels.fireMessageReceived(ctx, msg, event.getRemoteAddress());</span>
+                        }
+                    }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                } while (message.readable());</span>
+            } finally {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (message.readable()) {</span>
+<span class="nc" id="L153">                    message.discardReadBytes();</span>
+<span class="nc" id="L154">                    buffer = message;</span>
+                } else {
+<span class="nc" id="L156">                    buffer = org.apache.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;</span>
+                }
+<span class="nc" id="L158">                NettyChannel.removeChannelIfDisconnected(ctx.getChannel());</span>
+            }
+<span class="nc" id="L160">        }</span>
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
+<span class="nc" id="L164">            ctx.sendUpstream(e);</span>
+<span class="nc" id="L165">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>
